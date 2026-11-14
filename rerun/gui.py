@@ -275,6 +275,23 @@ class App(tk.Tk):
             tiles.columnconfigure(i, weight=1, uniform="tile")
             self.tiles[key] = t
 
+        ios.section_header(left, "Crests", pady=(px(16), px(6)))
+        ctiles = tk.Frame(left, bg=C["bg"])
+        ctiles.pack(fill="x")
+        self.crest_tiles: dict[str, StatTile] = {}
+        for i, (key, cap) in enumerate([("4+", "4+ crests"),
+                                        ("burst", "Crest Burst"),
+                                        ("lv4", "Lv4 (not 4+)"),
+                                        ("since", "Runs since last 4+"),
+                                        ("rate", "4+ observed rate")]):
+            t = StatTile(ctiles, cap)
+            t.grid(row=0, column=i, sticky="ew", padx=(0 if i == 0 else px(8), 0))
+            ctiles.columnconfigure(i, weight=1, uniform="ctile")
+            self.crest_tiles[key] = t
+        self.crest_note = self._label(left, "", anchor="w", justify="left")
+        self.crest_note.pack(fill="x", pady=(px(4), 0))
+        self._crest_cache_key = None
+
         ios.section_header(left, "Instructions", pady=(px(16), px(6)))
         _, self.instr = ios.text_box(left)
         self.instr.tag_configure("warn", foreground=C["orange"], font=F["footnote_semi"])
@@ -340,6 +357,36 @@ class App(tk.Tk):
         for key, tile in self.tiles.items():
             v = t.get(key, 0)
             tile.set(fmt_duration(v) if key == "seconds" else f"{v:,}")
+        self._refresh_crests(name)
+
+    def _refresh_crests(self, name: str | None):
+        """Crest 4+ / Burst / Lv4 tiles from the crest ledger (recomputed only when it changes)."""
+        led = getattr(self.m, "crests", None)
+        if led is None or not hasattr(self, "crest_tiles"):
+            return
+        key = (name, len(led.records), int(time.time() // 600))
+        if key == self._crest_cache_key:
+            return
+        self._crest_cache_key = key
+        s = led.summary(name)
+        for cls in ("4+", "burst", "lv4"):
+            self.crest_tiles[cls].set(" · ".join(
+                f"{s[w]['drops'][cls]:,}" for w in ("today", "session", "all")))
+        self.crest_tiles["since"].set(f"{s['since_4+']:,}")
+        n = s["all"]["drops"]["4+"]
+        self.crest_tiles["rate"].set(f"1/{s['avg_runs_4+']:,.0f}" if n else "–")
+        last = s["last_notable"]
+        parts = [f"{s['rate_4+'][0].upper()}{s['rate_4+'][1:]} (4+)", f"{s['rate_burst']} (Burst)"]
+        parts.append("Last 4+/Burst: " + (time.strftime("%d %b %H:%M", time.localtime(last["t"]))
+                                          + f" ({last['rarity']})" if last else "none yet"))
+        note = ("Counts: today · this session · all-time.  " + "  ·  ".join(parts)
+                + "\nObserved results only, not a prediction.")
+        if s["baseline_runs"]:
+            note += f" {s['baseline_runs']:,} earlier runs have no dates."
+        if s["uncertain"]:
+            note += f" {s['uncertain']} uncertain."
+        if self.crest_note.cget("text") != note:
+            self.crest_note.configure(text=note)
 
     def reset_stats(self):
         name = self.selected()

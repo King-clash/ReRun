@@ -147,7 +147,38 @@ CREST HANDLING
         self.keep_from = KEEP_CHOICES.get(self.cfg["keep"], "4+")
         self.crest_handled_at = 0.0
         self.session_kept = 0
+        self.crest_session = f"{self.ctx.instance}-{int(time.time())}"
+        self.palace = None  # set when 24/7 mode opens a palace tile
         self.log(f"Keeping crests: {self.cfg['keep']}")
+
+    # ------------------------------------------------------------ crest ledger
+    def count_run(self) -> None:
+        super().count_run()
+        ledger = getattr(self.ctx, "crests", None)
+        if ledger is not None:
+            try:
+                ledger.add_run(self.ctx.instance, self.session_tag(), self.ID)
+            except Exception as e:  # noqa: BLE001 - statistics must never stop farming
+                self.log(f"Could not record the run in crest statistics: {e}")
+
+    def session_tag(self) -> str:
+        if not getattr(self, "crest_session", None):
+            self.crest_session = f"{self.ctx.instance}-{int(time.time())}"
+        return self.crest_session
+
+    def ledger_drop(self, rarity: str, action: str, confidence: str = "verified",
+                    title: str | None = None) -> None:
+        """Every crest seen goes to the append-only ledger (4+ / Burst / Lv4
+        counted separately); notable ones keep a full screenshot."""
+        ledger = getattr(self.ctx, "crests", None)
+        if ledger is None:
+            return
+        try:
+            ledger.add_drop(self.ctx.instance, self.session_tag(), rarity, action, self.ID,
+                            image=self.screen_img, palace=getattr(self, "palace", None),
+                            confidence=confidence, title=title)
+        except Exception as e:  # noqa: BLE001 - statistics must never stop farming
+            self.log(f"Could not record crest statistics: {e}")
 
     # ------------------------------------------------------------ detection
     def detect_state(self, screen: np.ndarray) -> str:
@@ -242,6 +273,7 @@ CREST HANDLING
         self.save_debug(screen, "burst")
         self.record("crest", "Crest Burst (5+) - kept, script stopped", screen, rarity="5+",
                     action="kept")
+        self.ledger_drop("burst", "kept")
         self.notify(f"Crest Burst (5+) found on {self.ctx.instance}! Script stopped - check your emulator.")
         raise Finished("crest burst")
 
@@ -272,6 +304,7 @@ CREST HANDLING
         rarity, scores = self.identify_crest(screen, box)
         self.log(f"Crest icon scores: {scores}")
         row = self.row_image(screen, box)
+        text, confidence = None, "verified"
         if self.cfg.get("verify_text", True) and self.ocr is not None:
             said, text = self.read_crest_text(screen, box)
             self.log(f"Crest title reads: '{text}' -> {said or 'no level found'}")
@@ -283,6 +316,7 @@ CREST HANDLING
                 self.count("mismatch")
                 self.record("crest", f"Icon says {rarity}, title says {said} ('{text}') - "
                             "left on screen", row, rarity="?", action="stopped")
+                self.ledger_drop("?", "stopped", "uncertain", title=text)
                 self.notify(f"Crest: the icon looks like {rarity} but the title reads '{text}' "
                             f"({said}). Left it on screen and stopped so nothing is scrapped by mistake.")
                 raise Finished("crest icon/title disagree")
@@ -291,9 +325,10 @@ CREST HANDLING
             if self.cfg.get("stop_on_unknown", True):
                 self.record("crest", f"Unidentified crest - left on screen (scores {scores})", row,
                             rarity="?", action="stopped")
+                self.ledger_drop("?", "stopped", "uncertain", title=text)
                 self.notify(f"Crest: found a crest I couldn't identify (scores {scores}). Left it on screen and stopped.")
                 raise Finished("unknown crest")
-            rarity = "lv3"
+            rarity, confidence = "lv3", "assumed"
         self.count(f"crest_{rarity}")
         self.progress()
 
@@ -303,11 +338,13 @@ CREST HANDLING
             self.log(f"{rarity} CREST - keeping it and stopping")
             self.record("crest", f"{rarity} crest - kept, script stopped", row, rarity=rarity,
                         action="kept")
+            self.ledger_drop(rarity, "kept", confidence, title=text)
             self.notify(f"{rarity} crest found on {self.ctx.instance}! Left on the Equip Crest screen for you.")
             raise Finished(f"{rarity} crest")
 
         self.record("crest", f"{rarity} crest - scrapped into fragments", row, rarity=rarity,
                     action="scrapped")
+        self.ledger_drop(rarity, "scrapped", confidence, title=text)
         self.log(f"Crest identified as {rarity} - scrapping")
         # Tick the equipped crests so only the new one is converted.
         for (cx, cy) in self.find_blue_boxes(screen, box[1]):
@@ -370,6 +407,7 @@ CREST HANDLING
         for name in (f"crest_palace_{day}", "crest_palace_target"):
             if self.tap_template(name, screen, settle=3):
                 self.log(f"Opened palace ({name})")
+                self.palace = name
                 return
         self.notify("Crest: on the Crest Palace screen but no palace tile template matched today. Stopped.")
         raise Finished("palace not found")

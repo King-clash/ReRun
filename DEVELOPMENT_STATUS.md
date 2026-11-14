@@ -9,13 +9,17 @@
 - Git: `C:\Program Files\Git\cmd\git.exe` (prepend to PATH in a fresh shell)
 
 ## Current phase
-Milestone A · Phase 1 — Crest 4+ and Burst tracking (IN PROGRESS)
+Milestone A · Phase 2 — Always re-select Past Party (next)
 
 ## Completed
 - Phase 0 (2026-11-14): recovery, git baseline f4df578, backups, docs, baseline 54/54.
+- Phase 1 (2026-11-14, BETA): crest ledger (rerun/crest_stats.py), reconstruction, dashboard
+  tiles, /crests. 65/65 tests. Not yet live-verified with the rebuilt exe.
 
 ## Active task
-Phase 1: crest ledger + stats + reconstruction from History + dashboard tiles + /crests.
+Phase 2: rename the party setting to "Always re-select Past Party" (default on for Crest), with a
+migration from `party: Last Party/Current Party`; verify Include AI is ticked before Apply; re-apply
+on Start, relaunch, relogin, new quest entry and Resume, never on Redeploy.
 
 ## Outstanding (Milestone A)
 Phase 2 Past Party · 3 Units · 4 Compendium · 5 Compendium Farm · 6 Discord.
@@ -30,11 +34,12 @@ Phase 2 Past Party · 3 Units · 4 Compendium · 5 Compendium Farm · 6 Discord.
 - Phase 5 navigation templates (`templates/training`, `templates/exploring`) do not exist yet.
 
 ## Last successful tests
-2026-11-14 baseline 54/54 (see TESTING.md).
+2026-11-14 65/65 (see TESTING.md).
 
 ## Last commit
-f4df578 Baseline
+See `git log` (Phase 1 commit follows e795766).
 
 ## Next actions
-1. Finish Phase 1, run all suites, commit.
-2. Phase 2 Past Party verification flow.
+1. Phase 2 Past Party verification flow (see Active task).
+2. Ask the user about rebuilding/installing the exe (Rerun.exe is running; never close it unasked).
+3. Phase 3 needs real Units-list / Compendium screenshots — ask the user to open those screens.

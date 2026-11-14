@@ -14,6 +14,8 @@ debug_crest/
 crash.log
 *.log
 compendium_report.csv
+crest_log.jsonl
+crest_shots/
 data/
 backups/
 screenshots/

@@ -41,4 +41,10 @@ Crest Lv3, mailbox, errors). Also `debug_crest/` holds 3 real Equip Crest captur
 
 ## Regression runs
 
-(append after each milestone)
+| Date | Change | Result |
+|---|---|---|
+| 2026-11-14 | Phase 1 crest ledger | 65/65 (54 original + 11 new test_crest_stats); no new failures |
+
+Phase 1 also checked by rendering the dashboard against a temp copy of the user's backed-up live
+History (52 crest entries + 30 pre-ledger runs rebuilt). That is a screenshot of real data, not a live
+farming test: the live Crest hooks will be verified the next time the rebuilt exe farms.

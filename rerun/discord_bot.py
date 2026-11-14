@@ -11,6 +11,7 @@ Slash commands (only users in discord.allowed_user_ids may use control commands)
   /resetstats instance|all     zero an instance's counters
   /history [instance] [count]  recent crests, refills and problems
   /summary                     the last 24 hours (also posted daily)
+  /crests  [instance]          4+ / Burst / Lv4 today, session, all-time, observed rates
   /scripts                     list scripts
 """
 from __future__ import annotations
@@ -217,6 +218,25 @@ class DiscordBot:
         async def summary(inter: discord.Interaction):
             text = await asyncio.to_thread(m.daily_summary, False)
             await inter.response.send_message(text[:1900])
+
+        @tree.command(description="Crest 4+ / Burst / Lv4 drops: today, session, all-time, rates")
+        @app_commands.autocomplete(instance=instance_ac)
+        async def crests(inter: discord.Interaction, instance: str | None = None):
+            from .crest_stats import format_summary
+            name = None if not instance or instance == "all" else instance
+            led = getattr(m, "crests", None)
+            if led is None:
+                return await inter.response.send_message("Crest tracking is not available")
+            s = await asyncio.to_thread(led.summary, name)
+            embed = discord.Embed(title=f"Crests - {name or 'all instances'}",
+                                  description=format_summary(s, "Crest drops")[:4000],
+                                  color=0xF1C40F)
+            shot = led.shot_path(s["last_notable"])
+            if shot:
+                embed.set_image(url=f"attachment://{shot.name}")
+                await inter.response.send_message(embed=embed, file=discord.File(str(shot), shot.name))
+            else:
+                await inter.response.send_message(embed=embed)
 
         @tree.command(description="List available scripts")
         async def scripts(inter: discord.Interaction):

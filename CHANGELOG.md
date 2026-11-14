@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-11-14 — Phase 1: Crest 4+ and Burst tracking (BETA)
+- New `rerun/crest_stats.py`: append-only crest ledger `crest_log.jsonl` (runs, drops, pre-ledger
+  run baseline), never compacted, tolerant of a torn last line. Rarity classes lv3 / lv3+ / lv4 /
+  4+ / burst / ?; Lv4 is never counted as 4+. Records carry session, source (live/history),
+  confidence (verified/assumed/uncertain), palace (24/7 tile), OCR title.
+- Notable drops (4+, Burst, Lv4) keep a full screenshot in `crest_shots/`.
+- Stats: today (game day, resets 06:00 UTC-6) / session / all-time, observed rate
+  ("1 drop per N runs"), average runs per drop, runs since last 4+/Burst, last drop, palace and
+  weekday breakdowns.
+- Reconstruction from History + stats.json on startup; keyed, so it is repeatable and never double-counts.
+- Crest script (and Multiplayer Farm / Queue, which inherit it) writes runs and every crest outcome.
+- Dashboard: new "Crests" tiles (4+, Burst, Lv4 as today · session · all, runs since last 4+,
+  observed rate) with a plain-language note.
+- Discord: `/crests [instance]` (gold embed, last 4+/Burst screenshot attached).
+- Files: rerun/crest_stats.py (new), rerun/engine.py (Context.crests), rerun/manager.py,
+  rerun/scripts/crest.py, rerun/gui.py, rerun/discord_bot.py, tests/test_crest_stats.py (new),
+  .gitignore. No changes to existing data formats; no migration needed.
+
 ## 2026-11-14 — Phase 0: recovery and baseline
 - Recovered the project from the previous session's scratch folder to `C:\Users\dandr\Documents\Rerun`
   (457 files, byte totals verified identical).

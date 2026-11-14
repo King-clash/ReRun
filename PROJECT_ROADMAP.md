@@ -18,7 +18,7 @@ Status keys: COMPLETE (implemented + tests + live verified) · BETA (implemented
 | Phase | Feature | Priority | Status | Notes |
 |---|---|---|---|---|
 | 0 | Recovery, Git, baseline, backups, docs | P0 | COMPLETE | commit f4df578; backup in backups/ |
-| 1 | Crest 4+ / Burst tracking, stats, reconstruction, /crests | P0 | IN PROGRESS | crest ledger separate from compacting History |
+| 1 | Crest 4+ / Burst tracking, stats, reconstruction, /crests | P0 | BETA | ledger + tiles + /crests done; needs a live run with the rebuilt exe. Not yet: daily-summary crest line, History-tab crest analytics page (Phase 12) |
 | 2 | Always re-select Past Party (verified ticks, Resume, relaunch, relogin) | P0 | PLANNED | extends loop_farm.py party flow |
 | 3 | Unit Roster (OCR), /units | P1 | PLANNED | needs real Units-list/Compendium captures |
 | 4 | Compendium Counter UI, scans history, /compendium | P1 | PLANNED | builds on compendium_counter.py (Beta) |

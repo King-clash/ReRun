@@ -89,6 +89,7 @@ class Context:
     last_screen: np.ndarray | None = None  # newest frame (the dashboard's live view reuses it)
     history: Any = None                    # History store for crests/drops (optional)
     data_dir: Any = None                   # where debug frames are saved (defaults to cwd)
+    crests: Any = None                     # CrestLedger (append-only crest/run log), optional
 
 
 class Runner:
