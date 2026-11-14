@@ -11,6 +11,7 @@ Package: `jp.goodsmile.grandsummonersglobal_android`.
 
 ```
 main.py                 entry point (python main.py / Rerun.exe); writes crash.log on failure
+tools/publish.py        release: tests -> bump version -> build -> zip -> tag [--push -> gh release]
 build.py                one-file PyInstaller build -> dist/Rerun/Rerun.exe (+ templates, routines, README, config.example.yaml; never config.yaml)
 config.yaml             user config (instances, per-script settings, Discord token) — NOT in git
 config.example.yaml     tokenless copy of the default config
@@ -35,6 +36,8 @@ rerun/
   unit_screens.py       Units-grid card finder + unit-page reader (OCR, element, quest clears)
   units.py              UnitRoster: units/roster.json, scans.jsonl, aliases.json
   crest_stats.py        CrestLedger / CrestStats (crest_log.jsonl)
+  updates.py            update check: latest GitHub release of `update_repo` vs __version__ (read-only)
+  errlog.py             rate-limited error.log for errors that must not stop a script
   setup_check.py        Settings > Setup check
   restart_import.py     imports templates from a local ReStart install
   tray.py, appicon.py   tray icon (pystray), generated app icon

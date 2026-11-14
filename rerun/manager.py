@@ -50,6 +50,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "schedules": {},
     "summary": {"enabled": True, "time": "21:00"},  # daily Discord summary
     "setup_seen": False,
+    "update_repo": "",          # GitHub "owner/name" (public) to check for new releases; empty = off
 }
 
 LOG_KEEP = 3000

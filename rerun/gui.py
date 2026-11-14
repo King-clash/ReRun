@@ -15,7 +15,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageTk
 
-from . import ios
+from . import errlog, ios
 from .adb import discover_bluestacks_instances
 from .appicon import make_icon
 from .ios import C, F, px
@@ -197,10 +197,31 @@ class App(tk.Tk):
         self.after(10, lambda: ios.style_window(self))
         self.after(150, self._poll_events)
         self.after(1000, self._tick)
+        self.after(4000, self._check_updates)
         self._start_hotkeys()
         if self.m.config["discord"].get("enabled"):
             self.after(500, self.connect_discord)
         self.protocol("WM_DELETE_WINDOW", self.on_close)
+
+    def _check_updates(self):
+        """Once at startup, in a thread; silent unless a newer release exists (or the setting is bad)."""
+        repo = str(self.m.config.get("update_repo") or "").strip()
+        if not repo:
+            return
+
+        def work():
+            from . import updates
+            try:
+                found = updates.check(repo)
+            except ValueError as e:
+                self.m.log("app", str(e), level="warn")
+                return
+            except Exception as e:  # noqa: BLE001 - offline / rate-limited: just skip this time
+                errlog.note("gui.check_updates", e)
+                return
+            if found:
+                self.events.put({"type": "_update", **found})
+        threading.Thread(target=work, daemon=True).start()
 
     # small helpers --------------------------------------------------------
     def _page(self, title: str, tab: str, icon: str, scroll: bool = False):
@@ -1562,6 +1583,9 @@ class App(tk.Tk):
                     ios.alert(self, ev["message"], ev.get("title", "Rerun"))
                 elif t == "_setup":
                     self._show_setup_results(ev["checks"])
+                elif t == "_update":
+                    self.m.log("app", f"Rerun {ev['version']} is available: {ev['url']}")
+                    self.flash(f"Rerun {ev['version']} is available - see the Log for the link", "info")
                 elif t == "_hotkey":
                     ev["fn"]()
                 elif t == "_tray":

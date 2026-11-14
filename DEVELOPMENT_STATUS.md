@@ -2,7 +2,8 @@
 
 **Read this first, then PROJECT_ROADMAP.md, ARCHITECTURE.md, TESTING.md.**
 
-- Source: `C:\Users\dandr\Documents\Rerun` (git, branch main, local only — never push)
+- Source: `C:\Users\dandr\Documents\Rerun` (git, branch main; local only until a GitHub repo exists — then push/release ONLY via
+  `py tools/publish.py X.Y.Z --push`, and only when the user asks)
 - Installed app: `C:\Users\dandr\Downloads\Rerun\Rerun` (Rerun.exe; holds the user's LIVE config,
   stats, history — never overwrite them; ask before closing Rerun)
 - Python: `%LOCALAPPDATA%\Programs\Python\Python312\python.exe` (not on PATH)
