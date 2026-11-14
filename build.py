@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import struct
 import subprocess
@@ -26,6 +27,7 @@ ROOT = Path(__file__).resolve().parent
 DIST = ROOT / "dist" / "Rerun"
 RELEASE = ROOT / "release"
 SEP = ";" if sys.platform == "win32" else ":"
+INFO: dict = {}   # facts about this build for the build log (tools/buildlog.py, BUILDS.md)
 
 
 def build_exe(dist: Path) -> bool:
@@ -70,6 +72,8 @@ def copy_content(dist: Path) -> None:
     baseline = {rel: sha256_file(p) for rel, p in content_files(ROOT).items()}
     (dist / BASELINE_FILE).write_text(json.dumps({"files": baseline}, indent=1), encoding="utf-8")
     shutil.copy2(ROOT / "README.md", dist / "README.md")
+    INFO["templates"] = sum(r.startswith("templates/") for r in baseline)
+    INFO["routines"] = sum(r.startswith("routines/") and not r.endswith(".md") for r in baseline)
 
 
 # ------------------------------------------------------------------ Tesseract bundle
@@ -142,6 +146,7 @@ def bundle_tesseract(out: Path) -> str:
     try:
         exe, data = find_tesseract(os.environ.get("RERUN_TESSERACT"))
     except OcrUnavailable:
+        INFO["ocr"] = "not bundled"
         return "no Tesseract on this PC to bundle (text reading will need its own install)"
     if exe.parent.resolve() == (out / "tesseract").resolve():
         raise SystemExit("Refusing to bundle Tesseract from the release folder itself")
@@ -160,6 +165,8 @@ def bundle_tesseract(out: Path) -> str:
         NOTICE.format(version=first.replace("tesseract ", ""),
                       files=", ".join(f.name for f in files) + ", tessdata/eng.traineddata"),
         encoding="utf-8")
+    m = re.search(r"(\d+\.\d+\.\d+)", first)
+    INFO["ocr"] = f"Tesseract {m.group(1)}" if m else "bundled"
     return f"{first} from {exe.parent} ({len(files)} files)"
 
 
@@ -236,7 +243,9 @@ def release() -> int:
     (out / "config.yaml").write_text(clean_config(), encoding="utf-8")
     ocr = bundle_tesseract(out)
     problems = check_release(out)
+    INFO["leak_check"] = "passed" if not problems else f"FAILED ({len(problems)})"
     if problems:
+        INFO["error"] = "not safe to share: " + "; ".join(problems[:3])
         print("\nNOT SAFE TO SHARE - release/Rerun has personal data:\n  " + "\n  ".join(problems))
         return 1
     zpath = RELEASE / f"Rerun-{__version__}.zip"
@@ -246,6 +255,7 @@ def release() -> int:
             if p.is_file():
                 z.write(p, Path("Rerun") / p.relative_to(out))
     size = zpath.stat().st_size / 1e6
+    INFO["zip_mb"] = round(size, 1)
     print(f"\nRelease ready: {zpath} ({size:.0f} MB)\n  OCR: {ocr}\n  Checked: no token, "
           "no stats/History/units/crest log/key, blank config. GS Companion data left out.")
     return 0
@@ -263,6 +273,7 @@ def main() -> int:
     # GS Companion's data is local only (git-ignored, never inside the exe): when you have
     # it, it is copied next to the exe for the Companion tab and unit names.
     gsc = ROOT / "data" / "gscompanion"
+    INFO["gsc_data"] = (gsc / "units.json").exists()
     if (gsc / "units.json").exists():
         shutil.copytree(gsc, dist / "data" / "gscompanion", dirs_exist_ok=True,
                         ignore=shutil.ignore_patterns("raw", "companion_settings.json"))
@@ -273,4 +284,12 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    sys.path.insert(0, str(ROOT))
+    from tools.buildlog import logged
+    if "--release" in sys.argv:
+        _kind, _out = "release", RELEASE / "Rerun"
+    elif "--out" in sys.argv:
+        _kind, _out = "build --out", Path(sys.argv[sys.argv.index("--out") + 1]).resolve()
+    else:
+        _kind, _out = "build", DIST
+    raise SystemExit(logged("Rerun", _out / "Rerun.exe", main, kind=_kind, info=INFO))

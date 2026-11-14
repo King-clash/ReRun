@@ -99,6 +99,10 @@ it finds — two different adb versions kill each other's server.
 `python build.py` (needs `pip install pyinstaller`) makes `dist\Rerun\Rerun.exe` and copies your
 templates, routines, README and config next to it. The .exe keeps its own stats and history.
 
+Every build of Rerun, GS Companion and the Keygen (finished or failed) is listed in
+[BUILDS.md](BUILDS.md): when, version, git commit, how long it took, exe size and fingerprint,
+templates, OCR, zip size and the release leak check. `py tools/buildlog.py` rewrites it.
+
 **Sharing Rerun with other people:** use `python build.py --release`, never your own `dist\Rerun`
 (it holds your Discord token, stats, History, units and key). The release build makes
 `release\Rerun-<version>.zip` with the exe, templates, routines, README, a blank config and
