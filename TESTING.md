@@ -53,6 +53,7 @@ Crest Lv3, mailbox, errors). Also `debug_crest/` holds 3 real Equip Crest captur
 | 2026-11-14 | Phase 2 Past Party | 81/81 (12 new test_past_party; test_app made deterministic) |
 | 2026-11-14 | Phase 4 Compendium | 107/107 (8 new test_compendium) + test_gsc_data 6/6 |
 | 2026-11-14 | Units+Compendium merge, Companion tab, GS Companion names | 118/118 (5 new test_reference_names) + gsc_app/test_page.py 16/16 |
+| 2026-11-14 | Live View 30 fps (video stream) | 121/121 (3 new test_live_stream) + gsc_app 16/16; live: 30 fps drawn in 3 runs |
 
 **Live (installed exe, 2026-11-14 14:33–14:34):** Crest started from the party screen with Past
 Party on; the first run completed at 14:34:09 with no party fallback or failure in History.

@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-11-14 — Live View at 30 fps
+- Measured: an ADB screenshot takes ~180 ms on BlueStacks (5.6 fps at most), so the Live View
+  (1 s tick; a screenshot every 3 s when idle) could never reach 30 fps that way.
+- New `rerun/live_stream.py` LiveStream: the emulator's own `screenrecord --output-format=h264`
+  relayed over a local socket to OpenCV's bundled FFmpeg (no new dependency), newest frame
+  kept. 800 px tall, 4 Mbit/s. Restarts after screenrecord's 3-minute limit; gives up after 3
+  sessions without video and the Live View falls back to screenshots (retries after 60 s).
+- Dashboard: frames drawn at `live_view_fps` (config, default 30; 0 = old behaviour) only while
+  the Dashboard is shown, Auto is on and the window isn't minimised; the image is updated in
+  place; a label shows the rate ("30 fps"). Stopped when leaving the Dashboard and on quit.
+  Idle energy is still read from a full screenshot, at most once a minute.
+- Measured live (source app, real emulator): 30.0-30.4 fps drawn in 3 runs, 60-120 frames/s
+  decoded; leaving and returning to the Dashboard restarts cleanly; the packaged exe streams.
+  While it runs, a script's screenshot takes ~10-20% longer (encoder load on the emulator).
+- Tests: tests/test_live_stream.py (3, a real 1 s clip played by a fake adb); GUI tests set
+  live_view_fps 0 so they never record a real emulator. 121/121 + gsc_app 16/16.
+
 ## 2026-11-14 — Unit pictures in the Units tab
 - Each row shows the unit's thumbnail from GS Companion's saved pictures
   (data/gscompanion/images/unit_thumbnail_<id>.png), matched by name (units carry GS Companion's

@@ -50,6 +50,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "schedules": {},
     "summary": {"enabled": True, "time": "21:00"},  # daily Discord summary
     "setup_seen": False,
+    # Live View: frames per second of the emulator's video stream (rerun/live_stream.py);
+    # 0 = the old screenshot preview (one frame every few seconds when idle)
+    "live_view_fps": 30,
 }
 
 LOG_KEEP = 3000

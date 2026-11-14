@@ -566,6 +566,7 @@ def test_rerun_hookup_on_a_copy():
             m = Manager(r'%s')
             # GS Companion's name took priority over the game's title
             assert 'Clyde' in m.units.units and 'Troll' in m.units.units, list(m.units.units)
+            m.config['live_view_fps'] = 0   # no video stream from a real emulator in tests
             app = App(m)
             errors = []
             app.report_callback_exception = lambda *a: errors.append(a)

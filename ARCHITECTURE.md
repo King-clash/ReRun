@@ -88,6 +88,14 @@ listeners (`_poll_events`). There is no typed event bus yet (planned: Milestone 
 (`live` / `history` reconstruction) and `confidence`. `CrestStats` computes today / session /
 all-time counts, rates, runs-since and breakdowns from it. Lv4 is never counted as 4+.
 
+## Live View
+
+`rerun/live_stream.py` LiveStream streams `adb exec-out screenrecord --output-format=h264 -`
+through a local TCP socket into `cv2.VideoCapture(..., CAP_FFMPEG)` on its own thread; the GUI
+(`_manage_stream`, `_live_loop`) draws the newest frame at `live_view_fps` while the Dashboard
+is visible, and falls back to screenshots when the stream fails. Scripts never use it: they
+keep taking full-size `screencap` frames for recognition.
+
 ## OCR
 
 Tesseract 5.5 from `%LOCALAPPDATA%\ReStart\bin` (eng only; tessdata lacks configs, so TSV via

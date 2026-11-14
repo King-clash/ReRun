@@ -35,6 +35,7 @@ HISTORY_KINDS = {"All": None, "Crests": {"crest"}, "Energy": {"energy"},
                  "Problems": {"failure"}, "Other": {"finished", "drop", "arena", "raid", "mines",
                                                    "grand_crusade", "yuna", "queue"}}
 IDLE_PREVIEW_EVERY_S = 3.0
+STREAM_RETRY_S = 60     # after the Live View video failed, try it again this much later
 
 
 def to_photo(img: np.ndarray, max_w: int, max_h: int) -> tuple[ImageTk.PhotoImage, float]:
@@ -329,6 +330,8 @@ class App(tk.Tk):
         self.live_auto = tk.BooleanVar(value=bool(self.m.config.get("live_view_auto", True)))
         ios.Switch(h, self.live_auto, command=self._save_live_auto).pack(side="right", padx=(0, px(14)))
         self._label(h, "Auto").pack(side="right", padx=(0, px(6)))
+        self.live_rate = self._label(h, "")   # "30 fps" while the video stream runs
+        self.live_rate.pack(side="right", padx=(0, px(12)))
         pc = ios.Card(right, pad=6, stretch=True, color=C["viewer"])
         pc.pack(fill="both", expand=True)
         self.preview = tk.Canvas(pc.body, bg=C["viewer"], highlightthickness=0, bd=0)
@@ -339,6 +342,11 @@ class App(tk.Tk):
         self._preview_src = None   # last frame object drawn (skip redraws of the same frame)
         self._preview_busy = False
         self._preview_last_idle = 0.0
+        self._stream = None          # LiveStream (rerun/live_stream.py) while it runs
+        self._stream_serial = None
+        self._stream_seq = -1
+        self._stream_failed: dict[str, float] = {}  # serial -> when video failed (retry later)
+        self._live_loop_on = False
         self._idle_energy: dict[str, tuple[int, int, float]] = {}
 
     def selected(self) -> str | None:
@@ -621,6 +629,15 @@ class App(tk.Tk):
                 self._preview_busy = False
         threading.Thread(target=work, daemon=True).start()
 
+    def _energy_shot(self, name: str) -> None:
+        """A full-size screenshot just for the idle energy reading (worker thread)."""
+        def work():
+            try:
+                self._read_idle_energy(name, self.m.screenshot(name))
+            except Exception:  # noqa: BLE001 - energy is optional
+                pass
+        threading.Thread(target=work, daemon=True).start()
+
     def _read_idle_energy(self, name: str, img: np.ndarray) -> None:
         """Energy for an idle instance, from its preview frame (worker thread;
         at most once a minute per instance)."""
@@ -644,13 +661,91 @@ class App(tk.Tk):
         self.m.config["live_view_auto"] = bool(self.live_auto.get())
         self.m.save_config()
 
+    # Smooth live view: a video stream of the emulator (rerun/live_stream.py) shown at
+    # live_view_fps (default 30) while the Dashboard is on screen; 0 turns it off.
+    def _live_fps(self) -> int:
+        try:
+            return max(0, min(60, int(self.m.config.get("live_view_fps", 30))))
+        except (TypeError, ValueError):
+            return 30
+
+    def _stop_stream(self):
+        if self._stream is not None:
+            self._stream.stop()
+        self._stream, self._stream_serial = None, None
+        if self.live_rate.cget("text"):
+            self.live_rate.configure(text="")
+
+    def _manage_stream(self, name: str | None) -> bool:
+        """Start / stop the video stream for the shown instance. True while it runs."""
+        want = (name is not None and self._live_fps() > 0 and self.live_auto.get()
+                and self.nb.index() == 0 and self.state() not in ("withdrawn", "iconic"))
+        serial = self.m.instances[name].serial if want else None
+        failed_at = self._stream_failed.get(serial) if serial else None
+        if not want or (failed_at and time.monotonic() - failed_at < STREAM_RETRY_S):
+            self._stop_stream()
+            return False
+        s = self._stream
+        if s is not None and s.failed:
+            self.m.log(name, f"Live View: video stream unavailable ({s.error}) - using screenshots, "
+                             f"retrying in {STREAM_RETRY_S // 60} min")
+            self._stream_failed[serial] = time.monotonic()
+            self._stop_stream()
+            return False
+        if s is None or self._stream_serial != serial or not s.alive:
+            self._stop_stream()
+            from .live_stream import LiveStream
+            img = self._preview_img
+            portrait = img is None or img.shape[0] >= img.shape[1]
+            try:
+                self._stream = LiveStream(self.m.adb_path(), serial, portrait=portrait).start()
+            except Exception as e:  # noqa: BLE001 - fall back to screenshots
+                self.m.log(name, f"Live View: video stream could not start ({e}) - using screenshots")
+                self._stream_failed[serial] = time.monotonic()
+                return False
+            self._stream_serial, self._stream_seq = serial, -1
+        if not self._live_loop_on:
+            self._live_loop_on = True
+            self.after(10, self._live_loop)
+        return True
+
+    def _live_loop(self):
+        """Draws the newest stream frame up to live_view_fps times a second."""
+        s = self._stream
+        if s is None:
+            self._live_loop_on = False
+            return
+        started = time.perf_counter()
+        if s.seq != self._stream_seq and s.frame is not None:
+            self._stream_seq = s.seq
+            self._preview_img = s.frame
+            self._draw_preview()
+        fps = self._live_fps() or 30
+        rate = f"{min(fps, round(s.fps())):d} fps" if s.seq > 0 else "starting…"
+        if self.live_rate.cget("text") != rate:
+            self.live_rate.configure(text=rate)
+        # next frame one period after this one started (drawing time included)
+        spent = (time.perf_counter() - started) * 1000
+        self.after(max(1, int(1000 / fps - spent)), self._live_loop)
+
     def _auto_preview(self):
-        """While a script runs, show the frames it already captures (no extra
-        ADB work); when idle, take a screenshot every few seconds - and only
-        while the Dashboard is actually on screen."""
+        """Live View. With the video stream (default): smooth frames at live_view_fps.
+        Otherwise, while a script runs, show the frames it already captures (no extra
+        ADB work); when idle, take a screenshot every few seconds - and only while the
+        Dashboard is actually on screen."""
+        name = self.selected() if self.live_auto.get() else None
+        if self._manage_stream(name):
+            inst = self.m.instances[name]
+            # idle energy still comes from a full screenshot (at most once a minute)
+            last = self._idle_energy.get(name)
+            if inst.status in ("idle", "error") and inst.ctx is None and \
+                    (not last or time.time() - last[2] >= 60) and \
+                    time.monotonic() - self._preview_last_idle >= 60:
+                self._preview_last_idle = time.monotonic()
+                self._energy_shot(name)
+            return
         if not self.live_auto.get() or self.nb.index() != 0 or self.state() == "withdrawn":
             return
-        name = self.selected()
         if not name:
             return
         inst = self.m.instances[name]
@@ -667,15 +762,28 @@ class App(tk.Tk):
 
     def _draw_preview(self):
         c = self.preview
-        c.delete("all")
         W, H = c.winfo_width(), c.winfo_height()
         if self._preview_img is None:
+            c.delete("all")
+            self._preview_item = None
             c.create_text(W // 2, H // 2, justify="center", fill=C["gray"], font=F["footnote"],
                           text="No screenshot yet\nTurn on Auto or press Screenshot")
             return
-        self._preview_src = self._preview_img
-        self._preview_photo, _ = to_photo(self._preview_img, max(50, W), max(50, H))
-        c.create_image(W // 2, H // 2, image=self._preview_photo, anchor="center")
+        self._preview_src = img = self._preview_img
+        h, w = img.shape[:2]
+        scale = min(max(50, W) / w, max(50, H) / h, 1.0)
+        size = (max(1, int(w * scale)), max(1, int(h * scale)))
+        small = img if scale == 1.0 else cv2.resize(img, size, interpolation=cv2.INTER_AREA)
+        pil = Image.fromarray(cv2.cvtColor(small, cv2.COLOR_BGR2RGB))
+        photo = self._preview_photo
+        item = getattr(self, "_preview_item", None)
+        if item is not None and photo is not None and (photo.width(), photo.height()) == size \
+                and c.coords(item) == [float(W // 2), float(H // 2)]:
+            photo.paste(pil)   # same size and place: update in place (30 fps friendly)
+            return
+        c.delete("all")
+        self._preview_photo = ImageTk.PhotoImage(pil)
+        self._preview_item = c.create_image(W // 2, H // 2, image=self._preview_photo, anchor="center")
 
     # ================================================================ settings
     def _build_settings(self):
@@ -1892,6 +2000,8 @@ class App(tk.Tk):
         keep the process alive after the window is gone)."""
         if not self._closing:
             self._closing = True
+            if getattr(self, "_stream", None) is not None:
+                self._stream.stop()   # ends the emulator's screenrecord
             self.m.stats.flush()
             tray = getattr(self, "tray", None)
             if tray is not None:
