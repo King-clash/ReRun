@@ -1,17 +1,21 @@
-"""GS Companion page: the Crest Palace by day and by week, every crest, every unit's
-recommended crests, a farm planner and a crest comparison, in Rerun's iOS look.
+"""GS Companion page: today's farming, the Crest Palace by day and by week with each
+stage's guide, every crest, every unit (kit and recommended crests), a team checker, a
+farm planner and a crest comparison, in Rerun's iOS look.
 
 It is a plain tk.Frame, so it works in its own window (python -m gsc_app / the exe) and
 can be dropped into Rerun's tab bar later (see INTEGRATION.md).
 
-Reads:  data/gscompanion/*.json (rerun.gsc_data.GSCData), data/gscompanion/images/
-        (gsc_app/fetch_images.py), and Rerun's unit scan <rerun>/units/roster.json.
-Writes: only its own settings file (window, view, filters, text size, starred units,
-        farm plan, compared crests). Nothing is downloaded; "Open on GSCompanion"
-        opens the site in your browser.
+Reads:  data/gscompanion/*.json (rerun.gsc_data.GSCData + stage_guides / unit_details),
+        data/gscompanion/images/, and Rerun's unit scan <rerun>/units/roster.json.
+Writes: its own settings file (window, view, filters, text size, starred units, crests
+        units have, team, farm plan, compared crests). Only "Update data" downloads, when
+        you press it (gsc_app/update_data.py); "Open on GSCompanion" opens your browser.
 """
 from __future__ import annotations
 
+import json
+import shutil
+import threading
 import time
 import tkinter as tk
 import webbrowser
@@ -27,9 +31,11 @@ from rerun.ios import C, F, px
 
 from .guides import Guides
 from .store import MyUnits, Settings
+from .team import TEAM_SIZE, TeamCheck, hazard_hits, hazards
 
 SITE = "https://gscompanion.com"
-VIEWS = ["Palace", "Week", "Crests", "Units", "Planner", "Compare"]
+VIEWS = ["Today", "Palace", "Week", "Crests", "Units", "Team", "Planner", "Compare"]
+FIND = "Find"  # search results across stages, crests and units (not a tab)
 DIFFS = ["NOVA", "EXTREME", "PRO"]
 DIFF_COLOR = {"NOVA": "red", "EXTREME": "orange", "PRO": "blue"}
 LEVELS = ["Lv1", "Lv1+", "Lv2", "Lv2+", "Lv3", "Lv3+", "Lv4", "Lv4+", "Lv5", "Lv5+"]
@@ -46,8 +52,13 @@ MIN_LIST_W, MIN_DETAIL_W = 380, 300
 
 # (key, heading, width) - widths are starting proportions; text columns stretch.
 COLUMNS = {
+    "Today": [("name", "Stage / crest", 250), ("difficulty", "Difficulty", 90),
+              ("ready", "Ready", 80), ("units", "For your units", 260)],
     "Palace": [("name", "Stage", 220), ("difficulty", "Difficulty", 90), ("boss", "Boss", 120),
-               ("days", "Open", 120), ("mine", "For you", 80), ("team", "Your picks", 84)],
+               ("days", "Open", 110), ("mine", "For you", 76), ("ready", "Ready", 76)],
+    "Team": [("team", "Team", 52), ("name", "Unit", 200), ("element", "Element", 76),
+             ("fit", "Fits this stage as", 280)],
+    FIND: [("name", "Name", 250), ("what", "Type", 80), ("info", "Details", 320)],
     "Crests": [("name", "Crest", 220), ("kind", "Kind", 80), ("where", "Where it drops", 230),
                ("mine", "For you", 80)],
     "Units": [("mine", "★", 38), ("name", "Unit", 200), ("element", "Element", 76),
@@ -56,10 +67,14 @@ COLUMNS = {
 }
 # Columns that take the spare width, per view (the rest keep their size).
 STRETCH = {"Palace": {"name", "boss"}, "Crests": {"name", "where"}, "Units": {"picks"},
-           "Planner": {"stage", "units"}}
+           "Planner": {"stage", "units"}, "Today": {"name", "units"}, "Team": {"fit"},
+           FIND: {"name", "info"}}
 BOARD_VIEWS = ("Week", "Compare")  # drawn as a grid, not a table
-CENTER = {"difficulty", "element", "tag", "kind", "mine", "team"}
-HINTS = {"Palace": "stage", "Week": "stage", "Crests": "crest", "Units": "unit"}
+CENTER = {"difficulty", "element", "tag", "kind", "mine", "team", "ready", "what"}
+HINTS = {"Palace": "stage", "Week": "stage", "Crests": "crest", "Units": "unit",
+         "Today": "stage or crest", FIND: "result"}
+NBSP = " "  # keeps a unit's name on one line in the detail panel
+DAY_CHECK_MS = 60_000
 
 
 def short_days(days: list[str]) -> str:
@@ -151,19 +166,23 @@ class GSCompanionPage(tk.Frame):
     rerun_dir:     Rerun folder whose units/roster.json lists your scanned units (default root)."""
 
     def __init__(self, parent, root: str | Path, flash=None, open_url=webbrowser.open,
-                 settings_path: Path | None = None, rerun_dir: Path | None = None):
+                 settings_path: Path | None = None, rerun_dir: Path | None = None,
+                 data_out: Path | None = None):
         super().__init__(parent, bg=C["bg"])
-        self.gsc = GSCData(root)
-        self.pics = Pictures(self.gsc.dir / "images")
-        self.guides = Guides(self.gsc.dir)
+        self._load_data(Path(root))
+        # "Update data" writes here (the exe: a data folder next to it).
+        self.data_out = Path(data_out) if data_out else self.gsc.dir
+        self._updater = None
         self._show_foes = False  # stage guide: list every enemy under each wave
+        self._show_kit = True    # unit panel: the kit section
         self.s = Settings(settings_path or self.gsc.dir / "companion_settings.json")
         self.my = MyUnits(self.s, self.gsc, Path(rerun_dir or root))
+        self._game_day = today_name()
         self._flash_cb = flash
         self._open_url = open_url
         self._rows: dict[str, dict] = {}
-        self._sort: dict[str, tuple[str, bool]] = {v: ("", False) for v in VIEWS}
-        self._sel: dict[str, tuple[str, dict] | None] = {v: None for v in VIEWS}
+        self._sort: dict[str, tuple[str, bool]] = {v: ("", False) for v in VIEWS + [FIND]}
+        self._sel: dict[str, tuple[str, dict] | None] = {v: None for v in VIEWS + [FIND]}
         self._shown: tuple[str, dict] | None = None   # what the detail panel shows
         self._history: list[tuple[str, str, dict]] = []
         self._links = 0
@@ -172,11 +191,16 @@ class GSCompanionPage(tk.Frame):
         self._week_w = 0
         self._sash_ratio = self.s["sash"] if isinstance(self.s["sash"], float) else 0.6
 
-        view = self.s["view"] if self.s["view"] in VIEWS else "Palace"
+        view = self.s["view"] if self.s["view"] in VIEWS else "Today"
         self.view = tk.StringVar(value=view)
-        self.q = {v: tk.StringVar() for v in ("Crests", "Units")}
+        self._before_find = view
+        self.q = {v: tk.StringVar() for v in ("Crests", "Units", "Team")}
         for v in self.q.values():
             v.trace_add("write", lambda *a: self.refresh())
+        self.find_q = tk.StringVar()
+        self.find_q.trace_add("write", lambda *a: self._find_changed())
+        self.team_filter = tk.StringVar(value=self.s["team_filter"])
+        self.team_stage = tk.StringVar()
         self.day = tk.StringVar(value=self._today_label())
         self.diff = tk.StringVar(value=self.s["diff"])
         self.kind = tk.StringVar(value=self.s["kind"])
@@ -189,18 +213,49 @@ class GSCompanionPage(tk.Frame):
         self._apply_size()
         self._bind_keys()
         self._switch()
+        self._last_day_seen = self.s["last_day"]
+        self.s["last_day"] = self._game_day
+        self.s.save()
+        self.after(DAY_CHECK_MS, self._check_day)
+
+    def _load_data(self, root: Path):
+        """(Re)load everything read from data/gscompanion/ under root."""
+        self.root_dir = root
+        self.gsc = GSCData(root)
+        self.pics = Pictures(self.gsc.dir / "images")
+        self.guides = Guides(self.gsc.dir)
+        try:
+            doc = json.loads((self.gsc.dir / "unit_details.json").read_text(encoding="utf-8"))
+            self.details = doc.get("units", {}) if isinstance(doc, dict) else {}
+        except (OSError, ValueError):
+            self.details = {}
+        self.teams = TeamCheck(self.gsc, self.guides, self.details)
+        if hasattr(self, "my"):
+            self.my.gsc = self.gsc
+            self.my._scan_key = None
 
     # ================================================================== layout
     def _build(self):
         hdr = ios.page_header(self, "GS Companion")
-        ios.Button(hdr, "Open on GSCompanion", self.open_current, kind="tinted",
+        ios.Button(hdr, "Open on site", self.open_current, kind="tinted",
                    icon="link").pack(side="right")
         ios.Segmented(hdr, list(SIZES), self.size, command=self._size_changed).pack(
             side="right", padx=(px(8), px(18)))
         tk.Label(hdr, text="Text size", bg=C["bg"], fg=C["secondary"],
                  font=F["footnote"]).pack(side="right")
         self.back_btn = ios.Button(hdr, "‹ Back", self.back, kind="plain", small=True)
-        self.back_btn.pack(side="right", padx=(0, px(22)))
+        self.back_btn.pack(side="right", padx=(0, px(18)))
+        self.update_btn = ios.Button(hdr, "Update data", self.update_data, kind="plain",
+                                     small=True)
+        self.update_btn.pack(side="right", padx=(0, px(14)))
+        find = ios.Field(hdr, self.find_q, width=20)
+        find.pack(side="right", padx=(px(6), px(18)))
+        tk.Label(hdr, text=ios.icon_text("search") or "Search", bg=C["bg"], fg=C["secondary"],
+                 font=F["icon"] if ios.ICON_FONT else F["footnote"]).pack(side="right",
+                                                                          padx=(px(24), 0))
+        self.find_entry = find.entry
+        self.find_entry.bind("<Escape>", lambda e: self._close_find())
+        self.find_entry.bind("<Return>", lambda e: self._find_changed(force=True))
 
         bar = tk.Frame(self, bg=C["bg"])
         bar.pack(fill="x", padx=px(20), pady=(0, px(8)))
@@ -218,9 +273,7 @@ class GSCompanionPage(tk.Frame):
 
         self.footer = tk.Label(self, bg=C["bg"], fg=C["secondary"], font=F["caption"], anchor="w")
         self.footer.pack(side="bottom", fill="x", padx=px(24), pady=(0, px(8)))
-        built = self.gsc._load("crests.json").get("built", "?") if self.gsc.available else "?"
-        self.footer.configure(text=f"Fan-site data from gscompanion.com, built {built}. What the game "
-                                   "shows always wins.   Ctrl+F search · Alt+← back · Ctrl+1–6 views")
+        self._set_footer()
 
         st = ttk.Style(self)
         st.configure("GSC.TPanedwindow", background=C["bg"])
@@ -272,6 +325,23 @@ class GSCompanionPage(tk.Frame):
         for t in ("link", "action"):
             d.tag_bind(t, "<Enter>", lambda e: d.configure(cursor="hand2"))
             d.tag_bind(t, "<Leave>", lambda e: d.configure(cursor="arrow"))
+
+    def data_age_days(self) -> int | None:
+        built = self.gsc._load("crests.json").get("built") if self.gsc.available else None
+        try:
+            return (time.time() - time.mktime(time.strptime(built, "%Y-%m-%d"))) // 86400
+        except (TypeError, ValueError):
+            return None
+
+    def _set_footer(self, text: str | None = None):
+        if text is None:
+            built = self.gsc._load("crests.json").get("built", "?") if self.gsc.available else "?"
+            age = self.data_age_days()
+            old = f"  ·  {int(age)} days old: press Update data" if age and age > 30 else ""
+            text = (f"Fan-site data from gscompanion.com, built {built}{old}. What the game shows "
+                    f"always wins.   Ctrl+F search · Alt+← back · Ctrl+1–{len(VIEWS)} views")
+            self.footer.configure(fg=C["orange"] if old else C["secondary"])
+        self.footer.configure(text=text)
 
     def _apply_size(self):
         """Text size: list rows, pictures and the detail panel (controls keep Rerun's size)."""
@@ -352,14 +422,90 @@ class GSCompanionPage(tk.Frame):
             top.bind(f"<Control-Key-{i}>", when_shown(lambda e, v=v: self.show_view(v)), add="+")
 
     def _focus_search(self):
-        if getattr(self, "_search_entry", None) and self._search_entry.winfo_exists():
-            self._search_entry.focus_set()
-            self._search_entry.select_range(0, "end")
+        """Ctrl+F: the search-everything box (header)."""
+        self.find_entry.focus_set()
+        self.find_entry.select_range(0, "end")
 
     def _clear_search(self):
         v = self.view.get()
+        if v == FIND:
+            return self._close_find()
         if v in self.q and self.q[v].get():
             self.q[v].set("")
+
+    # --- search everything --------------------------------------------------------
+    def _find_changed(self, force: bool = False):
+        q = self.find_q.get().strip()
+        if not q:
+            if self.view.get() == FIND:
+                self._close_find()
+            return
+        if len(q) < 2 and not force:
+            return
+        if self.view.get() != FIND:
+            self._before_find = self.view.get()
+            self.view.set(FIND)
+            self.seg._draw()
+            self._switch()
+        else:
+            self.refresh()
+
+    def _close_find(self):
+        if self.find_q.get():
+            self.find_q.set("")
+        if self.view.get() == FIND:
+            self.view.set(self._before_find if self._before_find in VIEWS else "Today")
+            self.seg._draw()
+            self._switch()
+
+    def _find_rows(self) -> list[dict]:
+        q = self.find_q.get().strip().lower()
+        my = self.my.all()
+        stages, crests, units = [], [], []
+        for s in sorted(self.gsc.stages, key=diff_order):
+            g = self.guides.for_stage(s) or {}
+            hay = " ".join([s["name"], s["boss"], s["difficulty"], " ".join(s.get("hazards", [])),
+                            " ".join(s.get("crests", [])), g.get("summary", "")]).lower()
+            if q in hay:
+                stages.append({"rec": s, "kind": "stage", "values": {
+                    "name": s["name"], "what": s["difficulty"],
+                    "info": f"{s['boss']}  ·  {short_days(s['days'])}"}})
+        for c in self.gsc.crests:
+            hay = " ".join([c["name"], c.get("event") or "", c.get("effect") or "",
+                            " ".join((c.get("levels") or {}).values())]).lower()
+            if q in hay:
+                crests.append({"rec": c, "kind": "crest", "values": {
+                    "name": c["name"], "what": c["kind"].title(), "info": self._crest_where(c)}})
+        for u in self.gsc.units:
+            d = self.details.get(u["name"], {})
+            names = " ".join([u["name"]] + d.get("aka", [])).lower()
+            kit = self.teams_kit(u["name"])
+            if q in names or q in kit:
+                why = "" if q in names else "kit: " + self._kit_snippet(kit, q)
+                units.append({"rec": u, "kind": "unit", "values": {
+                    "name": ("★ " if u["name"] in my else "") + u["name"],
+                    "what": u["element"], "info": why or ", ".join(
+                        self.gsc.recommendations.get(u["name"], [])) or "–"}})
+        total = len(stages) + len(crests) + len(units)
+        self.summary.configure(text=f"{total} result{'s' if total != 1 else ''} for “{q}”  ·  "
+                                    "Esc closes")
+        rows = []
+        for title, items in (("Stages", stages), ("Crests", crests), ("Units", units)):
+            if items:
+                rows.append({"rec": None, "kind": "group", "tags": ("day",),
+                             "values": {"name": f"{title} ({len(items)})"},
+                             "children": items[:200]})
+        return rows
+
+    def teams_kit(self, name: str) -> str:
+        from .team import _kit_text
+        return _kit_text(self.details.get(name))
+
+    @staticmethod
+    def _kit_snippet(text: str, q: str, width: int = 60) -> str:
+        i = text.find(q)
+        a = max(0, i - width // 3)
+        return ("…" if a else "") + text[a:a + width].strip() + "…"
 
     # ================================================================== helpers
     def flash(self, text: str, kind: str = "info"):
@@ -386,10 +532,32 @@ class GSCompanionPage(tk.Frame):
         self.refresh()
 
     def _mine_for_stage(self, s: dict, my: set[str]) -> set[str]:
+        """Your units that still need a crest dropping at stage s."""
         out = set()
         for name in s.get("crests", []):
-            out |= set(self.gsc.units_wanting(name)) & my
+            out |= set(self.my.needing(name, set(self.gsc.units_wanting(name)) & my))
         return out
+
+    def _ready_text(self, s: dict, my: set[str]) -> tuple[str, float]:
+        """'3/5' roles your units can fill (+ ' ★' when you own a whole example team)."""
+        r = self.teams.readiness(s, my)
+        if not r["guide"] or not r["roles"]:
+            return "", -1.0
+        n = len(r["filled"])
+        score = n / r["roles"] + (1 if r["full_teams"] else 0)
+        return f"{n}/{r['roles']}" + (" ★" if r["full_teams"] else ""), score
+
+    def _stage_label(self, s: dict) -> str:
+        return f"{s['name']} ({s['difficulty']})"
+
+    def team_stage_rec(self) -> dict | None:
+        slug = self.s["team_stage"]
+        st = next((s for s in self.gsc.stages if s["slug"] == slug), None)
+        if st is None:
+            today = self.gsc.palace_on(today_name())
+            st = sorted(today, key=diff_order)[0] if today else (
+                self.gsc.stages[0] if self.gsc.stages else None)
+        return st
 
     # ================================================================== views
     def show_view(self, view: str):
@@ -399,8 +567,11 @@ class GSCompanionPage(tk.Frame):
 
     def _switch(self, keep_detail: bool = False):
         view = self.view.get()
-        self.s["view"] = view
-        self.s.save()
+        if view != FIND:
+            self.s["view"] = view
+            self.s.save()
+            if self.find_q.get():
+                self.find_q.set("")
         for w in self.filters.winfo_children():
             w.destroy()
         self._search_entry = None
@@ -442,7 +613,29 @@ class GSCompanionPage(tk.Frame):
             fld.pack(side="left", padx=(0, px(16)))
             self._search_entry = fld.entry
 
-        if view == "Palace":
+        if view == "Today":
+            n = len(self.my.all())
+            self._note(f"Stages open on {today_name()} (game day, resets 06:00 UTC−6), best "
+                       f"for you first  ·  {n} unit{'s' if n != 1 else ''} of yours"
+                       if n else "Star your units in Units to see what to farm for them")
+        elif view == "Team":
+            labels = [self._stage_label(s) for s in sorted(self.gsc.stages, key=diff_order)]
+            st = self.team_stage_rec()
+            self.team_stage.set(self._stage_label(st) if st else (labels[0] if labels else ""))
+            ios.Select(f, values=labels, variable=self.team_stage, accent=True,
+                       command=self._team_stage_changed).pack(side="left", padx=(0, px(16)))
+            search()
+            ios.Select(f, values=["My units", "All units"], variable=self.team_filter,
+                       accent=True, command=self._team_filter_changed).pack(side="left")
+            ios.Button(f, "Suggest a team", self.team_suggest, kind="gray",
+                       small=True).pack(side="left", padx=(px(16), 0))
+            ios.Button(f, "Clear", self.team_clear, kind="plain", color="red",
+                       small=True).pack(side="left", padx=(px(10), 0))
+            self._note(f"Click ＋ to add a unit (up to {TEAM_SIZE})")
+        elif view == FIND:
+            self._note("Searches stage names, bosses and guides, crest effects, unit names, "
+                       "nicknames and kits")
+        elif view == "Palace":
             if self.day.get().startswith("Today"):
                 self.day.set(self._today_label())
             select([self._today_label()] + DAYS, self.day)
@@ -481,7 +674,7 @@ class GSCompanionPage(tk.Frame):
         cols = COLUMNS[view]
         self._cols = cols
         self.tree.configure(columns=[c[0] for c in cols], displaycolumns=[c[0] for c in cols])
-        sortable = view != "Planner"
+        sortable = view not in ("Planner", "Today", FIND)
         for key, head, w in cols:
             self.tree.heading(key, text=head,
                               command=(lambda k=key: self._sort_by(k)) if sortable else "")
@@ -490,7 +683,7 @@ class GSCompanionPage(tk.Frame):
                              anchor="center" if key in CENTER else "w")
         pw = 0
         if self.pics.available:
-            pw = px(104 * self.k) if view == "Palace" else px(48 * self.k)
+            pw = px(104 * self.k) if view in ("Palace", "Today") else px(48 * self.k)
         self.tree.heading("#0", text="")
         self.tree.column("#0", width=pw, minwidth=pw, stretch=False, anchor="center")
         self._pic_w = pw
@@ -523,7 +716,7 @@ class GSCompanionPage(tk.Frame):
     def _sort_by(self, key: str):
         view = self.view.get()
         cur, desc = self._sort[view]
-        self._sort[view] = (key, not desc if cur == key else key == "mine")
+        self._sort[view] = (key, not desc if cur == key else key in ("mine", "ready", "team"))
         self.refresh()
 
     def refresh(self):
@@ -539,10 +732,14 @@ class GSCompanionPage(tk.Frame):
             self._empty("No GS Companion data\nBuild it with:  py tools/gscompanion_build.py")
             return
         rows = {"Palace": self._palace_rows, "Crests": self._crest_rows, "Units": self._unit_rows,
-                "Planner": self._planner_rows}[view]()
+                "Planner": self._planner_rows, "Today": self._today_rows,
+                "Team": self._team_rows, FIND: self._find_rows}[view]()
         key, desc = self._sort[view]
         if key:
-            rows.sort(key=lambda r: str(r["values"][key]).lower(), reverse=desc)
+            def sort_key(r):
+                v = r.get("sortkeys", {}).get(key)
+                return (0, v, "") if v is not None else (1, 0, str(r["values"][key]).lower())
+            rows.sort(key=sort_key, reverse=desc)
         self.tree.delete(*self.tree.get_children())
         self._rows = {}
         names = [c[0] for c in self._cols]
@@ -564,7 +761,10 @@ class GSCompanionPage(tk.Frame):
             self.empty.place_forget()
         else:
             self._empty({"Planner": "No units in the plan yet\nOpen a unit and choose “Add to "
-                                    "farm planner”, or use “Add my units”."}
+                                    "farm planner”, or use “Add my units”.",
+                         "Team": "No units to show\nStar your units in Units, or switch the "
+                                 "list to “All units”.",
+                         FIND: "Nothing found\nTry a shorter or different word."}
                         .get(view, "Nothing matches\nTry another search or filter."))
         sel = self._sel.get(view)
         if sel:
@@ -603,14 +803,77 @@ class GSCompanionPage(tk.Frame):
         rows = []
         for s in stages:
             n = len(self._mine_for_stage(s, my)) if my else 0
-            g = self.guides.for_stage(s)
-            t = len(set(Guides.recommended(g)) & my) if g and my else 0
+            ready, score = self._ready_text(s, my) if my else ("", -1.0)
             rows.append({"rec": s, "kind": "stage",
                          "tags": ("open",) if today in s["days"] else (),
+                         "sortkeys": {"ready": score, "mine": n},
                          "values": {"name": s["name"], "difficulty": s["difficulty"],
                                     "boss": s["boss"], "days": short_days(s["days"]),
-                                    "mine": f"★ {n}" if n else "",
-                                    "team": f"✓ {t}" if t else ""}})
+                                    "mine": f"★ {n}" if n else "", "ready": ready}})
+        return rows
+
+    def _today_rows(self) -> list[dict]:
+        """Stages open today, best for your units first, each with the crests your units
+        still need from it."""
+        today = today_name()
+        my = self.my.all()
+        stages = self.gsc.palace_on(today)
+        rows, crest_n = [], 0
+        for s in stages:
+            ready, score = self._ready_text(s, my) if my else ("", -1.0)
+            kids = []
+            for cname in s.get("crests", []):
+                who = sorted(self.my.needing(cname, set(self.gsc.units_wanting(cname)) & my))
+                if who:
+                    c = self.gsc.crest(cname)
+                    kids.append({"rec": c, "kind": "crest", "values": {
+                        "name": cname, "units": ", ".join(who)}})
+            crest_n += len(kids)
+            rows.append({"rec": s, "kind": "stage", "tags": ("open",), "children": kids,
+                         "score": (score, len(kids), -diff_order(s)[0]),
+                         "values": {"name": s["name"], "difficulty": s["difficulty"],
+                                    "ready": ready,
+                                    "units": f"{len(kids)} crest{'s' if len(kids) != 1 else ''}"
+                                             " to farm" if kids else
+                                             ("nothing your units need" if my else "")}})
+        rows.sort(key=lambda r: r["score"], reverse=True)
+        self.summary.configure(text=f"{today}: {len(stages)} stages open  ·  {crest_n} crest "
+                                    f"drop{'s' if crest_n != 1 else ''} your units need")
+        return rows
+
+    def _team_rows(self) -> list[dict]:
+        st = self.team_stage_rec()
+        g = self.guides.for_stage(st) if st else None
+        roles: dict[str, list[str]] = {}
+        for r in (g or {}).get("roles", []):
+            for u in r.get("picks", []):
+                roles.setdefault(u["name"], []).append(r["role"])
+            for u in r.get("also", []):
+                roles.setdefault(u["name"], []).append(r["role"] + " (also)")
+        bad = hazards(st, g) if st else []
+        q = self.q["Team"].get().strip().lower()
+        mine = self.team_filter.get() == "My units"
+        my = self.my.all()
+        team = list(self.s["team"])
+        units = [u for u in self.gsc.units
+                 if (not mine or u["name"] in my or u["name"] in team)
+                 and (not q or q in u["name"].lower())]
+        rows = []
+        for u in units:
+            fit = ", ".join(roles.get(u["name"], []))
+            warn = next((w for h in bad
+                         if (w := hazard_hits(h, u, self.details.get(u["name"])))), None)
+            text = fit + (("   ⚠ " + warn) if warn else "")
+            rows.append({"rec": u, "kind": "unit",
+                         "tags": () if fit else ("quiet",),
+                         "sortkeys": {"team": 1 if u["name"] in team else 0},
+                         "order": (u["name"] not in team, not fit, bool(warn), u["name"]),
+                         "values": {"team": "✓" if u["name"] in team else "＋",
+                                    "name": ("★ " if u["name"] in my else "") + u["name"],
+                                    "element": u["element"], "fit": text or "–"}})
+        rows.sort(key=lambda r: r["order"])
+        self.summary.configure(text=f"Team {len(team)}/{TEAM_SIZE}  ·  "
+                                    f"{self._stage_label(st) if st else 'no stage'}")
         return rows
 
     def _crest_where(self, c: dict) -> str:
@@ -901,15 +1164,21 @@ class GSCompanionPage(tk.Frame):
 
     # ================================================================== selection
     def _tree_click(self, e):
-        """Units view: a click in the ★ column stars / unstars that unit."""
-        if self.view.get() != "Units" or self.tree.identify_region(e.x, e.y) != "cell":
+        """Units view: a click in the ★ column stars / unstars that unit.
+        Team view: a click in the Team column adds / removes that unit."""
+        view = self.view.get()
+        if view not in ("Units", "Team") or self.tree.identify_region(e.x, e.y) != "cell":
             return
         if self.tree.identify_column(e.x) != "#1":
             return
         iid = self.tree.identify_row(e.y)
         r = self._rows.get(iid)
         if r:
-            self.toggle_star(r["rec"])
+            if view == "Units":
+                self.toggle_star(r["rec"])
+            else:
+                self.toggle_team(r["rec"]["name"])
+            return "break"
 
     def _on_select(self):
         sel = self.tree.selection()
@@ -917,9 +1186,12 @@ class GSCompanionPage(tk.Frame):
         view = self.view.get()
         if r and r.get("kind") == "group":  # a day row in the planner: back to the summary
             self._sel[view] = None
-            return self._show_plan_panel()
+            return self._show_placeholder(view)
         if not r or not r.get("rec"):
             return
+        if view == "Team":  # the panel stays on the team check; the row is just a pick
+            self._sel[view] = None
+            return self._show_team_panel()
         self._sel[view] = (r["kind"], r["rec"])
         self._show(r["kind"], r["rec"])
 
@@ -934,6 +1206,10 @@ class GSCompanionPage(tk.Frame):
             return self._show_plan_panel()
         if view == "Compare":
             return self._show_compare_panel()
+        if view == "Team":
+            return self._show_team_panel()
+        if view == "Today":
+            return self._show_today_panel()
         self._begin()
         self._put(f"\nSelect a {HINTS.get(view, 'row')} to see its details.\n\n", "dim")
         self._put("Blue names are links to other stages, crests and units; ‹ Back (Alt+←) "
@@ -997,9 +1273,9 @@ class GSCompanionPage(tk.Frame):
         u = self.gsc.match_unit(name)
         mine = name in self.my.all()
         if u:
-            self._link(("★ " if mine else "") + u["name"], "Units", u)
+            self._link((("★ " if mine else "") + u["name"]).replace(" ", NBSP), "Units", u)
         else:
-            self._put(name)
+            self._put(name.replace(" ", NBSP))
 
     def _stage_text(self, s: dict, today: str):
         self._link(s["name"], "Palace", s)
@@ -1243,7 +1519,14 @@ class GSCompanionPage(tk.Frame):
             self._action("✓ In farm planner – remove", lambda: self.toggle_plan(u))
         else:
             self._action("＋ Add to farm planner", lambda: self.toggle_plan(u))
+        self._put("      ")
+        self._action("⚔ Add to team", lambda: (self.toggle_team(name)
+                                               if name not in self.s["team"] else None,
+                                               self.show_view("Team")))
         self._put("\n")
+        d = self.details.get(name) or {}
+        if d.get("aka"):
+            self._put("Also known as: " + ", ".join(d["aka"]) + "\n", "dim")
         stages = {s["slug"]: s for s in self.gsc.stages if s.get("slug")}
         rec_in = [(stages[slug], role) for slug, role in self.guides.stages_for_unit(name)
                   if slug in stages]
@@ -1257,12 +1540,20 @@ class GSCompanionPage(tk.Frame):
         self._put("RECOMMENDED CRESTS (BEST FIRST)\n", "h")
         if not picks:
             self._put("No crest recommendation for this unit.\n", "dim")
+        for note in self.gsc._load("crest_recommendations.json").get("notes", {}).get(name, []):
+            self._put(note + "\n", "dim")
         farm_today = []
         for i, cname in enumerate(picks, 1):
+            have = self.my.has(name, cname)
             self._put(f"{i}.  ")
             self._crest_icon(cname)
             self._crest_link(cname)
+            self._put("    ")
+            self._action("✓ has it" if have else "☐ has it",
+                         lambda c=cname: self.toggle_have(u, c))
             self._put("\n")
+            if have:
+                continue
             c = self.gsc.crest(cname)
             stages = self.gsc.stages_dropping(cname)
             if stages:
@@ -1287,8 +1578,11 @@ class GSCompanionPage(tk.Frame):
                     self._link(s["name"], "Palace", s)
                     self._put(f" {s['difficulty']}", s["difficulty"])
                     self._put("\n")
+            elif all(self.my.has(name, c) for c in picks):
+                self._put("It has every recommended crest.\n", "good")
             else:
-                self._put(f"None of these crests drop on {today}.\n", "dim")
+                self._put(f"None of the crests it still needs drop on {today}.\n", "dim")
+        self._kit_section(name)
         self._end()
 
     def _show_plan_panel(self):
@@ -1325,6 +1619,199 @@ class GSCompanionPage(tk.Frame):
                 self._action("remove", lambda n=name: self.toggle_plan({"name": n}))
                 self._put("\n")
         self._end()
+
+    def _show_today_panel(self):
+        self._shown = None
+        today = today_name()
+        my = self.my.all()
+        self._begin()
+        self._put(f"Today: {today}\n", "title")
+        self._put("Game day (resets 06:00 UTC−6). Pick a stage or crest for its details.\n",
+                  "sub")
+        if not my:
+            self._put("\nStar the units you own in Units (★ column), or point “Rerun folder…” "
+                      "at your Rerun to use its unit scan. Today then shows what to farm for "
+                      "them and how ready you are for each stage.\n", "dim")
+        best = None
+        rows = self._today_rows()
+        for r in rows:
+            s = r["rec"]
+            self._put("\n")
+            self._link(s["name"], "Palace", s, "semi")
+            self._put(f"  {s['difficulty']}", s["difficulty"])
+            if r["values"]["ready"]:
+                self._put(f"   ready {r['values']['ready']}", "good")
+            self._put("\n")
+            for kid in r.get("children", []):
+                self._put("•  ")
+                self._crest_icon(kid["values"]["name"])
+                self._crest_link(kid["values"]["name"])
+                self._put(f"   for {kid['values']['units']}\n", "dim")
+            if not r.get("children") and my:
+                self._put("Nothing your units still need.\n", "dim")
+            if best is None and r.get("children"):
+                best = s
+        if best is not None:
+            self._put("\n")
+            self._action(f"Check a team for {best['name']} ›",
+                         lambda s=best: self.open_team_for(s))
+            self._put("\n")
+        if self.s["have"]:
+            n = sum(len(v) for v in self.s["have"].values())
+            self._put(f"\n{n} crest{'s' if n != 1 else ''} marked as already had are left out. "
+                      "Change that on a unit's page.\n", "dim")
+        self._end()
+
+    def _show_team_panel(self):
+        self._shown = None
+        st = self.team_stage_rec()
+        team = [n for n in self.s["team"] if self.gsc.match_unit(n)]
+        my = self.my.all()
+        self._begin()
+        if st is None:
+            self._put("No Crest Palace data.\n", "dim")
+            return self._end()
+        self._put("Team check\n", "title")
+        self._link(st["name"], "Palace", st)
+        self._put(f"  {st['difficulty']}", st["difficulty"])
+        self._put(f"   ·   {short_days(st['days'])}\n", "dim")
+        res = self.teams.check(team, st, my)
+        g = res["guide"]
+        self._put(f"TEAM ({len(team)}/{TEAM_SIZE})\n", "h")
+        for i in range(TEAM_SIZE):
+            self._put(f"{i + 1}.  ", "dim")
+            if i < len(team):
+                self._face(team[i])
+                self._put("   ")
+                self._action("remove", lambda n=team[i]: self.toggle_team(n))
+            else:
+                self._put("empty – click ＋ next to a unit in the list", "dim")
+            self._put("\n")
+        if team:
+            self._action("Clear team", self.team_clear)
+            self._put("      ")
+        self._action("Suggest a team from my units", self.team_suggest)
+        self._put("\n")
+        if not g:
+            self._put("\nNo guide for this stage, so there is nothing to check against.\n", "dim")
+            return self._end()
+        self._put("ROLES THE GUIDE ASKS FOR\n", "h")
+        for r in res["roles"]:
+            if r["covered"]:
+                self._put("✓  ", "good")
+                self._put(r["role"], "semi")
+                self._put("   ")
+                for j, n in enumerate(r["covered"]):
+                    if j:
+                        self._put(", ")
+                    self._unit_link(n)
+                self._put("\n")
+            else:
+                self._put("✗  ", "bad")
+                self._put(r["role"], "semi")
+                if r["yours"]:
+                    self._put("   yours: ", "dim")
+                    for j, n in enumerate(r["yours"][:6]):
+                        if j:
+                            self._put(", ")
+                        self._unit_link(n)
+                        self._put(" ")
+                        self._action("＋", lambda n=n: self.toggle_team(n))
+                else:
+                    self._put("   none of yours – top picks: ", "dim")
+                    self._units_inline(r["picks"][:4])
+                self._put("\n")
+        self._put("HAZARD WARNINGS\n", "h")
+        if res["warnings"]:
+            for name, why in res["warnings"]:
+                self._put("⚠  ", "bad")
+                self._unit_link(name)
+                self._put(f": {why}\n")
+        elif team:
+            self._put("None found for this team.\n", "dim")
+        else:
+            self._put("Add units to check them against: " +
+                      ", ".join(hazards(st, g)) + "\n", "dim")
+        if res["no_details"] and self.details:
+            self._put(f"No kit details for {', '.join(res['no_details'])}: only element "
+                      "checks were made for them.\n", "dim")
+        elif not self.details:
+            self._put("Unit kits aren't downloaded (Update data), so only element hazards "
+                      "are checked.\n", "dim")
+        if res["teams"]:
+            self._put(f"EXAMPLE TEAMS ({len(res['teams'])})\n", "h")
+            for t in res["teams"]:
+                self._put(f"{t['n']}.  ", "semi")
+                self._units_inline(t["units"])
+                own = len(t["owned"])
+                self._put(f"   you have {own}/{len(t['units'])}",
+                          "good" if own == len(t["units"]) else "dim")
+                self._put("   ")
+                self._action("Use this team", lambda t=t: self.team_set(t["units"]))
+                self._put("\n")
+                if t["note"]:
+                    self._put(t["note"] + "\n", "dim", "indent")
+        self._put("\nA rule-of-thumb check against the stage guide; equips, levels and "
+                  "playing it out still decide the clear.\n", "dim")
+        self._end()
+
+    def _units_inline(self, names: list[str]):
+        for j, n in enumerate(names):
+            if j:
+                self._put(", ")
+            self._unit_link(n)
+
+    def _kit_section(self, name: str):
+        d = self.details.get(name)
+        if not d:
+            return
+        self._put("KIT\n", "h")
+        self._action("Hide kit" if self._show_kit else "Show kit", self._toggle_kit)
+        bits = [d.get("race", ""), d.get("details", {}).get("Attack", ""),
+                ("Released " + d["released"]) if d.get("released") else ""]
+        line = "  ·  ".join(b for b in bits if b)
+        if line:
+            self._put("    " + line, "dim")
+        self._put("\n")
+        if not self._show_kit:
+            return
+        for m in d.get("moves", []):
+            self._put(m.get("type", "") + "  ", "dim")
+            self._put(m.get("name", ""), "semi")
+            tags = "  ·  ".join(f"{k} {v}" for k, v in m.get("tags", {}).items())
+            if tags:
+                self._put("   " + tags, "dim")
+            self._put("\n" + m.get("text", "") + "\n", "indent")
+        if d.get("passives"):
+            self._put("Passives\n", "semi", "role")
+            for p in d["passives"]:
+                self._put(p["name"], "semi", "indent")
+                self._put("  " + p["text"] + "\n", "indent")
+        tw = d.get("true_weapon") or {}
+        if tw.get("name"):
+            self._put("True weapon  ", "dim", "role")
+            self._put(tw["name"], "semi", "role")
+            self._put(("   " + tw["kind"]) if tw.get("kind") else "", "dim", "role")
+            self._put("\n" + tw.get("text", "") + "\n", "indent")
+            for p in tw.get("passives", []):
+                self._put("•  " + p + "\n", "indent")
+        if d.get("slots"):
+            self._put("Equip slots  ", "dim", "role")
+            self._put("   ".join(d["slots"]) + "\n", "role")
+        tags = {k: v for k, v in d.get("tags", {}).items()
+                if k not in ("Equip Slots", "Source", "Race") and v}
+        if tags:
+            self._put("Tags\n", "semi", "role")
+            for k, v in tags.items():
+                self._put(k + ":  ", "dim", "indent")
+                self._put(", ".join(v) + "\n", "indent")
+
+    def _toggle_kit(self):
+        self._show_kit = not self._show_kit
+        y = self.detail.yview()[0]
+        if self._shown:
+            self._show(*self._shown)
+            self.detail.yview_moveto(y)
 
     def _show_compare_panel(self):
         self._shown = None

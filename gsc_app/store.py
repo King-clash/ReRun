@@ -14,6 +14,12 @@ DEFAULTS = {
     "view": "Palace", "size": "Medium", "sash": None, "geometry": None,
     "diff": "All difficulties", "kind": "All kinds", "element": "All elements",
     "unit_filter": "All units", "starred": [], "plan": [], "compare": [], "rerun_dir": None,
+    # crests a unit already has: {"Shirou Emiya": ["ATK UP"]} (Planner / Today skip them)
+    "have": {},
+    # Team checker: the team being built and the stage it is checked against
+    "team": [], "team_stage": None, "team_filter": "My units",
+    # the game day the app last saw, for the "new game day" reminder
+    "last_day": None,
 }
 
 
@@ -56,6 +62,7 @@ class MyUnits:
         self.default_dir = rerun_dir
         self._scan: set[str] = set()
         self._scan_key = None
+        self.unmatched: list[str] = []  # scan names with no GS Companion unit
 
     # --- Rerun scan ---------------------------------------------------------------
     @property
@@ -75,7 +82,7 @@ class MyUnits:
         except OSError:
             key = None
         if key != self._scan_key:
-            self._scan_key, self._scan = key, set()
+            self._scan_key, self._scan, self.unmatched = key, set(), []
             if key:
                 try:
                     roster = json.loads(p.read_text(encoding="utf-8"))
@@ -87,13 +94,38 @@ class MyUnits:
                         or self.gsc.match_unit(name)
                     if u:
                         self._scan.add(u["name"])
+                    else:
+                        self.unmatched.append(name)
         return self._scan
 
     def scan_status(self) -> str:
         p = self.roster_path
         if not p or not p.exists():
             return "No Rerun scan found"
-        return f"Rerun scan: {len(self.scanned())} units"
+        n = len(self.scanned())
+        miss = f" ({len(self.unmatched)} not matched)" if self.unmatched else ""
+        return f"Rerun scan: {n} units{miss}"
+
+    # --- crests a unit already has --------------------------------------------------
+    def has(self, unit: str, crest: str) -> bool:
+        return crest in (self.s["have"] or {}).get(unit, [])
+
+    def toggle_have(self, unit: str, crest: str) -> bool:
+        have = {k: list(v) for k, v in (self.s["have"] or {}).items()}
+        lst = have.setdefault(unit, [])
+        if crest in lst:
+            lst.remove(crest)
+        else:
+            lst.append(crest)
+        if not lst:
+            have.pop(unit)
+        self.s["have"] = have
+        self.s.save()
+        return self.has(unit, crest)
+
+    def needing(self, crest: str, units) -> list[str]:
+        """Those of `units` that still need `crest`."""
+        return [u for u in units if not self.has(u, crest)]
 
     # --- stars --------------------------------------------------------------------
     @property
