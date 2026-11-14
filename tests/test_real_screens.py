@@ -57,7 +57,7 @@ def crest_state(fixture: str) -> str:
     img = cv2.imread(str(FIX / fixture))
     ctx = Context(instance="t", device=FakeDevice([img]), vision=v, stats=Stats(), routines={},
                   base_resolution=(720, 1280), log=lambda *a: None, notify=lambda *a, **k: None)
-    s = CrestScript(ctx, {})
+    s = CrestScript(ctx, {"start_home": False})
     s.on_start()
     return s.detect_state(img)
 
@@ -85,7 +85,7 @@ def test_equip_crest_real_frame():
     img = cv2.imread(str(FIX / "equip_crest_lv3.png"))
     ctx = Context(instance="t", device=FakeDevice([img]), vision=v, stats=Stats(), routines={},
                   base_resolution=(720, 1280), log=lambda *a: None, notify=lambda *a, **k: None)
-    s = CrestScript(ctx, {})
+    s = CrestScript(ctx, {"start_home": False})
     s.on_start()
     box = s.find_orange_box(img)
     assert box and 600 < box[1] + box[3] // 2 < 850, box   # the NEW row
@@ -107,7 +107,7 @@ def test_loop_results_redeploys_instead_of_waiting():
     dev = FakeDevice([img])
     ctx = Context(instance="t", device=dev, vision=v, stats=Stats(), routines={},
                   base_resolution=(720, 1280), log=lambda *a: None, notify=lambda *a, **k: None)
-    s = CrestScript(ctx, {"runs": 0})
+    s = CrestScript(ctx, {"runs": 0, "start_home": False})
     s.on_start()
     s.sleep = lambda *a, **k: None
     s.handle_drop_info(img)
@@ -150,7 +150,7 @@ def test_unexpected_error_popup_is_dismissed_not_battle():
         dev = FakeDevice([img])
         ctx = Context(instance="t", device=dev, vision=v, stats=Stats(), routines={},
                       base_resolution=(720, 1280), log=lambda *a: None, notify=lambda *a, **k: None)
-        s = cls(ctx, {})
+        s = cls(ctx, {"start_home": False})
         s.on_start()
         s.sleep = lambda *a, **k: None
         assert s.detect_state(img) == "unexpected_error", cls.NAME
@@ -220,7 +220,7 @@ def test_potion_used_popup_is_dismissed():
         dev = FakeDevice([img])
         ctx = Context(instance="t", device=dev, vision=v, stats=Stats(), routines={},
                       base_resolution=(720, 1280), log=lambda *a: None, notify=lambda *a, **k: None)
-        s = cls(ctx, {})
+        s = cls(ctx, {"start_home": False})
         s.on_start()
         s.sleep = lambda *a, **k: None
         return s, dev

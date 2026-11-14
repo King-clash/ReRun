@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased — Crest always starts from the Home screen (BETA, simulator-tested only)
+- New Crest setting **Always start from the Home screen** (`start_home`, default on). On Start the
+  script first reaches Home: known popups are closed with their own handlers, anything else gets
+  Back (max 30 presses / 2 minutes, then it stops with a screenshot saved to debug/). Home counts
+  only when the Exploring button is lit, so a popup dimming Home is not mistaken for it.
+- Then it walks Home > Exploring > Crest Palace > palace tile > quest list > quest (the 24/7-mode
+  navigation, now also used for a normal Start), and the usual party/Auto-Loop flow takes over.
+- Safety: an Equip Crest / Crest Burst screen at Start is never left with Back (an undecided crest
+  could be lost) - it stops and asks you to decide it. Missing navigation templates stop the script
+  before it touches the game and name the missing ones. Needs a palace tile template
+  (`crest_palace_target`, or `crest_palace_<day>`); the repo ships none, so capture one first.
+- Tests: tests/test_crest_home.py (9); older Crest tests pass `start_home: False`.
+
 ## 2026-11-14 — Phase 3: Unit Roster (BETA)
 - Source decision from real captures: the Units list grid has no readable text (portrait, element
   icon, star badge, 'Lv' badge without a number). Tapping a card opens the unit's page (the same

@@ -27,6 +27,13 @@ Party dialog as tests/fixtures/past_party_dialog.png.
 - Phase 1 (2026-11-14, BETA): crest ledger (rerun/crest_stats.py), reconstruction, dashboard
   tiles, /crests. 65/65 tests. Not yet live-verified with the rebuilt exe.
 
+## Crest start-from-Home — BETA (simulator only, not live-verified)
+Crest now goes Home first on Start (setting `start_home`, default on). The user's installed
+templates have no `crest_palace_target` / `crest_palace_<day>` tile yet, so Crest will stop with a
+"missing template" message until one is captured (Templates tab) - or turn the setting off.
+Live check pending: Start from a quest page / popup, watch the log: "Getting to the Home screen
+first" > "On the Home screen" > Exploring > Crest Palace > "Opened palace" > quest.
+
 ## Active task
 None open. Phase 2 is done; Phase 3 awaits its live scan.
 

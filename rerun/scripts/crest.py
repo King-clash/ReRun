@@ -62,9 +62,13 @@ Repeats a Crest Palace quest on Auto-Loop and handles the Equip Crest screen
 after every batch.
 
 SETUP
-1. Go to the Crest Palace screen (or the quest list / party screen).
+1. Have the game open on ANY screen (not mid-way through an Equip Crest decision).
 2. In Settings choose the run count, party, and which crests to keep.
-3. Press Start.
+3. Press Start. Rerun first gets the game to the Home screen (dismissing popups and
+   pressing Back), then walks Exploring > Crest Palace > today's palace > quest.
+   Needs the templates exploring_button, crest_palace_icon, quest_list, quest_list_entry
+   and a palace tile (crest_palace_<day> or crest_palace_target) - see the Templates tab.
+   Turn off "Always start from the Home screen" to start from wherever the game is.
 
 CREST HANDLING
 - Your equipped crests (blue boxes) are ticked so they are kept.
@@ -89,6 +93,10 @@ CREST HANDLING
         Setting("verify_text", "Double-check the crest's level by reading its title", "bool", True,
                 help="Reads 'Lv3', 'Lv4+'... from the crest's name. If it disagrees with the icon, "
                      "Rerun stops instead of scrapping. Needs the text reader (comes with ReStart)."),
+        Setting("start_home", "Always start from the Home screen", "bool", True,
+                help="On Start: reach the Home screen first (closing popups, pressing Back), then "
+                     "walk Exploring > Crest Palace > the palace tile > quest. Off: start from "
+                     "whatever screen the game is on."),
         Setting("save_debug", "Save Equip Crest screenshots to debug_crest/", "bool", False),
     ]
     TEMPLATES = LOOP_TEMPLATES + [
@@ -132,7 +140,8 @@ CREST HANDLING
     # Seen live: the 'Used L Potion' popup dimmed the Equip Crest screen to 65%
     # of its brightness and Crest judged the dimmed row (unidentifiable -> stop).
     # A dimmed Equip Crest screen means a popup is on top: handle that first.
-    LIT_STATES = LoopFarmScript.LIT_STATES | {"equip_crest_screen"}
+    # A popup over Home dims the Exploring button; that is not the Home screen.
+    LIT_STATES = LoopFarmScript.LIT_STATES | {"equip_crest_screen", "home_screen"}
     LIT_RATIO = {"equip_crest_screen": 0.8}
 
     # Equip Crest screen colour/size, for the 720x1280 frame. Calibrate with save_debug.
@@ -149,7 +158,88 @@ CREST HANDLING
         self.session_kept = 0
         self.crest_session = f"{self.ctx.instance}-{int(time.time())}"
         self.palace = None  # set when 24/7 mode opens a palace tile
+        self.nav_active = False
         self.log(f"Keeping crests: {self.cfg['keep']}")
+        if self.cfg.get("start_home", True):
+            self.go_home()
+            self.nav_active = True  # walk Home > Exploring > Crest Palace > quest like 24/7 mode does
+
+    # ------------------------------------------------------------ start from Home
+    HOME_TIMEOUT_S = 120
+    HOME_MAX_BACKS = 30
+    HOME_NEEDS = ("exploring_button", "quest_list", "quest_list_entry")
+    # Screens where an undecided crest is on offer: never leave them with Back.
+    PENDING_CREST = {"crest_burst", "equip_crest_screen"}
+
+    def navigating(self) -> bool:
+        return bool(self.cfg.get("mode_247")) or self.nav_active
+
+    def palace_tile_names(self) -> list[str]:
+        return [f"crest_palace_{WEEKDAYS[game_now().weekday()]}", "crest_palace_target"]
+
+    def check_nav_templates(self) -> None:
+        """Before touching the game: everything the walk to the quest needs is captured."""
+        missing = [n for n in self.HOME_NEEDS if not self.has_template(n)]
+        if not (self.has_template("crest_palace_icon") or self.has_template("crest_palace_icon2")):
+            missing.append("crest_palace_icon")
+        if not any(self.has_template(n) for n in self.palace_tile_names()):
+            missing.append("crest_palace_target (or " + self.palace_tile_names()[0] + ")")
+        if missing:
+            self.notify(f"{self.NAME}: can't start from the Home screen - missing template(s): "
+                        f"{', '.join(missing)}. Capture them in the Templates tab, or turn off "
+                        "'Always start from the Home screen'.", screenshot=False)
+            raise Finished("Home navigation templates missing: " + ", ".join(missing))
+
+    def go_home(self) -> None:
+        """Get the game to the Home screen from wherever it is: dismiss known popups with their
+        handlers, press Back on everything else, and stop (with a screenshot) if Home can't be
+        reached. Home must be lit - a popup over it dims the Exploring button."""
+        self.check_nav_templates()
+        self.log("Getting to the Home screen first")
+        if not self._game_running():
+            self.recover_crash()  # relaunches in 24/7 mode, otherwise stops with a clear message
+        popups = {e[0] for e in self.COMMON_STATES} | {"ok_button", "crest_fragment", "select_crest_ok2"}
+        end = time.monotonic() + self.HOME_TIMEOUT_S
+        backs = 0
+        while time.monotonic() < end:
+            screen = self.grab()
+            state = self.detect_state(screen)
+            self._watch_unknown(state, screen)
+            if state == "home_screen":
+                self.state = state
+                self.log("On the Home screen")
+                self.progress()
+                return
+            if state in self.PENDING_CREST:
+                self.notify(f"{self.NAME}: the game is on a crest screen ({state}). Not leaving it "
+                            "with Back in case that loses the crest - decide it yourself, then Start "
+                            "again.")
+                raise Finished(f"crest decision pending at start ({state})")
+            if state == "unknown" and self._text_safety_net(screen):
+                self.sleep(self.TICK)
+                continue
+            if state in popups:
+                self.log(f"Start: closing {state}")
+                getattr(self, f"handle_{state}")(screen)
+            else:
+                backs += 1
+                if backs > self.HOME_MAX_BACKS:
+                    break
+                self.log(f"Start: on '{state}' - pressing Back ({backs})")
+                self.ctx.device.back()
+            self.sleep(1.2)
+        saved = self.save_frame("no_home")
+        self.notify(f"{self.NAME}: couldn't reach the Home screen from where the game is. Stopped."
+                    + (f" Frame saved to {saved}." if saved else ""))
+        raise Finished("could not reach the Home screen")
+
+    def handle_solo_quest_button(self, screen):
+        self.nav_active = False  # the walk is over once a quest page is reached
+        super().handle_solo_quest_button(screen)
+
+    def handle_battle_button(self, screen):
+        self.nav_active = False
+        super().handle_battle_button(screen)
 
     @classmethod
     def past_party_from_old(cls, party: str) -> bool:
@@ -412,23 +502,22 @@ CREST HANDLING
             self.reset_party("new quest entry")
 
     def handle_home_screen(self, screen):
-        if not self.cfg.get("mode_247"):
+        if not self.navigating():
             return
         self.log("Home screen - entering Exploring")
         self.tap_template("exploring_button", screen, settle=3)
 
     def handle_exploring_screen(self, screen):
-        if not self.cfg.get("mode_247"):
+        if not self.navigating():
             return
         self.log("Exploring - entering Crest Palace")
         self.tap_template("crest_palace_icon", screen, settle=3) or \
             self.tap_template("crest_palace_icon2", screen, settle=3)
 
     def handle_crest_palace_screen(self, screen):
-        if not self.cfg.get("mode_247"):
+        if not self.navigating():
             return
-        day = WEEKDAYS[game_now().weekday()]
-        for name in (f"crest_palace_{day}", "crest_palace_target"):
+        for name in self.palace_tile_names():
             if self.tap_template(name, screen, settle=3):
                 self.log(f"Opened palace ({name})")
                 self.palace = name

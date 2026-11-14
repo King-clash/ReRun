@@ -219,7 +219,7 @@ def test_every_script_state_is_detected_and_handled():
                 continue  # user-captured template (e.g. raid_ticket_target)
             img = synthetic(context + [tpl])
             ctx = ctx_for(img)
-            s = no_wait(cls(ctx, {}))
+            s = no_wait(cls(ctx, {"start_home": False}))
             s.on_start()
             got = s.detect_state(img)
             if (state, got) in SAME_BUTTON:
@@ -343,7 +343,7 @@ def test_instances_in_parallel_share_vision_safely():
     frames = [cv2.imread(str(FIX / n)) for n in names]
 
     def detect(img):
-        s = CrestScript(ctx_for(img), {})
+        s = CrestScript(ctx_for(img), {"start_home": False})
         s.on_start()
         return s.detect_state(img)
     solo = [detect(f) for f in frames]

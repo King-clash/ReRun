@@ -175,7 +175,7 @@ def _crest_run(icon: str, keep: str = "4+ and Burst only"):
     d = tempfile.mkdtemp()
     ctx = make_ctx(Path(d), dev, CrestScript)
     ctx.crests = CrestLedger(d)
-    result = run(CrestScript(ctx, {"keep": keep}))
+    result = run(CrestScript(ctx, {"keep": keep, "start_home": False}))
     return result, ctx
 
 
@@ -202,7 +202,7 @@ def test_crest_script_records_burst():
     d = tempfile.mkdtemp()
     ctx = make_ctx(Path(d), dev, CrestScript)
     ctx.crests = CrestLedger(d)
-    assert run(CrestScript(ctx, {})) == "finished: crest burst"
+    assert run(CrestScript(ctx, {"start_home": False})) == "finished: crest burst"
     s = ctx.crests.summary("Test")
     assert s["all"]["drops"]["burst"] == 1 and s["today"]["drops"]["burst"] == 1
 
@@ -215,7 +215,7 @@ def test_same_crest_seen_again_after_a_popup_is_not_counted_twice():
     d = tempfile.mkdtemp()
     ctx = make_ctx(Path(d), dev, CrestScript)
     ctx.crests = CrestLedger(d)
-    s = CrestScript(ctx, {"verify_text": False})
+    s = CrestScript(ctx, {"verify_text": False, "start_home": False})
     s.on_start()
     s.handle_equip_crest_screen(dev.screencap())
     s.crest_handled_at = 0.0          # popup handled, screen is back
@@ -236,7 +236,7 @@ def test_same_rarity_different_title_is_a_new_crest():
     fast()
     dev = Sim({"equip": crest_equip_screen("crest_icon_lv3")}, "equip", {})
     ctx = make_ctx(Path(tempfile.mkdtemp()), dev, CrestScript)
-    s = CrestScript(ctx, {})
+    s = CrestScript(ctx, {"start_home": False})
     s.judged = {"rarity": "lv3", "title": "Freeze Resistance Lv3"}
     assert s.same_crest_again("lv3", "Freeze Resistance Lv3")
     assert s.same_crest_again("lv3", "")            # title unreadable: trust the run count
@@ -250,7 +250,7 @@ def test_crest_script_without_ledger_still_works():
     dev = Sim({"burst": Screen([], extra=[("crest_icon_lv5plus", 250, 480)])}, "burst", {})
     ctx = make_ctx(Path(tempfile.mkdtemp()), dev, CrestScript)
     assert ctx.crests is None
-    assert run(CrestScript(ctx, {})) == "finished: crest burst"
+    assert run(CrestScript(ctx, {"start_home": False})) == "finished: crest burst"
 
 
 def test_manager_rebuilds_from_history_once():

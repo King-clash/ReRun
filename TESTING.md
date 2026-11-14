@@ -13,6 +13,7 @@ py tests/test_app.py          # manager, engine, Discord, GUI start/close
 py tests/test_crest_stats.py  # Phase 1 crest ledger, stats, reconstruction
 py tests/test_past_party.py   # Phase 2 Past Party
 py tests/test_units.py        # Phase 3 unit roster
+py tests/test_crest_home.py   # Crest starts from the Home screen
 ```
 
 Tests do not write to project data (verified 2026-11-14 by hashing all files before/after).
