@@ -77,6 +77,13 @@ crest_log.jsonl keeps 11 duplicate "history" records from the 14:10 restart, ign
 2026-11-14 16:41: build 382e212 installed (exe only; 95 user files hash-verified unchanged;
 relaunched, no crash.log). Rollback: `backups/preinstall_20261114_164106/Rerun.exe`.
 
+## Key system (2026-11-14, user request)
+Rerun needs a key (rerun/license.py, sign-in rerun/license_gate.py). Signing key:
+%LOCALAPPDATA%\Rerun Keygen\signing_key.txt (back it up; never commit). Public key in
+rerun/license.py. Key generator: tools/keygen.py / dist/Rerun Keygen/. Before installing a
+key-system build, the user needs a key for themselves (or the installed app stops at sign-in).
+Built to dist/Rerun (key system)/ because dist/Rerun/Rerun.exe was running.
+
 ## Next actions
 1. User: Remove the junk units and correct uncertain names in the Units tab (their decision).
 2. Live-verify that a crest after a potion refill is logged once (needs a farm that runs out of energy).
