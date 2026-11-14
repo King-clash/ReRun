@@ -1310,8 +1310,14 @@ class App(tk.Tk):
         cols = ("name", "element", "race", "clears", "target", "pct", "remaining", "delta")
         heads = ("Unit", "Element", "Race", "Clears", "Target", "Progress", "Remaining", "Change")
         sb = ttk.Scrollbar(lc.body, orient="vertical", style="IOS.Vertical.TScrollbar")
-        self.units_tree = ttk.Treeview(lc.body, columns=cols, show="headings", style="IOS.Treeview",
-                                       selectmode="browse", yscrollcommand=sb.set)
+        # Taller rows with the unit's picture (GS Companion's thumbnail) in the first column.
+        ttk.Style(self).configure("Units.IOS.Treeview", rowheight=px(44), indent=0)
+        self.units_tree = ttk.Treeview(lc.body, columns=cols, show="tree headings",
+                                       style="Units.IOS.Treeview", selectmode="browse",
+                                       yscrollcommand=sb.set)
+        self.units_tree.heading("#0", text="")
+        self.units_tree.column("#0", width=px(52), minwidth=px(52), stretch=False, anchor="center")
+        self._unit_pics: dict[str, object] = {}   # name -> PhotoImage (or None: no picture)
         sb.configure(command=self.units_tree.yview)
         self._units_sort = ("name", False)
         for c, h, w in zip(cols, heads, (240, 76, 84, 84, 100, 160, 90, 130)):
@@ -1356,8 +1362,9 @@ class App(tk.Tk):
             clears = "–" if r["clears"] is None else f"{r['clears']:,}" + ("?" if r["status"] == "uncertain" else "")
             el_txt = "–" if not r["element"] else r["element"] + ("?" if r["element_unsure"] else "")
             tags = ("uncertain",) if r["uncertain"] else ((r["state"],) if r["state"] in ("done", "near") else ())
-            self.units_tree.insert("", "end", iid=r["name"], tags=tags,
-                                   values=(r["name"] + (" ?" if r["uncertain"] else ""), el_txt,
+            pic = self._unit_pic(r["name"], r["element"])
+            self.units_tree.insert("", "end", iid=r["name"], tags=tags, image=pic or "",
+                                   values=("  " + r["name"] + (" ?" if r["uncertain"] else ""), el_txt,
                                            r["race"] or "–", clears, tgt, bar(r["pct"]),
                                            "" if r["remaining"] is None else f"{r['remaining']:,}",
                                            c.change_text(r)))
@@ -1372,6 +1379,32 @@ class App(tk.Tk):
 
     # kept for callers of the former Compendium tab
     refresh_compendium = refresh_units
+
+    def _unit_pic(self, name: str, element: str | None = None):
+        """The unit's thumbnail from GS Companion's saved pictures
+        (data/gscompanion/images/unit_thumbnail_<id>.png), matched by name - units carry
+        GS Companion's name after a clear match. None when there is no picture (story
+        units the site doesn't list, or no local data)."""
+        key = f"{name}|{element}"
+        if key in self._unit_pics:
+            return self._unit_pics[key]
+        photo = None
+        g = getattr(self.m, "gsc", None)
+        if g is not None:
+            try:
+                u = next((x for x in g.units if x["name"] == name), None)
+                if u is None:
+                    u = (g.match_unit(f"{name} ({element})") if element else None) or g.match_unit(name)
+                if u and u.get("unit_id"):
+                    p = g.dir / "images" / f"unit_thumbnail_{u['unit_id']}.png"
+                    if p.exists():
+                        size = px(38)
+                        with Image.open(p) as im:
+                            photo = ImageTk.PhotoImage(im.convert("RGBA").resize((size, size), Image.LANCZOS))
+            except Exception:  # noqa: BLE001 - a missing picture never breaks the list
+                photo = None
+        self._unit_pics[key] = photo
+        return photo
 
     def _units_selected(self) -> str | None:
         sel = self.units_tree.selection()
