@@ -184,9 +184,24 @@ def run_gui(home: Path = HOME) -> None:
     win.configure(bg=C["bg"])
     icon = ImageTk.PhotoImage(make_icon(64))
     win.iconphoto(True, icon)
-    win.geometry(f"{px(760)}x{px(820)}")
-    win.minsize(px(640), px(700))
+    height = min(px(940), win.winfo_screenheight() - px(80))
+    win.geometry(f"{px(780)}x{height}")
+    win.minsize(px(640), min(px(720), height))
     toast = ios.Toast(win)
+
+    def on_error(exc, val, tb):
+        """Never fail silently (the exe has no console): log it and say what went wrong."""
+        import traceback
+        text = "".join(traceback.format_exception(exc, val, tb))
+        try:
+            kg.home.mkdir(parents=True, exist_ok=True)
+            with (kg.home / "keygen_error.log").open("a", encoding="utf-8") as fh:
+                fh.write(time.strftime("%Y-%m-%d %H:%M:%S\n") + text + "\n")
+        except OSError:
+            pass
+        ios.alert(win, f"Something went wrong: {val}\n\nDetails were saved to "
+                       f"{kg.home / 'keygen_error.log'}", "Key Generator")
+    win.report_callback_exception = on_error
 
     hdr = ios.page_header(win, "Key Generator")
     body = tk.Frame(win, bg=C["bg"])
@@ -226,8 +241,16 @@ def run_gui(home: Path = HOME) -> None:
                command=lambda: update()).pack(side="left", padx=(px(10), 0))
     until_row = g.row("Until a date", "YYYY-MM-DD or YYYY-MM-DD HH:MM (your local time)")
     ios.Field(until_row, until, width=18).pack()
-    for v in (amount, until):
-        v.trace_add("write", lambda *a: update())
+
+    # Typing a length or a date chooses that time frame (it used to be ignored unless
+    # "Key works for" was switched too - you got a 30-day key instead).
+    def chose(kind):
+        if frame.get() != kind:
+            frame.set(kind)
+        update()
+    amount.trace_add("write", lambda *a: chose(CUSTOM))
+    unit.trace_add("write", lambda *a: chose(CUSTOM))
+    until.trace_add("write", lambda *a: chose(UNTIL) if until.get().strip() else update())
     ends = tk.Label(body, text="", bg=C["bg"], fg=C["secondary"], font=F["footnote"], anchor="w")
     ends.pack(fill="x", padx=px(16), pady=(px(4), 0))
 
@@ -239,7 +262,15 @@ def run_gui(home: Path = HOME) -> None:
     ios.Switch(g2.row("Lock to one PC", "Only works on the PC whose ID you enter (shown on "
                                          "Rerun's sign-in screen)"), lock,
                command=lambda: update()).pack()
-    ios.Field(g2.row("PC ID"), pc_txt, width=22).pack()
+    pc_row = g2.row("PC ID", "From the person's Rerun sign-in screen")
+    ios.Field(pc_row, pc_txt, width=22).pack(side="left")
+
+    def this_pc():
+        from rerun.license import machine_id
+        pc_txt.set(format_pc(machine_id()))
+    ios.Button(pc_row, "This PC", this_pc, kind="plain", small=True).pack(side="left", padx=(px(10), 0))
+    # typing a PC ID turns the lock on
+    pc_txt.trace_add("write", lambda *a: lock.set(True) if pc_txt.get().strip() else None)
     ios.Field(g2.row("Note", "For your records, e.g. who the key is for"), note, width=26).pack()
 
     # ---- generate
@@ -251,7 +282,7 @@ def run_gui(home: Path = HOME) -> None:
                icon="check").pack(side="left", padx=(px(10), 0))
     card = ios.Card(body, pad=8, radius=10, color=C["field"])
     card.pack(fill="x")
-    out = tk.Text(card.body, height=4, wrap="char", bd=0, relief="flat", bg=C["field"],
+    out = tk.Text(card.body, height=3, wrap="char", bd=0, relief="flat", bg=C["field"],
                   fg=C["label"], font=F["mono"], selectbackground=C["blue"])
     out.pack(fill="x")
 
@@ -348,7 +379,24 @@ def main(argv: list[str]) -> int:
         print(f"Signing key created: {kg.secret_path}")
         print(f"Public key (goes into rerun/license.py PUBLIC_KEY): {pub.hex()}")
         return 0
-    run_gui()
+    try:
+        run_gui()
+    except Exception:  # noqa: BLE001 - the exe has no console: show and log it
+        import traceback
+        text = traceback.format_exc()
+        try:
+            HOME.mkdir(parents=True, exist_ok=True)
+            (HOME / "keygen_error.log").open("a", encoding="utf-8").write(
+                time.strftime("%Y-%m-%d %H:%M:%S\n") + text + "\n")
+        except OSError:
+            pass
+        try:
+            from tkinter import messagebox
+            messagebox.showerror("Rerun Key Generator", f"The key generator could not start:\n\n"
+                                 f"{text.strip().splitlines()[-1]}\n\nDetails: {HOME / 'keygen_error.log'}")
+        except Exception:  # noqa: BLE001
+            pass
+        return 1
     return 0
 
 
