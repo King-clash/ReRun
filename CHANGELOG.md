@@ -16,8 +16,12 @@
 - `/energy [instance]`: from the running script, else read from a screenshot
   (`Manager.energy`).
 - Tests: tests/test_discord.py (5; fake interactions). 144/144 + gsc_app 16/16.
-- Not verified against the real Discord yet. allowed_user_ids is still empty in the user's
-  config, so every button is refused until an ID is added (Discord tab).
+- Live check 18:47 (test bot from a copy of dist/Rerun, user's server "RERUN PROJECT",
+  #rerun-bot): gold / red / green test alerts with buttons and the pinned status board posted;
+  user confirmed everything looks good. Found first: the bot had no permissions in #rerun-bot
+  (403 Missing Access, so alerts had never arrived); the user granted them. The user's ID was
+  added to dist/Rerun/config.yaml (backup config.yaml.before_discord_id.bak); the installed
+  copy in Downloads still has an empty allowed list.
 
 ## 2026-11-14 — Updates keep your data
 - Replacing Rerun.exe in its folder always kept everything (data lives next to the exe; new

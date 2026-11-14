@@ -23,7 +23,7 @@ Status keys: COMPLETE (implemented + tests + live verified) · BETA (implemented
 | 3 | Unit Roster (OCR), /units | P1 | BETA | real-screen readers + roster + Units tab + /units done; full live scan 2026-11-14 read 191 units (27 names uncertain). Level/rarity/awakening not readable from the unit page (need another screen) |
 | 4 | Compendium Counter UI, scans history, /compendium | P1 | BETA | Compendium tab (targets, progress, near/at filters, change since last scan), dashboard line, /compendium; checked on a copy of the real 191-unit scan. Weekly automatic scans INCOMPLETE (needs navigation to the Units list) |
 | 5 | Compendium Farm (Training > Cross Battle) | P1 | PLANNED | templates/training, templates/exploring not present yet — BLOCKED on captures |
-| 6 | Discord embeds, buttons, status board, /energy | P1 | BETA | coloured alert embeds, Stop/Resume/Screenshot/Start Crest buttons with permission checks, live status board, /energy; tested offline only - needs a live check and an allowed user ID |
+| 6 | Discord embeds, buttons, status board, /energy | P1 | BETA | coloured alert embeds, Stop/Resume/Screenshot/Start Crest buttons with permission checks, live status board, /energy; live-checked 2026-11-14 18:47 in the user's server (alerts, buttons, pinned board; user confirmed) |
 
 ## Milestone B — automation foundation
 Phase 7 shared services (run tracker, screenshot manager, typed events) · Phase 8 watchdog/recovery,
