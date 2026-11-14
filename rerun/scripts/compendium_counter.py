@@ -78,17 +78,17 @@ debug/); fix them in the Units tab and Rerun remembers the correction.
                 self.save_roster()
             raise
 
-    def save_roster(self) -> str:
+    def save_roster(self, complete: bool = False) -> str:
         self._saved = True
         roster = getattr(self.ctx, "units", None)
         if roster is None or not self.observed:
             return ""
-        s = roster.apply_scan(self.observed, "units_list")
+        s = roster.apply_scan(self.observed, "units_list", complete=complete)
         return (f" Roster: {s['seen']} read, {len(s['new'])} new"
                 + (f", {len(s['uncertain'])} uncertain" if s["uncertain"] else "") + ".")
 
-    def report(self, why: str) -> None:
-        why = f"{why}{self.save_roster()}"
+    def report(self, why: str, complete: bool = False) -> None:
+        why = f"{why}{self.save_roster(complete)}"
         if self.skipped:
             why += f" {self.skipped} unreadable page(s) skipped (frames in debug/)."
         path = Path(self.ctx.data_dir or ".") / "compendium_report.csv"
@@ -159,7 +159,7 @@ debug/); fix them in the Units tab and Rerun remembers the correction.
         self.sleep(1.2)
         after = self.grab()
         if np.abs(after[300:1100].astype(int) - before[300:1100].astype(int)).mean() < 2:
-            self.report("Reached the end of the list.")
+            self.report("Reached the end of the list.", complete=True)
         self.force_scroll = False
         self.view_sig, self.done_cards = None, set()  # new view: every card is new
         self.log("Scrolled")

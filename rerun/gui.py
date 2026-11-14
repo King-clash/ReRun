@@ -181,7 +181,8 @@ class App(tk.Tk):
         self._build_templates()
         self._build_history()
         self._build_units()
-        self._tab_discord = 5
+        self._build_compendium()
+        self._tab_discord = 6
         self._build_discord()
         self._build_log()
         self.status.configure(text="F12 stops everything  ·  F11 pauses or resumes all")
@@ -294,6 +295,11 @@ class App(tk.Tk):
         self.crest_note.pack(fill="x", pady=(px(4), 0))
         self._crest_cache_key = None
 
+        # Compendium summary: one line, so the Instructions box keeps its room
+        self.comp_line = self._label(left, "", anchor="w", justify="left", secondary=False)
+        self.comp_line.pack(fill="x", pady=(px(8), 0))
+        self._comp_cache_key = None
+
         ios.section_header(left, "Instructions", pady=(px(16), px(6)))
         _, self.instr = ios.text_box(left)
         self.instr.tag_configure("warn", foreground=C["orange"], font=F["footnote_semi"])
@@ -360,6 +366,34 @@ class App(tk.Tk):
             v = t.get(key, 0)
             tile.set(fmt_duration(v) if key == "seconds" else f"{v:,}")
         self._refresh_crests(name)
+        self._refresh_compendium_tiles()
+
+    def _refresh_compendium_tiles(self, force: bool = False):
+        """Dashboard: last full scan, units near / at target (recomputed when scans change)."""
+        c = getattr(self.m, "compendium", None)
+        if c is None or not hasattr(self, "comp_line"):
+            return
+        p = c.r.scans_path
+        try:
+            mt = p.stat().st_mtime
+        except OSError:
+            mt = 0
+        key = (mt, len(c.r.units), int(time.time() // 600))
+        if key == self._comp_cache_key and not force:
+            return
+        self._comp_cache_key = key
+        s = c.summary()
+        last = s["last_complete"]
+        text = "Compendium:  last full scan " + (
+            datetime.fromtimestamp(last).strftime("%d %b %H:%M") if last else "none yet")
+        if s["units"]:
+            text += f"  ·  {s['units']:,} units"
+        if s["with_target"]:
+            text += f"  ·  near target {s['near']:,}  ·  at target {s['done']:,}"
+        elif s["units"]:
+            text += "  ·  no targets set"
+        if self.comp_line.cget("text") != text:
+            self.comp_line.configure(text=text)
 
     def _refresh_crests(self, name: str | None):
         """Crest 4+ / Burst / Lv4 tiles from the crest ledger (recomputed only when it changes)."""
@@ -1317,8 +1351,10 @@ class App(tk.Tk):
                                "scans will remember it.", name)
         if right and right.strip() and right.strip() != name:
             self.m.units.correct_name(name, right.strip())
+            self.m.compendium.rename(name, right.strip())
             self.flash(f"Saved: '{name}' is {right.strip()}", "ok")
             self.refresh_units()
+            self.refresh_compendium()
 
     def units_remove(self):
         name = self._units_selected()
@@ -1331,6 +1367,7 @@ class App(tk.Tk):
             self.m.units.remove(name)
             self.flash(f"Removed '{name}'", "ok")
             self.refresh_units()
+            self.refresh_compendium()
 
     def units_gsc(self):
         """GSCompanion as a reference you open yourself: Rerun copies the unit's name and
@@ -1343,6 +1380,135 @@ class App(tk.Tk):
             self.clipboard_append(name)
             self.flash(f"Copied '{name}' - paste it into GSCompanion's search", "info")
         webbrowser.open(GSC_UNITS_URL)
+
+    # ================================================================ compendium
+    def _build_compendium(self):
+        from .compendium import FILTERS
+        _, page, hdr = self._page("Compendium", "Compendium", "check")
+        ios.Button(hdr, "Global Target", self.comp_global, kind="tinted",
+                   icon="edit").pack(side="right")
+        ios.Button(hdr, "Set Target", self.comp_target, kind="plain", icon="edit",
+                   small=True).pack(side="right", padx=(0, px(14)))
+        bar = tk.Frame(page, bg=C["bg"])
+        bar.pack(fill="x", padx=px(20), pady=(0, px(10)))
+        self.comp_q = tk.StringVar()
+        ios.Field(bar, self.comp_q, width=22).pack(side="left")
+        self.comp_q.trace_add("write", lambda *a: self.refresh_compendium())
+        self.comp_show = ios.Select(bar, values=list(FILTERS), accent=True,
+                                    command=self.refresh_compendium)
+        self.comp_show.set(FILTERS[0])
+        self.comp_show.pack(side="left", padx=px(16))
+        self._label(bar, "Near target from").pack(side="left")
+        self.comp_near = ios.Select(bar, values=["75%", "80%", "90%", "95%"], accent=True,
+                                    command=self._comp_near_changed)
+        self.comp_near.set(f"{self.m.compendium.targets.get('near_pct') or 90}%")
+        self.comp_near.pack(side="left", padx=(px(6), 0))
+        self.comp_summary = self._label(bar, "", justify="right")
+        self.comp_summary.pack(side="right")
+
+        lc = ios.Card(page, pad=6, stretch=True)
+        lc.pack(fill="both", expand=True, padx=px(20), pady=(0, px(14)))
+        cols = ("name", "clears", "target", "pct", "remaining", "delta")
+        heads = ("Unit", "Clears", "Target", "Progress", "Remaining", "Change")
+        sb = ttk.Scrollbar(lc.body, orient="vertical", style="IOS.Vertical.TScrollbar")
+        self.comp_tree = ttk.Treeview(lc.body, columns=cols, show="headings", style="IOS.Treeview",
+                                      selectmode="browse", yscrollcommand=sb.set)
+        sb.configure(command=self.comp_tree.yview)
+        self._comp_sort = ("name", False)
+        for c, h, w in zip(cols, heads, (260, 90, 110, 170, 100, 150)):
+            self.comp_tree.heading(c, text=h, command=lambda c=c: self._comp_sort_by(c))
+            self.comp_tree.column(c, width=px(w), stretch=(c == "name"),
+                                  anchor="w" if c in ("name", "pct") else "center")
+        self.comp_tree.tag_configure("uncertain", foreground=C["orange"])
+        self.comp_tree.tag_configure("done", foreground=C["green"])
+        self.comp_tree.tag_configure("near", foreground=C["blue"])
+        sb.pack(side="right", fill="y", pady=px(4))
+        self.comp_tree.pack(side="left", fill="both", expand=True)
+        self.comp_tree.bind("<Double-1>", lambda e: self.comp_target())
+        self.comp_empty = tk.Label(lc.body, bg=C["card"], fg=C["secondary"], font=F["footnote"],
+                                   justify="center",
+                                   text="Nothing to show\nRun the Compendium Counter on the in-game "
+                                        "Units list to read every unit's quest clears.")
+        self.after(140, self.refresh_compendium)
+
+    def _comp_sort_by(self, col: str):
+        cur, desc = self._comp_sort
+        self._comp_sort = (col, not desc if cur == col else col in ("clears", "pct", "delta"))
+        self.refresh_compendium()
+
+    def _comp_near_changed(self):
+        try:
+            self.m.compendium.set_near(int(self.comp_near.get().rstrip("%")))
+        except ValueError:
+            return
+        self.refresh_compendium()
+        self._refresh_compendium_tiles(force=True)
+
+    def refresh_compendium(self):
+        c = self.m.compendium
+        rows = c.rows(search=self.comp_q.get(), sort=self._comp_sort[0], desc=self._comp_sort[1],
+                      show=self.comp_show.get() or "All units")
+        from .compendium import bar
+        self.comp_tree.delete(*self.comp_tree.get_children())
+        for r in rows:
+            tgt = "" if not r["target"] else (f"{r['target']:,}" + (" (all)" if r["target_kind"] == "global" else ""))
+            clears = "–" if r["clears"] is None else f"{r['clears']:,}" + ("?" if r["status"] == "uncertain" else "")
+            tags = ("uncertain",) if r["uncertain"] else ((r["state"],) if r["state"] in ("done", "near") else ())
+            self.comp_tree.insert("", "end", iid=r["name"], tags=tags,
+                                  values=(r["name"] + (" ?" if r["uncertain"] else ""), clears, tgt,
+                                          bar(r["pct"]), "" if r["remaining"] is None else f"{r['remaining']:,}",
+                                          c.change_text(r)))
+        if rows:
+            self.comp_empty.place_forget()
+        else:
+            self.comp_empty.place(relx=0.5, rely=0.45, anchor="center")
+        self.comp_summary.configure(text=c.summary_text().replace("**", "").replace("\n", "   ·   "))
+
+    def _comp_selected(self) -> str | None:
+        sel = self.comp_tree.selection()
+        return sel[0] if sel else None
+
+    @staticmethod
+    def _parse_count(text: str | None) -> int | None | bool:
+        """'' -> None (clear), '500' / '1,000' -> int, anything else -> False."""
+        t = (text or "").replace(",", "").strip()
+        if not t:
+            return None
+        return int(t) if t.isdigit() else False
+
+    def comp_target(self):
+        name = self._comp_selected()
+        if not name:
+            return ios.alert(self, "Select a unit first.", "Set Target")
+        c = self.m.compendium
+        cur = c.targets["units"].get(name)
+        text = ios.ask_string(self, "Set Target",
+                              f"Quest clear target for {name}. Leave empty to use the global "
+                              "target instead.", str(cur or ""))
+        if text is None:
+            return
+        n = self._parse_count(text)
+        if n is False:
+            return ios.alert(self, "Type a whole number, e.g. 500.", "Set Target")
+        c.set_target(name, n)
+        self.flash(f"{name}: target {n:,}" if n else f"{name}: uses the global target", "ok")
+        self.refresh_compendium()
+        self._refresh_compendium_tiles(force=True)
+
+    def comp_global(self):
+        c = self.m.compendium
+        text = ios.ask_string(self, "Global Target",
+                              "Quest clear target for every unit without its own target. "
+                              "Leave empty for none.", str(c.targets.get("global") or ""))
+        if text is None:
+            return
+        n = self._parse_count(text)
+        if n is False:
+            return ios.alert(self, "Type a whole number, e.g. 100.", "Global Target")
+        c.set_global(n)
+        self.flash(f"Global target {n:,}" if n else "Global target removed", "ok")
+        self.refresh_compendium()
+        self._refresh_compendium_tiles(force=True)
 
     # ================================================================ discord
     def _build_discord(self):
@@ -1565,6 +1731,8 @@ class App(tk.Tk):
                     history_changed = True
                     if ev.get("entry", {}).get("kind") == "compendium":
                         self.after(50, self.refresh_units)  # a unit scan just finished
+                        self.after(80, self.refresh_compendium)
+                        self.after(90, lambda: self._refresh_compendium_tiles(force=True))
                 elif t == "_preview":
                     self._preview_img = ev["img"]
                     self._draw_preview()

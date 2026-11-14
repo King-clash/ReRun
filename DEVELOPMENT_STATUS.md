@@ -18,6 +18,11 @@ Water/Earth elements from that scan are stored "uncertain" (icons not yet verifi
 a rescan on 382e212 upgrades them. GSCompanion: link-out only from Rerun (robots.txt).
 Phase 4 (Compendium) builds on units/scans.jsonl (quest_clears per scan).
 
+## Phase 4 (Compendium) — BETA, 2026-11-14
+rerun/compendium.py + Compendium tab + dashboard line + /compendium. Targets in
+units/targets.json. Checked against a temp copy of the live data (191 units). Not live-verified in
+the installed app yet. Weekly automatic scans not done (no navigation to the Units list).
+
 ## Completed
 - Phase 0: recovery, git baseline f4df578, backups, docs.
 - Phase 1 (BETA): crest ledger, reconstruction, dashboard tiles, /crests; live-verified 13:57.
@@ -25,7 +30,7 @@ Phase 4 (Compendium) builds on units/scans.jsonl (quest_clears per scan).
 - Phase 3 (BETA): see above.
 
 ## Outstanding (Milestone A)
-4 Compendium · 5 Compendium Farm (BLOCKED: no Training/Exploring templates) · 6 Discord.
+5 Compendium Farm (BLOCKED: no Training/Exploring templates) · 6 Discord.
 
 ## Known issues / facts
 - History is capped at 2000 entries and deletes the oldest (with thumbnails) — all-time crest stats
@@ -60,4 +65,5 @@ relaunched, no crash.log). Rollback: `backups/preinstall_20261114_164106/Rerun.e
 ## Next actions
 1. User: Remove the junk units and correct uncertain names in the Units tab (their decision).
 2. Live-verify that a crest after a potion refill is logged once (needs a farm that runs out of energy).
-3. Phase 4 Compendium.
+3. Install the Phase 4 build (user quits Rerun), check the Compendium tab on live data.
+4. Phase 5 Compendium Farm: needs captures of Exploring > Tower of Initiation > Training > Cross Battle.

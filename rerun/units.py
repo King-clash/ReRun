@@ -130,9 +130,11 @@ class UnitRoster:
             self._save()
 
     # ------------------------------------------------------------ scans
-    def apply_scan(self, observed: list[dict], source: str, shot_dir: str | None = None) -> dict:
+    def apply_scan(self, observed: list[dict], source: str, shot_dir: str | None = None,
+                   complete: bool | None = None) -> dict:
         """Merge one scan. observed: [{"name", "name_conf", "fields": {f: {"value",
-        "confidence"}}, "shot"}]. Returns a summary with new units and changes."""
+        "confidence"}}, "shot"}]. complete: the scan reached the end of the list
+        (False = stopped early). Returns a summary with new units and changes."""
         t = time.time()
         scan_id = time.strftime("%Y%m%d_%H%M%S", time.localtime(t))
         summary = {"scan": scan_id, "seen": 0, "new": [], "changed": [], "uncertain": [],
@@ -191,10 +193,12 @@ class UnitRoster:
                         summary["kept"] += 1  # lower-trust reading never replaces a better value
                 stored_obs[name] = obs_fields
             self._save()
+            rec = {"id": scan_id, "t": t, "source": source, "observed": stored_obs,
+                   "new": summary["new"]}
+            if complete is not None:
+                rec["complete"] = bool(complete)
             with self.scans_path.open("a", encoding="utf-8") as fh:
-                fh.write(json.dumps({"id": scan_id, "t": t, "source": source,
-                                     "observed": stored_obs, "new": summary["new"]},
-                                    ensure_ascii=False) + "\n")
+                fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
         return summary
 
     def scans(self) -> list[dict]:

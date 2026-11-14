@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-11-14 — Phase 4: Compendium (BETA)
+- `rerun/compendium.py`: quest clear targets per unit and a global target (units/targets.json),
+  progress, remaining clears, near-target (75/80/90/95 %, default 90) and at-target states, change
+  since the previous scan that read the unit ("+12 since 14 Nov"), last full scan. Reads the
+  roster and units/scans.jsonl (every scan kept, never edited); corrected names keep their
+  history (aliases) and their target.
+- Scans now record whether they reached the end of the list (`complete`); older scans are
+  judged by their History entry ("Reached the end of the list").
+- UI: new **Compendium** tab (search, All / With a target / Near target / At target, sortable,
+  text progress bars, Set Target, Global Target, double-click to set). Dashboard: one-line
+  Compendium summary (last full scan, units, near / at target).
+- Discord `/compendium [search] [show]`.
+- Weekly scans: not automated. A scan needs the game on the Units list and Rerun cannot navigate
+  there yet; the existing scheduler never starts on a busy instance.
+- Tests: tests/test_compendium.py (8); test_app covers the new tab. 107/107 (+6 GSC data).
+
 ## 2026-11-14 — Third live scan saved; build 382e212 installed
 - Scan 15:22–16:40 saved: 191 units (Fire 41, Water 44, Earth 27, Light 41, Dark 38), 189 with
   quest clears, 27 names uncertain (incl. the junk "wee", "ae", "sc" this build now prevents).

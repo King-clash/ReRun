@@ -75,6 +75,8 @@ listeners (`_poll_events`). There is no typed event bus yet (planned: Milestone 
 | history/history.jsonl | JSONL | kinds: crest (rarity, action), energy, failure, finished; **compacted to 2000** |
 | crest_log.jsonl (Phase 1) | JSONL | append-only crest ledger, never compacted — see below |
 | templates/_meta.json | JSON | per-template threshold, source (ReStart/user), generation, resolution |
+| units/roster.json, scans.jsonl, aliases.json (Phase 3) | JSON/JSONL | `rerun/units.py` UnitRoster: units with per-field provenance; every scan appended (with `complete`); learned name corrections |
+| units/targets.json (Phase 4) | JSON | `rerun/compendium.py` Compendium: global / per-unit quest clear targets, near-target %; progress and "+N since" computed from scans.jsonl |
 
 ## Crest ledger (Phase 1)
 

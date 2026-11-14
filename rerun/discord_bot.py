@@ -13,6 +13,7 @@ Slash commands (only users in discord.allowed_user_ids may use control commands)
   /summary                     the last 24 hours (also posted daily)
   /crests  [instance]          4+ / Burst / Lv4 today, session, all-time, observed rates
   /units   [search]            unit roster from your scans (newest first)
+  /compendium [search] [show]  quest clear targets, progress, change since the last scan
   /scripts                     list scripts
 """
 from __future__ import annotations
@@ -258,6 +259,36 @@ class DiscordBot:
             more = f"\n…and {len(rows) - 15} more" if len(rows) > 15 else ""
             embed = discord.Embed(title="Units", description=(head + "\n\n" + "\n".join(lines) + more)[:4000],
                                   color=0x2ECC71)
+            await inter.response.send_message(embed=embed)
+
+        @tree.command(description="Quest clear targets: progress, near/at target, change since last scan")
+        @app_commands.choices(show=[app_commands.Choice(name=f, value=f) for f in
+                                    ("All units", "With a target", "Near target", "At target")])
+        async def compendium(inter: discord.Interaction, search: str | None = None,
+                             show: str | None = None):
+            from .compendium import bar
+            c = getattr(m, "compendium", None)
+            if c is None or not c.r.units:
+                return await inter.response.send_message(
+                    "No units scanned yet - run the Compendium Counter on the Units list.")
+            show = show or ("With a target" if c.summary()["with_target"] else "All units")
+            rows = await asyncio.to_thread(c.rows, search or "", "pct" if show != "All units" else "clears",
+                                           True, show)
+            lines = []
+            for r in rows[:15]:
+                line = f"**{r['name']}**{' (?)' if r['uncertain'] else ''} · "
+                line += "? clears" if r["clears"] is None else f"{r['clears']:,} clears"
+                if r["target"]:
+                    line += f" / {r['target']:,} `{bar(r['pct'])}` · {r['remaining']:,} to go" \
+                        if r["pct"] is not None else f" / {r['target']:,}"
+                ch = c.change_text(r)
+                if ch:
+                    line += f" · {ch}"
+                lines.append(line)
+            head = c.summary_text() + f"\n{show}" + (f" matching '{search}'" if search else "") + f": {len(rows)}"
+            more = f"\n…and {len(rows) - 15} more" if len(rows) > 15 else ""
+            embed = discord.Embed(title="Compendium", color=0x2ECC71,
+                                  description=(head + "\n\n" + "\n".join(lines) + more)[:4000])
             await inter.response.send_message(embed=embed)
 
         @tree.command(description="List available scripts")

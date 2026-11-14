@@ -18,6 +18,7 @@ from .adb import AdbError, Device, find_adb
 from .engine import Context, RoutineError, Runner, StopRoutine, load_routines, templates_used
 from .crest_stats import CrestLedger
 from .history import History
+from .compendium import Compendium
 from .units import UnitRoster
 from .scripts import SCRIPTS
 from .scripts.base import Finished
@@ -105,6 +106,7 @@ class Manager:
             added = {"error": repr(e)}
         self._crest_rebuild = added
         self.units = UnitRoster(self.root)
+        self.compendium = Compendium(self.units, self.history)
         self.discord = None  # set by DiscordBot.start()
         self.log_lines: list[str] = []
         self.log_entries: list[dict] = []  # same lines with instance + level, for filtering
