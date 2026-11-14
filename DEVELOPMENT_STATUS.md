@@ -39,7 +39,9 @@ relaunched, no crash.log, the Live View stream started. Backup backups/preinstal
 Not in this exe: the new app icon (another session's uncommitted work in rerun/appicon.py,
 rerun/assets/, build.py).
 
-## Crest start-from-Home (v1.0.3) — BETA (simulator only, not live-verified)
+## Crest start-from-Home (v1.0.3) — LIVE-VERIFIED from Home (2026-11-14): Home > Exploring > Crest Palace > Cursed Claw > quest > farming. Back-from-battle untested.
+Needs per-palace templates: crest_palace_target (tile) and quest_list_entry (row; _2/_3/_4 for other palaces). Rotating palaces break them.
+(older note:) 
 Crest goes Home first on Start (setting `start_home`, default on), then walks Exploring > Crest
 Palace > palace tile > quest. The installed templates have no `crest_palace_target` /
 `crest_palace_<day>` tile, so Crest stops with a "missing template" message until one is captured
