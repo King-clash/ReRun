@@ -1,6 +1,7 @@
-"""Build Rerun.exe:  python build.py
+"""Build Rerun.exe:  python build.py  [--out FOLDER]
 
-Produces dist/Rerun/Rerun.exe - one self-contained file (a one-file build has
+Produces dist/Rerun/Rerun.exe (or FOLDER/Rerun.exe, e.g. while that copy is running) -
+one self-contained file (a one-file build has
 no deep internal folders, so it also builds inside long paths that Windows'
 260-character limit would otherwise break). Your templates, custom routines,
 README and config are copied next to it, so the .exe works exactly like
@@ -18,6 +19,9 @@ DIST = ROOT / "dist" / "Rerun"
 
 
 def main() -> int:
+    global DIST
+    if "--out" in sys.argv:
+        DIST = Path(sys.argv[sys.argv.index("--out") + 1]).resolve()
     sys.path.insert(0, str(ROOT))
     from rerun.appicon import write_ico
     work = Path(tempfile.mkdtemp(prefix="rrb_"))  # short path for PyInstaller's scratch files

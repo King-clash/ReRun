@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-11-14 — Key system and key generator
+- Rerun now opens only with a valid key (user request). `rerun/license.py`: a key is 21 bytes
+  (version, issued, expires or lifetime, optional PC lock, random id) signed with Ed25519
+  (`rerun/ed25519.py`, plain Python RFC 8032 code - checked against the RFC's test vector; no
+  new library). Rerun holds only the public key, so keys can be checked but not made from it.
+- Sign-in screen (`rerun/license_gate.py`) before the app starts: paste the key, see why a key
+  is refused (changed, incomplete, expired, other PC, PC clock turned back), copy this PC's ID.
+  The accepted key is kept in `<Rerun folder>/license.json` (git-ignored) with the latest time
+  seen. While running: checked every minute; the status line and title show the time left
+  (click the status line to change key); a warning 3 days before the end; when it ends, every
+  script stops, starts are blocked (also from Discord) and the sign-in asks for a new key.
+- Key generator `tools/keygen.py` (`tools/build_keygen.py` -> `dist/Rerun Keygen/Rerun Keygen.exe`):
+  time frame presets (1 hour ... 1 year, Lifetime), a custom length (minutes ... years) or
+  "until a date", optional lock to one PC, a note; shows when the key ends; lists every key made
+  (issued_keys.csv, double-click to copy); "Back up signing key…". The private signing key was
+  created once (`--init`) in `%LOCALAPPDATA%\Rerun Keygen\signing_key.txt`, never in git or an exe.
+- Limits (offline keys): a key can't be withdrawn before it ends; deleting license.json
+  defeats the clock-rollback check; losing the signing key means no new keys for these builds.
+- build.py: `--out FOLDER` (the dist copy was running). Exe checks: no key -> sign-in only;
+  valid key -> app with time left in the title; expired -> sign-in; keygen exe opens.
+- Tests: tests/test_license.py (11). 132/132 + gsc_app 16/16.
+
 ## 2026-11-14 — New app icon
 - The window, tray and .exe icon is now a picture, `rerun/assets/rerun_icon.png` (512 px, glossy
   blue rounded square with a glowing loop arrow, transparent corners). `rerun/appicon.py` loads

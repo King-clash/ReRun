@@ -295,7 +295,11 @@ class Manager:
         return dev.screencap()
 
     # ------------------------------------------------------------ control
+    locked = False   # set by the app while its key is expired: nothing may start
+
     def start(self, name: str, script: str | None = None) -> str:
+        if self.locked:
+            return "Rerun's key has expired - enter a new key in Rerun to start scripts"
         with self._lock:
             inst = self.instances.get(name)
             if not inst:

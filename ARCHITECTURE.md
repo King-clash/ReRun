@@ -88,6 +88,15 @@ listeners (`_poll_events`). There is no typed event bus yet (planned: Milestone 
 (`live` / `history` reconstruction) and `confidence`. `CrestStats` computes today / session /
 all-time counts, rates, runs-since and breakdowns from it. Lv4 is never counted as 4+.
 
+## Key system
+
+`main.py` -> `rerun.gui.run_app` -> `rerun.license_gate.require_key(root)` before `App` exists:
+the saved key in `license.json` if valid, else the sign-in window. `rerun/license.py` checks
+Ed25519-signed keys against the embedded `PUBLIC_KEY`; the private key only exists in
+`%LOCALAPPDATA%\Rerun Keygen\` for `tools/keygen.py`. `App(manager, license=...)` re-checks
+every minute (`_check_key`); on expiry `Manager.locked` blocks `start()`. Tests create `App`
+directly, without a key.
+
 ## Live View
 
 `rerun/live_stream.py` LiveStream streams `adb exec-out screenrecord --output-format=h264 -`

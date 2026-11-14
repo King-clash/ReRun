@@ -7,6 +7,10 @@ __pycache__/
 
 # User data and secrets - never commit (config.yaml holds the Discord token)
 config.yaml
+license.json
+signing_key*.txt
+*signing_key*
+issued_keys.csv
 stats.json
 history/
 debug/

@@ -174,10 +174,11 @@ class RerunLink:
 
 
 class App(tk.Tk):
-    def __init__(self, manager: Manager):
+    def __init__(self, manager: Manager, license=None):
         ios.enable_dpi_awareness()
         super().__init__()
         self.m = manager
+        self.license = license   # rerun/license.py License (None: no key check, e.g. tests)
         ios.init(self, str(self.m.config.get("appearance", "auto")))
         self.title("Rerun")
         self.geometry(f"{px(1220)}x{px(840)}")
@@ -205,6 +206,11 @@ class App(tk.Tk):
         self._build_log()
         self._build_companion()
         self.status.configure(text="F12 stops everything  ·  F11 pauses or resumes all")
+        if self.license is not None:
+            self._show_key_status()
+            self.status.configure(cursor="hand2")
+            self.status.bind("<Button-1>", lambda e: self.change_key())
+            self.after(60_000, self._check_key)
 
         self.tray = Tray(lambda action: self.events.put({"type": "_tray", "action": action}))
         self._tray_on = self.tray.start()
@@ -221,6 +227,69 @@ class App(tk.Tk):
         if self.m.config["discord"].get("enabled"):
             self.after(500, self.connect_discord)
         self.protocol("WM_DELETE_WINDOW", self.on_close)
+
+    # key (rerun/license.py) ---------------------------------------------------
+    def _show_key_status(self):
+        lic = self.license
+        text = "F12 stops everything  ·  F11 pauses or resumes all  ·  " + lic.describe() + \
+            "  (click to change key)"
+        if self.status.cget("text") != text:
+            self.status.configure(text=text)
+        self.title("Rerun" if lic.lifetime else f"Rerun  ·  key: {lic.describe()}")
+
+    def _check_key(self):
+        """Every minute: remember the time (clock check) and stop when the key runs out."""
+        from .license import KeyError_, KeyStore, fmt_left
+        if self._closing or self.license is None:
+            return
+        store = KeyStore(self.m.root)
+        try:
+            self.license = store.current()
+            store.touch()
+        except KeyError_ as e:
+            return self._key_expired(str(e))
+        left = self.license.remaining()
+        if left < 3 * 86400 and not getattr(self, "_key_warned", False):
+            self._key_warned = True
+            self.flash(f"Your Rerun key runs out in {fmt_left(left)}", "info")
+        self._show_key_status()
+        self.after(60_000, self._check_key)
+
+    def _key_expired(self, reason: str):
+        """Key no longer valid: stop every script, block remote starts, ask for a new key."""
+        from .license import KeyStore
+        from .license_gate import ask_key
+        self.m.locked = True
+        self.m.stop_all()
+        self.m.log("app", f"Key: {reason} - scripts stopped until a valid key is entered")
+        if self.state() == "withdrawn":
+            self.deiconify()
+        lic = ask_key(self, KeyStore(self.m.root), reason)
+        if lic is None:
+            self.m.stop_all()
+            self.disconnect_discord()
+            return self.destroy()
+        self.license, self.m.locked = lic, False
+        self._key_warned = False
+        self.flash("Signed in: " + lic.describe(), "ok")
+        self._show_key_status()
+        self.after(60_000, self._check_key)
+
+    def change_key(self):
+        """Click on the status line: enter another key (Cancel keeps the current one)."""
+        from .license import KeyStore
+        from .license_gate import ask_key
+        store = KeyStore(self.m.root)
+        old = store.saved_key()
+        lic = ask_key(self, store, "", quit_text="Cancel")
+        if lic is None:
+            if old:
+                store.save(old)
+            return
+        self.license = lic
+        self._key_warned = False
+        self.flash("Key changed: " + lic.describe(), "ok")
+        self._show_key_status()
 
     # small helpers --------------------------------------------------------
     def _page(self, title: str, tab: str, icon: str, scroll: bool = False):
@@ -2033,5 +2102,9 @@ Alerts:  rare crests, Crest Bursts, hyper rare drops, failures, crashes and fini
 
 
 def run_app(root: str | Path) -> None:
-    app = App(Manager(root))
+    from .license_gate import require_key
+    lic = require_key(root)   # Rerun opens only with a valid key (rerun/license.py)
+    if lic is None:
+        return
+    app = App(Manager(root), license=lic)
     app.mainloop()
