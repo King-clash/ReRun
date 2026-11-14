@@ -134,6 +134,16 @@ class TemplateStore:
         if self.path(name).exists():
             self.path(name).unlink()
 
+    def reload(self) -> None:
+        """Forget every cached image and re-read _meta.json (after a template update)."""
+        with self._lock:
+            old = set(self.meta)
+            self.meta = self._load_meta()
+            names = set(self._cache) | set(self._gen) | old | set(self.meta)
+            self._cache.clear()
+            for name in names:
+                self._gen[name] = self._gen.get(name, 0) + 1
+
     def generation(self, name: str) -> int:
         return self._gen.get(name, 0)
 

@@ -54,6 +54,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # Live View: frames per second of the emulator's video stream (rerun/live_stream.py);
     # 0 = the old screenshot preview (one frame every few seconds when idle)
     "live_view_fps": 30,
+    # rerun/updates.py: url "" = the address built into Rerun; channel stable | beta;
+    # check = look for updates at start and every few hours
+    "updates": {"url": "", "channel": "stable", "check": True},
 }
 
 LOG_KEEP = 3000

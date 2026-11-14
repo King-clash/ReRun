@@ -34,7 +34,10 @@ rerun/
   discord_bot.py        DiscordBot: alerts (text + screenshot), slash commands
   setup_check.py        Settings > Setup check
   restart_import.py     imports templates from a local ReStart install
-  tray.py, appicon.py   tray icon (pystray), generated app icon
+  tray.py, appicon.py   tray icon (pystray), app icon (assets/rerun_icon.png)
+  updates.py            signed update manifest: templates/routines (never over your edits,
+                        staged then committed while idle) and Rerun.exe self-replacement;
+                        published by tools/publish_update.py; Settings › Updates
   scripts/
     base.py             BaseScript: state machine loop (STATES -> handle_<state>), common popups,
                         watchdogs (stuck / no-progress / unknown screen), 24/7 crash relaunch +

@@ -15,7 +15,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageTk
 
-from . import ios
+from . import __version__, ios, updates
 from .adb import discover_bluestacks_instances
 from .appicon import make_icon
 from .ios import C, F, px
@@ -23,6 +23,7 @@ from .manager import Manager
 from .scripts import SCRIPTS
 from .stats import fmt_duration
 from .tray import Tray
+from .updates import UpdateError
 
 STATUS_TEXT = {"idle": "Idle", "starting": "Starting", "running": "Running",
                "paused": "Paused", "error": "Error"}
@@ -191,6 +192,10 @@ class App(tk.Tk):
         self._hotkeys = None
         self._closing = False
         self._weak_seen: set[str] = set()
+        self._upd_busy = False                  # an update check or download is running
+        self._upd_declined: set[str] = set()    # app versions you said "Later" to
+        self._content_pending = False           # templates staged, waiting for scripts to stop
+        self._app_ready: dict | None = None     # downloaded Rerun.exe, swapped in on quit
 
         self.nb = ios.TabView(self)
         self.nb.pack(fill="both", expand=True)
@@ -229,6 +234,7 @@ class App(tk.Tk):
         if self.m.config["discord"].get("enabled"):
             self.after(500, self.connect_discord)
         self.protocol("WM_DELETE_WINDOW", self.on_close)
+        self.after(4000, self._schedule_update_check)
 
     # data from an older Rerun (rerun/migrate.py) ---------------------------------
     def import_old_data(self):
@@ -256,6 +262,178 @@ class App(tk.Tk):
         # closing must not write this session's stats over the imported ones
         self.m.stats.flush = lambda *a, **k: None
         ios.alert(self, f"Copied: {summary(done)}.\n\nRerun closes now - start it again.", "Import")
+        self.m.stop_all()
+        self.disconnect_discord()
+        self.destroy()
+
+    # updates (rerun/updates.py) ---------------------------------------------------
+    UPDATE_EVERY_MS = 6 * 3600 * 1000
+
+    def _busy(self) -> bool:
+        return any(i.status in ("running", "paused", "starting") for i in self.m.instances.values())
+
+    def _update_idle_text(self) -> str:
+        if not updates.settings(self.m.config)["url"]:
+            return "Updates are not set up in this build."
+        ver = updates.load_state(self.m.root).get("content_version")
+        return f"Templates: {ver}" if ver else "Not checked yet."
+
+    def _set_update_status(self, text: str):
+        lbl = getattr(self, "upd_status", None)
+        if lbl is not None and lbl.winfo_exists():
+            lbl.configure(text=text)
+
+    def _save_update_settings(self, *_):
+        u = self.m.config.setdefault("updates", {})
+        u["check"] = bool(self.upd_check.get())
+        u["channel"] = self.upd_channel.get().lower()
+        self.m.save_config()
+        self._set_update_status(self._update_idle_text())
+
+    def _schedule_update_check(self):
+        s = updates.settings(self.m.config)
+        if s["url"] and s["check"]:
+            self.check_updates(quiet=True)
+        self.after(self.UPDATE_EVERY_MS, self._schedule_update_check)
+
+    def check_updates(self, quiet: bool = False):
+        """Fetch the signed manifest; download new templates (applied once no script runs)
+        and offer a newer Rerun.exe. quiet = the automatic check (no 'up to date' message)."""
+        if self._upd_busy:
+            return None if quiet else self.flash("Already checking for updates…")
+        if not updates.settings(self.m.config)["url"]:
+            self._set_update_status(self._update_idle_text())
+            return None if quiet else ios.alert(
+                self, "This Rerun has no update address yet, so it cannot look for updates.",
+                "Updates")
+        self._upd_busy = True
+        self._set_update_status("Checking for updates…")
+        cfg, root = dict(self.m.config), self.m.root
+
+        def work():
+            res, staged = updates.check(root, cfg), ""
+            if not res.error and res.plan is not None and not res.plan.empty:
+                try:
+                    updates.stage_content(root, cfg, res.plan)
+                    staged = res.plan.describe()
+                except Exception as e:  # noqa: BLE001 - reported, never raised
+                    res.error = f"Template update failed: {e}"
+            self.events.put({"type": "_update", "result": res, "staged": staged, "quiet": quiet})
+        threading.Thread(target=work, daemon=True).start()
+        return None
+
+    def _on_update_result(self, ev: dict):
+        self._upd_busy = False
+        res, quiet = ev["result"], ev["quiet"]
+        if res.error:
+            self._set_update_status(res.error)
+            self.m.log("app", f"Update check: {res.error}", level="warn")
+            if not quiet:
+                ios.alert(self, res.error, "Updates")
+            return
+        self._set_update_status(f"{res.summary()}  ·  checked {datetime.now():%H:%M}")
+        if ev["staged"]:
+            self.m.log("app", f"Template update downloaded: {ev['staged']}")
+            self._content_pending = True
+            self._commit_content()
+        if res.app:
+            self._offer_app_update(res.app, quiet)
+        elif not quiet and not ev["staged"]:
+            self.flash(f"Rerun {__version__} is up to date", "ok")
+
+    def _commit_content(self):
+        """Move downloaded templates/routines into place - now, unless a script runs."""
+        if not self._content_pending:
+            return
+        if self._busy():
+            self._set_update_status("New templates downloaded - they install when your scripts stop.")
+            return
+        self._content_pending = False
+        try:
+            msg = updates.commit_staged(self.m.root)
+        except (UpdateError, OSError) as e:
+            self.m.log("app", f"Template update not installed: {e}", level="error")
+            self._set_update_status(f"Template update not installed: {e}")
+            return
+        if not msg:
+            return
+        self.m.store.reload()
+        try:
+            from .engine import load_routines
+            self.m.routines = load_routines(self.m.root / "routines")
+        except Exception as e:  # noqa: BLE001 - a bad routine must not undo the template update
+            self.m.log("app", f"Custom routines: {e}", level="error")
+        if hasattr(self, "refresh_checklist"):
+            self.refresh_checklist()
+        self.m.log("app", msg)
+        self.flash(msg, "ok")
+        self._set_update_status(msg)
+
+    def _offer_app_update(self, app: dict, quiet: bool):
+        v = str(app["version"])
+        if not updates.frozen():
+            self._set_update_status(f"Rerun {v} is available (this copy runs from source).")
+            self.m.log("app", f"Rerun {v} is available; this copy runs from source, so it is not "
+                              "installed")
+            return
+        if self._app_ready and self._app_ready.get("version") == v:
+            return self._ask_restart()
+        if quiet and v in self._upd_declined:
+            return
+        notes = str(app.get("notes") or "").strip()
+        mb = int(app.get("size") or 0) / 1e6
+        if not ios.confirm(self, f"Rerun {v} is available (you have {__version__})."
+                                 + (f"\n\n{notes}" if notes else "")
+                                 + f"\n\nDownload it now ({mb:.0f} MB)? Rerun restarts to finish; "
+                                   "your settings and data stay.",
+                           "Update Available", ok="Download", cancel="Later"):
+            self._upd_declined.add(v)
+            self._set_update_status(f"Rerun {v} is available - Check Now to download it.")
+            return
+        self._upd_busy = True
+        cfg, root = dict(self.m.config), self.m.root
+        last = [-1]
+
+        def progress(got, total):
+            pct = int(got * 100 / total) if total else 0
+            if pct != last[0]:
+                last[0] = pct
+                self.events.put({"type": "_update_progress", "text": f"Downloading Rerun {v}… {pct}%"})
+
+        def work():
+            try:
+                updates.download_app(root, cfg, app, progress)
+                self.events.put({"type": "_update_app", "app": app})
+            except Exception as e:  # noqa: BLE001 - reported, never raised
+                self.events.put({"type": "_update_app", "app": app, "error": str(e)})
+        threading.Thread(target=work, daemon=True).start()
+
+    def _on_app_downloaded(self, ev: dict):
+        self._upd_busy = False
+        if ev.get("error"):
+            self._set_update_status(ev["error"])
+            return ios.alert(self, ev["error"], "Update")
+        self._app_ready = ev["app"]
+        self.m.log("app", f"Rerun {ev['app']['version']} downloaded")
+        self._ask_restart()
+
+    def _ask_restart(self):
+        v = self._app_ready["version"]
+        warn = "\n\nYour scripts are running: restarting stops them." if self._busy() else ""
+        if not ios.confirm(self, f"Rerun {v} is ready.{warn}\n\nRestart now to finish? "
+                                 "(Later: it installs when you quit Rerun.)",
+                           "Restart Rerun?", ok="Restart Now", cancel="Later"):
+            self._set_update_status(f"Rerun {v} installs when you quit Rerun.")
+            return
+        self._install_app(restart=True)
+
+    def _install_app(self, restart: bool):
+        try:
+            updates.launch_swap(self.m.root, restart=restart)
+        except (UpdateError, OSError) as e:
+            self._app_ready = None
+            return ios.alert(self, f"Could not install the update: {e}", "Update")
+        self._app_ready = None
         self.m.stop_all()
         self.disconnect_discord()
         self.destroy()
@@ -969,6 +1147,25 @@ class App(tk.Tk):
         ios.Button(g2.row("Setup check", "Checks ADB, your instances, screen size, templates "
                           "and the text reader, with a fix for anything missing."),
                    "Run", self.open_setup_check, kind="tinted", small=True).pack()
+
+        us = updates.settings(self.m.config)
+        g3 = ios.Group(wrap, header="Updates",
+                       footer="New templates and routines install by themselves (any you captured "
+                              "or edited are kept). A new Rerun asks first, then restarts; your "
+                              "settings and data stay.")
+        g3.pack(fill="x", pady=(0, px(24)))
+        self.upd_check = tk.BooleanVar(value=us["check"])
+        ios.Switch(g3.row("Check for updates", "When Rerun opens and every few hours."),
+                   self.upd_check, command=self._save_update_settings).pack()
+        self.upd_channel = ios.Select(g3.row("Channel", "Beta gets fixes first, with less testing."),
+                                      values=["Stable", "Beta"], command=self._save_update_settings)
+        self.upd_channel.set(us["channel"].title())
+        self.upd_channel.pack()
+        right = g3.row(f"Rerun {__version__}", " ")
+        ios.Button(right, "Check Now", self.check_updates, kind="tinted", small=True).pack()
+        # the row's grey subtitle doubles as the update status line
+        self.upd_status = right.master.winfo_children()[1].winfo_children()[1]
+        self._set_update_status(self._update_idle_text())
         self.form_vars: dict[str, tk.Variable] = {}
         self.set_script.current(1)
 
@@ -2059,6 +2256,12 @@ class App(tk.Tk):
                     ios.alert(self, ev["message"], ev.get("title", "Rerun"))
                 elif t == "_setup":
                     self._show_setup_results(ev["checks"])
+                elif t == "_update":
+                    self._on_update_result(ev)
+                elif t == "_update_progress":
+                    self._set_update_status(ev["text"])
+                elif t == "_update_app":
+                    self._on_app_downloaded(ev)
                 elif t == "_hotkey":
                     ev["fn"]()
                 elif t == "_tray":
@@ -2071,6 +2274,8 @@ class App(tk.Tk):
         self.after(150, self._poll_events)
 
     def _tick(self):
+        if self._content_pending and not self._busy():
+            self._commit_content()
         if self.state() != "withdrawn":
             self.refresh_instances()
             self._auto_preview()
@@ -2142,6 +2347,8 @@ class App(tk.Tk):
         if running and not ios.confirm(self, "Scripts are still running. Stop them and quit?",
                                        "Quit Rerun?", ok="Stop & Quit", destructive=True):
             return
+        if self._app_ready:   # a downloaded update: swap it in as Rerun closes
+            return self._install_app(restart=False)
         self.m.stop_all()
         self.disconnect_discord()
         self.destroy()
@@ -2197,7 +2404,15 @@ def run_app(root: str | Path) -> None:
     if lic is None:
         return
     remember(root)            # so the next update knows where your data is
+    updates.cleanup_after_update(root)
+    try:   # templates downloaded last time while scripts ran (rerun/updates.py)
+        updated = updates.commit_staged(root)
+    except Exception as e:  # noqa: BLE001 - never block start-up on an update
+        updated = f"Template update not installed: {e}"
     app = App(Manager(root), license=lic)
+    if updated:
+        app.after(2500, lambda: app.flash(updated, "ok"))
+        app.m.log("app", updated)
     if imported:
         app.after(1500, lambda: app.flash(imported, "ok"))
         app.m.log("app", imported)

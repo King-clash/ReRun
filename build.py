@@ -8,6 +8,7 @@ README and config are copied next to it, so the .exe works exactly like
 `python main.py`."""
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 import sys
@@ -53,6 +54,12 @@ def main() -> int:
         src = ROOT / folder
         if src.is_dir():
             shutil.copytree(src, DIST / folder, dirs_exist_ok=True)
+    # What this build shipped, so a later template update (rerun/updates.py) knows which
+    # files are still untouched and may be replaced, and which ones the user changed.
+    from tools.publish_update import content_files
+    from rerun.updates import BASELINE_FILE, sha256_file
+    baseline = {rel: sha256_file(p) for rel, p in content_files(ROOT).items()}
+    (DIST / BASELINE_FILE).write_text(json.dumps({"files": baseline}, indent=1), encoding="utf-8")
     # GS Companion's data is local only (git-ignored, never inside the exe): when you have
     # it, it is copied next to the exe for the Companion tab and unit names.
     gsc = ROOT / "data" / "gscompanion"

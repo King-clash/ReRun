@@ -13,6 +13,7 @@ py tests/test_crest_stats.py  # Phase 1 crest ledger, stats, reconstruction
 py tests/test_past_party.py   # Phase 2
 py tests/test_units.py        # Phase 3 roster + unit page readers
 py tests/test_compendium.py   # Phase 4 targets, progress, change since last scan
+py tests/test_updates.py      # signed updates against a local web server (throwaway key)
 ```
 
 Tests do not write to project data (verified 2026-11-14 by hashing all files before/after).

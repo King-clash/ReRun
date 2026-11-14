@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-11-14 — Updates: templates without a new exe, and a self-updating Rerun.exe
+- New `rerun/updates.py`: one manifest per channel (stable/beta) on any static host, signed
+  with the keygen's Ed25519 key (own domain prefix, so it can never pass as a Rerun key).
+  Every file is checked by SHA-256; an older release than one installed is refused (serial).
+- Templates/routines: downloaded to `.update_staging/`, moved into place only while no script
+  runs (else when they stop, or at the next start); the template cache is reloaded. A file is
+  replaced only if it is still what the build (`content_baseline.json`, written by build.py)
+  or an earlier update (`content_state.json`) put there, so captured/edited ones are kept.
+  `_meta.json` is merged per template and keeps a tuned threshold.
+- Rerun.exe: offered with release notes, downloaded as `Rerun.update.exe`, checked, and a
+  hidden helper swaps it in after Rerun (and the one-file bootloader) exit, keeping
+  `Rerun.old.exe`, then restarts it ("Later" installs it when you quit).
+- Settings › Updates: check on/off, channel, Check Now, status. Checks at start + every 6 h.
+- `tools/publish_update.py` writes `updates_site/` (git-ignored) for upload.
+- Off until `UPDATE_URL` in rerun/updates.py is set (no host chosen yet).
+- Checked: tests/test_updates.py 12/12 (local web server, throwaway key: tampering, wrong
+  key, replayed release, bad download, user edits kept, removals, app download); the real
+  window installing a test release; the real signing key verifying a 190-file release; the
+  swap helper with a locked exe and a closing parent process. All other suites pass.
+  Not yet done: a real Rerun.exe build updating itself from a real host.
+
 ## 2026-11-14 — Phase 6: Discord bot upgrade (BETA, not yet live-verified)
 - Alerts are embeds coloured by what happened (`alert_kind`): gold = Crest 4+ / Burst / hyper
   rare, red = stopped / stuck / failed / out of energy / game message, green = finished /

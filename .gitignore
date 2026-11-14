@@ -35,3 +35,10 @@ screenshots/
 .idea/
 Thumbs.db
 desktop.ini
+
+# Updates (rerun/updates.py, tools/publish_update.py)
+updates_site/
+.update_staging/
+content_state.json
+Rerun.update.exe*
+Rerun.old.exe
