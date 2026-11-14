@@ -30,14 +30,40 @@ SEP = ";" if sys.platform == "win32" else ":"
 INFO: dict = {}   # facts about this build for the build log (tools/buildlog.py, BUILDS.md)
 
 
+def write_version_file(path: Path, version: str) -> Path:
+    """Windows 'file details' (Properties > Details) for Rerun.exe. An exe with no company, product
+    or description looks anonymous to Defender and SmartScreen; this labels it honestly."""
+    nums = [int(x) for x in version.split(".")[:3]] + [0] * (4 - len(version.split(".")[:3]))
+    t = tuple(nums[:4])
+    path.write_text(f"""VSVersionInfo(
+  ffi=FixedFileInfo(filevers={t}, prodvers={t}, mask=0x3f, flags=0x0, OS=0x40004, fileType=0x1, subtype=0x0, date=(0, 0)),
+  kids=[
+    StringFileInfo([StringTable('040904B0', [
+      StringStruct('CompanyName', 'Rerun'),
+      StringStruct('FileDescription', 'Rerun - Grand Summoners automation helper for BlueStacks'),
+      StringStruct('FileVersion', '{version}'),
+      StringStruct('InternalName', 'Rerun'),
+      StringStruct('OriginalFilename', 'Rerun.exe'),
+      StringStruct('ProductName', 'Rerun'),
+      StringStruct('ProductVersion', '{version}'),
+      StringStruct('LegalCopyright', 'github.com/King-clash/ReRun')])]),
+    VarFileInfo([VarStruct('Translation', [1033, 1200])])
+  ]
+)
+""", encoding="utf-8")
+    return path
+
+
 def build_exe(dist: Path) -> bool:
     sys.path.insert(0, str(ROOT))
     from rerun.appicon import write_ico
     work = Path(tempfile.mkdtemp(prefix="rrb_"))  # short path for PyInstaller's scratch files
     icon = write_ico(work / "rerun.ico")
+    from rerun import __version__
+    vfile = write_version_file(work / "version_info.txt", __version__)
     cmd = [
         sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--windowed", "--onefile",
-        "--name", "Rerun", "--icon", str(icon),
+        "--name", "Rerun", "--icon", str(icon), "--version-file", str(vfile), "--noupx",
         "--distpath", str(dist), "--workpath", str(work / "build"),
         "--specpath", str(work),
         # App icon picture, loaded at run time for the window (and tray).

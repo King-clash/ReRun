@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.1 — Rerun.exe now carries Windows file details (not released yet)
+- build.py adds company, product, description and version to Rerun.exe (Properties > Details) and turns UPX off explicitly, to look less anonymous to Microsoft Defender/SmartScreen. Not proven to stop any flag.
+
 ## 1.1.0 — Quality-of-life settings (15 of 16 ideas; BETA, simulator + real fixtures)
 **Crest / loop farms** (Settings tab, per script)
 - **Palaces to farm, in order of preference** - a comma list ("Cursed Claw, Whirlwind"); the first one that is open
