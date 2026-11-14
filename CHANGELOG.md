@@ -1,6 +1,7 @@
 # Changelog
 
-## Unreleased — Crest always starts from the Home screen (BETA, simulator-tested only)
+## 1.0.2 — Crest always starts from the Home screen (BETA, simulator-tested only)
+- Also: update check defaults to King-clash/ReRun; publish script fixes; error.log for silent failures.
 - New Crest setting **Always start from the Home screen** (`start_home`, default on). On Start the
   script first reaches Home: known popups are closed with their own handlers, anything else gets
   Back (max 30 presses / 2 minutes, then it stops with a screenshot saved to debug/). Home counts
