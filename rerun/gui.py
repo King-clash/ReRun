@@ -15,7 +15,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageTk
 
-from . import errlog, ios
+from . import __version__, ios, updates
 from .adb import discover_bluestacks_instances
 from .appicon import make_icon
 from .ios import C, F, px
@@ -23,6 +23,7 @@ from .manager import Manager
 from .scripts import SCRIPTS
 from .stats import fmt_duration
 from .tray import Tray
+from .updates import UpdateError
 
 STATUS_TEXT = {"idle": "Idle", "starting": "Starting", "running": "Running",
                "paused": "Paused", "error": "Error"}
@@ -35,6 +36,7 @@ HISTORY_KINDS = {"All": None, "Crests": {"crest"}, "Energy": {"energy"},
                  "Problems": {"failure"}, "Other": {"finished", "drop", "arena", "raid", "mines",
                                                    "grand_crusade", "yuna", "queue"}}
 IDLE_PREVIEW_EVERY_S = 3.0
+STREAM_RETRY_S = 60     # after the Live View video failed, try it again this much later
 
 
 def to_photo(img: np.ndarray, max_w: int, max_h: int) -> tuple[ImageTk.PhotoImage, float]:
@@ -154,11 +156,30 @@ class StatTile(ios.Card):
             self.value.configure(text=text)
 
 
+class RerunLink:
+    """What GS Companion may ask of Rerun (gsc_app/page.py, `rerun=`): read-only facts
+    about your roster and a way to show a unit in the Units tab. It never writes."""
+
+    def __init__(self, app: "App"):
+        self.app = app
+
+    @property
+    def root(self):
+        return self.app.m.root
+
+    def unit_line(self, roster_name: str) -> str | None:
+        return self.app.m.compendium.unit_line(roster_name)
+
+    def show_unit(self, roster_name: str) -> bool:
+        return self.app.show_in_units(roster_name)
+
+
 class App(tk.Tk):
-    def __init__(self, manager: Manager):
+    def __init__(self, manager: Manager, license=None):
         ios.enable_dpi_awareness()
         super().__init__()
         self.m = manager
+        self.license = license   # rerun/license.py License (None: no key check, e.g. tests)
         ios.init(self, str(self.m.config.get("appearance", "auto")))
         self.title("Rerun")
         self.geometry(f"{px(1220)}x{px(840)}")
@@ -171,6 +192,10 @@ class App(tk.Tk):
         self._hotkeys = None
         self._closing = False
         self._weak_seen: set[str] = set()
+        self._upd_busy = False                  # an update check or download is running
+        self._upd_declined: set[str] = set()    # app versions you said "Later" to
+        self._content_pending = False           # templates staged, waiting for scripts to stop
+        self._app_ready: dict | None = None     # downloaded Rerun.exe, swapped in on quit
 
         self.nb = ios.TabView(self)
         self.nb.pack(fill="both", expand=True)
@@ -184,7 +209,15 @@ class App(tk.Tk):
         self._tab_discord = 5
         self._build_discord()
         self._build_log()
+        self._build_companion()
         self.status.configure(text="F12 stops everything  ·  F11 pauses or resumes all")
+        if self.license is not None:
+            self._show_key_status()
+            self.status.configure(cursor="hand2")
+            self.status.bind("<Button-1>", lambda e: self.change_key())
+            self._schedule_key_check()
+            self.after(1000, self._tick_key_timer)
+            self.after(600, self._wip_notice)
 
         self.tray = Tray(lambda action: self.events.put({"type": "_tray", "action": action}))
         self._tray_on = self.tray.start()
@@ -197,31 +230,321 @@ class App(tk.Tk):
         self.after(10, lambda: ios.style_window(self))
         self.after(150, self._poll_events)
         self.after(1000, self._tick)
-        self.after(4000, self._check_updates)
         self._start_hotkeys()
         if self.m.config["discord"].get("enabled"):
             self.after(500, self.connect_discord)
         self.protocol("WM_DELETE_WINDOW", self.on_close)
+        self.after(4000, self._schedule_update_check)
 
-    def _check_updates(self):
-        """Once at startup, in a thread; silent unless a newer release exists (or the setting is bad)."""
-        repo = str(self.m.config.get("update_repo") or "").strip()
-        if not repo:
+    # data from an older Rerun (rerun/migrate.py) ---------------------------------
+    def import_old_data(self):
+        """Settings › Import from another Rerun…: copy its data in, then restart Rerun."""
+        from .migrate import describe, has_user_data, import_data, summary
+        d = filedialog.askdirectory(parent=self, title="Folder of your other Rerun")
+        if not d:
             return
+        if not has_user_data(d):
+            return ios.alert(self, "That folder has no Rerun data (no stats, History, units or key).",
+                             "Import")
+        if any(i.status in ("running", "paused", "starting") for i in self.m.instances.values()):
+            return ios.alert(self, "Stop your scripts first, then import.", "Import")
+        if not ios.confirm(self, f"Copy the data from\n{d}\n{describe(d)}\n\nIt replaces this Rerun's "
+                                 "settings, stats, crest log, History, units and key. This Rerun's "
+                                 "current data is moved to backups/before_import_… first, and the "
+                                 "other folder is not changed. Rerun closes afterwards; start it "
+                                 "again to load the data.", "Import Data?", ok="Import"):
+            return
+        self.m.stats.flush()
+        try:
+            done = import_data(d, self.m.root, replace=True)
+        except (OSError, ValueError) as e:
+            return ios.alert(self, f"Could not import: {e}", "Import")
+        # closing must not write this session's stats over the imported ones
+        self.m.stats.flush = lambda *a, **k: None
+        ios.alert(self, f"Copied: {summary(done)}.\n\nRerun closes now - start it again.", "Import")
+        self.m.stop_all()
+        self.disconnect_discord()
+        self.destroy()
+
+    # updates (rerun/updates.py) ---------------------------------------------------
+    UPDATE_EVERY_MS = 6 * 3600 * 1000
+
+    def _busy(self) -> bool:
+        return any(i.status in ("running", "paused", "starting") for i in self.m.instances.values())
+
+    def _update_idle_text(self) -> str:
+        if not updates.settings(self.m.config)["url"]:
+            return "Updates are not set up in this build."
+        ver = updates.load_state(self.m.root).get("content_version")
+        return f"Templates: {ver}" if ver else "Not checked yet."
+
+    def _set_update_status(self, text: str):
+        lbl = getattr(self, "upd_status", None)
+        if lbl is not None and lbl.winfo_exists():
+            lbl.configure(text=text)
+
+    def _save_update_settings(self, *_):
+        u = self.m.config.setdefault("updates", {})
+        u["check"] = bool(self.upd_check.get())
+        u["channel"] = self.upd_channel.get().lower()
+        self.m.save_config()
+        self._set_update_status(self._update_idle_text())
+
+    def _schedule_update_check(self):
+        s = updates.settings(self.m.config)
+        if s["url"] and s["check"]:
+            self.check_updates(quiet=True)
+        self.after(self.UPDATE_EVERY_MS, self._schedule_update_check)
+
+    def check_updates(self, quiet: bool = False):
+        """Fetch the signed manifest; download new templates (applied once no script runs)
+        and offer a newer Rerun.exe. quiet = the automatic check (no 'up to date' message)."""
+        if self._upd_busy:
+            return None if quiet else self.flash("Already checking for updates…")
+        if not updates.settings(self.m.config)["url"]:
+            self._set_update_status(self._update_idle_text())
+            return None if quiet else ios.alert(
+                self, "This Rerun has no update address yet, so it cannot look for updates.",
+                "Updates")
+        self._upd_busy = True
+        self._set_update_status("Checking for updates…")
+        cfg, root = dict(self.m.config), self.m.root
 
         def work():
-            from . import updates
-            try:
-                found = updates.check(repo)
-            except ValueError as e:
-                self.m.log("app", str(e), level="warn")
-                return
-            except Exception as e:  # noqa: BLE001 - offline / rate-limited: just skip this time
-                errlog.note("gui.check_updates", e)
-                return
-            if found:
-                self.events.put({"type": "_update", **found})
+            res, staged = updates.check(root, cfg), ""
+            if not res.error and res.plan is not None and not res.plan.empty:
+                try:
+                    updates.stage_content(root, cfg, res.plan)
+                    staged = res.plan.describe()
+                except Exception as e:  # noqa: BLE001 - reported, never raised
+                    res.error = f"Template update failed: {e}"
+            self.events.put({"type": "_update", "result": res, "staged": staged, "quiet": quiet})
         threading.Thread(target=work, daemon=True).start()
+        return None
+
+    def _on_update_result(self, ev: dict):
+        self._upd_busy = False
+        res, quiet = ev["result"], ev["quiet"]
+        if res.error:
+            self._set_update_status(res.error)
+            self.m.log("app", f"Update check: {res.error}", level="warn")
+            if not quiet:
+                ios.alert(self, res.error, "Updates")
+            return
+        self._set_update_status(f"{res.summary()}  ·  checked {datetime.now():%H:%M}")
+        if ev["staged"]:
+            self.m.log("app", f"Template update downloaded: {ev['staged']}")
+            self._content_pending = True
+            self._commit_content()
+        if res.app:
+            self._offer_app_update(res.app, quiet)
+        elif not quiet and not ev["staged"]:
+            self.flash(f"Rerun {__version__} is up to date", "ok")
+
+    def _commit_content(self):
+        """Move downloaded templates/routines into place - now, unless a script runs."""
+        if not self._content_pending:
+            return
+        if self._busy():
+            self._set_update_status("New templates downloaded - they install when your scripts stop.")
+            return
+        self._content_pending = False
+        try:
+            msg = updates.commit_staged(self.m.root)
+        except (UpdateError, OSError) as e:
+            self.m.log("app", f"Template update not installed: {e}", level="error")
+            self._set_update_status(f"Template update not installed: {e}")
+            return
+        if not msg:
+            return
+        self.m.store.reload()
+        try:
+            from .engine import load_routines
+            self.m.routines = load_routines(self.m.root / "routines")
+        except Exception as e:  # noqa: BLE001 - a bad routine must not undo the template update
+            self.m.log("app", f"Custom routines: {e}", level="error")
+        if hasattr(self, "refresh_checklist"):
+            self.refresh_checklist()
+        self.m.log("app", msg)
+        self.flash(msg, "ok")
+        self._set_update_status(msg)
+
+    def _offer_app_update(self, app: dict, quiet: bool):
+        v = str(app["version"])
+        if not updates.frozen():
+            self._set_update_status(f"Rerun {v} is available (this copy runs from source).")
+            self.m.log("app", f"Rerun {v} is available; this copy runs from source, so it is not "
+                              "installed")
+            return
+        if self._app_ready and self._app_ready.get("version") == v:
+            return self._ask_restart()
+        if quiet and v in self._upd_declined:
+            return
+        notes = str(app.get("notes") or "").strip()
+        mb = int(app.get("size") or 0) / 1e6
+        if not ios.confirm(self, f"Rerun {v} is available (you have {__version__})."
+                                 + (f"\n\n{notes}" if notes else "")
+                                 + f"\n\nDownload it now ({mb:.0f} MB)? Rerun restarts to finish; "
+                                   "your settings and data stay.",
+                           "Update Available", ok="Download", cancel="Later"):
+            self._upd_declined.add(v)
+            self._set_update_status(f"Rerun {v} is available - Check Now to download it.")
+            return
+        self._upd_busy = True
+        cfg, root = dict(self.m.config), self.m.root
+        last = [-1]
+
+        def progress(got, total):
+            pct = int(got * 100 / total) if total else 0
+            if pct != last[0]:
+                last[0] = pct
+                self.events.put({"type": "_update_progress", "text": f"Downloading Rerun {v}… {pct}%"})
+
+        def work():
+            try:
+                updates.download_app(root, cfg, app, progress)
+                self.events.put({"type": "_update_app", "app": app})
+            except Exception as e:  # noqa: BLE001 - reported, never raised
+                self.events.put({"type": "_update_app", "app": app, "error": str(e)})
+        threading.Thread(target=work, daemon=True).start()
+
+    def _on_app_downloaded(self, ev: dict):
+        self._upd_busy = False
+        if ev.get("error"):
+            self._set_update_status(ev["error"])
+            return ios.alert(self, ev["error"], "Update")
+        self._app_ready = ev["app"]
+        self.m.log("app", f"Rerun {ev['app']['version']} downloaded")
+        self._ask_restart()
+
+    def _ask_restart(self):
+        v = self._app_ready["version"]
+        warn = "\n\nYour scripts are running: restarting stops them." if self._busy() else ""
+        if not ios.confirm(self, f"Rerun {v} is ready.{warn}\n\nRestart now to finish? "
+                                 "(Later: it installs when you quit Rerun.)",
+                           "Restart Rerun?", ok="Restart Now", cancel="Later"):
+            self._set_update_status(f"Rerun {v} installs when you quit Rerun.")
+            return
+        self._install_app(restart=True)
+
+    def _install_app(self, restart: bool):
+        try:
+            updates.launch_swap(self.m.root, restart=restart)
+        except (UpdateError, OSError) as e:
+            self._app_ready = None
+            return ios.alert(self, f"Could not install the update: {e}", "Update")
+        self._app_ready = None
+        self.m.stop_all()
+        self.disconnect_discord()
+        self.destroy()
+
+    # key (rerun/license.py) ---------------------------------------------------
+    def _show_key_status(self):
+        lic = self.license
+        text = "F12 stops everything  ·  F11 pauses or resumes all  ·  " + lic.describe() + \
+            "  (click to change key)"
+        if self.status.cget("text") != text:
+            self.status.configure(text=text)
+        self.title("Rerun" if lic.lifetime else f"Rerun  ·  key: {lic.describe()}")
+
+    WIP_TEXT = ("Rerun is a Work In Progress.\n\nSome features are still in Beta and may not "
+                "behave as expected. Keep an eye on it while it plays, and report anything odd.")
+
+    def _wip_notice(self):
+        """Shown every time you sign in (app start and after entering a new key)."""
+        if not self._closing:
+            ios.alert(self, self.WIP_TEXT, "Work In Progress")
+
+    @staticmethod
+    def key_timer_text(lic, now: float | None = None) -> tuple[str, str]:
+        """('Key: 29d 23:59:12 left', colour key) for the Dashboard countdown."""
+        if lic.lifetime:
+            return "Key: Lifetime", "green"
+        left = max(0, int(lic.remaining(now)))
+        d, rest = divmod(left, 86400)
+        h, rest = divmod(rest, 3600)
+        m, s = divmod(rest, 60)
+        clock = f"{h:02d}:{m:02d}:{s:02d}"
+        text = f"Key: {d}d {clock} left" if d else f"Key: {clock} left"
+        return text, ("red" if left < 3600 else "orange" if left < 86400 else "secondary")
+
+    def _tick_key_timer(self):
+        """Dashboard countdown of the key's time left, every second."""
+        if self._closing or self.license is None:
+            return
+        text, color = self.key_timer_text(self.license)
+        if self.key_timer.cget("text") != text:
+            self.key_timer.configure(text=text, fg=C[color])
+        if not self.license.lifetime and self.license.remaining() <= 0 and not self.m.locked:
+            self._schedule_key_check(10)   # ended: stop at once rather than within the minute
+        self.after(1000, self._tick_key_timer)
+
+    def _schedule_key_check(self, ms: int = 60_000):
+        """One pending key check at a time."""
+        pending = getattr(self, "_key_check_id", None)
+        if pending:
+            try:
+                self.after_cancel(pending)
+            except tk.TclError:
+                pass
+        self._key_check_id = self.after(ms, self._check_key)
+
+    def _check_key(self):
+        self._key_check_id = None
+        """Every minute: remember the time (clock check) and stop when the key runs out."""
+        from .license import KeyError_, KeyStore, fmt_left
+        if self._closing or self.license is None:
+            return
+        store = KeyStore(self.m.root)
+        try:
+            self.license = store.current()
+            store.touch()
+        except KeyError_ as e:
+            return self._key_expired(str(e))
+        left = self.license.remaining()
+        if left < 3 * 86400 and not getattr(self, "_key_warned", False):
+            self._key_warned = True
+            self.flash(f"Your Rerun key runs out in {fmt_left(left)}", "info")
+        self._show_key_status()
+        self._schedule_key_check()
+
+    def _key_expired(self, reason: str):
+        """Key no longer valid: stop every script, block remote starts, ask for a new key."""
+        from .license import KeyStore
+        from .license_gate import ask_key
+        self.m.locked = True
+        self.m.stop_all()
+        self.m.log("app", f"Key: {reason} - scripts stopped until a valid key is entered")
+        if self.state() == "withdrawn":
+            self.deiconify()
+        lic = ask_key(self, KeyStore(self.m.root), reason)
+        if lic is None:
+            self.m.stop_all()
+            self.disconnect_discord()
+            return self.destroy()
+        self.license, self.m.locked = lic, False
+        self._key_warned = False
+        self.flash("Signed in: " + lic.describe(), "ok")
+        self._show_key_status()
+        self.after(300, self._wip_notice)
+        self._schedule_key_check()
+
+    def change_key(self):
+        """Click on the status line: enter another key (Cancel keeps the current one)."""
+        from .license import KeyStore
+        from .license_gate import ask_key
+        store = KeyStore(self.m.root)
+        old = store.saved_key()
+        lic = ask_key(self, store, "", quit_text="Cancel")
+        if lic is None:
+            if old:
+                store.save(old)
+            return
+        self.license = lic
+        self._key_warned = False
+        self.flash("Key changed: " + lic.describe(), "ok")
+        self._show_key_status()
+        self.after(300, self._wip_notice)
 
     # small helpers --------------------------------------------------------
     def _page(self, title: str, tab: str, icon: str, scroll: bool = False):
@@ -245,6 +568,9 @@ class App(tk.Tk):
         ios.Button(hdr, "Stop All", self.stop_all, kind="tinted", color="red",
                    icon="stop").pack(side="right", padx=(px(8), 0))
         ios.Button(hdr, "Start All", self.start_all, kind="tinted", icon="play").pack(side="right")
+        # Countdown of the signed-in key's time left (empty when Rerun runs without a key check)
+        self.key_timer = tk.Label(hdr, text="", bg=C["bg"], fg=C["secondary"], font=F["body_semi"])
+        self.key_timer.pack(side="right", padx=(0, px(18)))
 
         body = tk.Frame(page, bg=C["bg"])
         body.pack(fill="both", expand=True, padx=px(20), pady=(0, px(14)))
@@ -315,6 +641,11 @@ class App(tk.Tk):
         self.crest_note.pack(fill="x", pady=(px(4), 0))
         self._crest_cache_key = None
 
+        # Compendium summary: one line, so the Instructions box keeps its room
+        self.comp_line = self._label(left, "", anchor="w", justify="left", secondary=False)
+        self.comp_line.pack(fill="x", pady=(px(8), 0))
+        self._comp_cache_key = None
+
         ios.section_header(left, "Instructions", pady=(px(16), px(6)))
         _, self.instr = ios.text_box(left)
         self.instr.tag_configure("warn", foreground=C["orange"], font=F["footnote_semi"])
@@ -326,6 +657,8 @@ class App(tk.Tk):
         self.live_auto = tk.BooleanVar(value=bool(self.m.config.get("live_view_auto", True)))
         ios.Switch(h, self.live_auto, command=self._save_live_auto).pack(side="right", padx=(0, px(14)))
         self._label(h, "Auto").pack(side="right", padx=(0, px(6)))
+        self.live_rate = self._label(h, "")   # "30 fps" while the video stream runs
+        self.live_rate.pack(side="right", padx=(0, px(12)))
         pc = ios.Card(right, pad=6, stretch=True, color=C["viewer"])
         pc.pack(fill="both", expand=True)
         self.preview = tk.Canvas(pc.body, bg=C["viewer"], highlightthickness=0, bd=0)
@@ -336,6 +669,11 @@ class App(tk.Tk):
         self._preview_src = None   # last frame object drawn (skip redraws of the same frame)
         self._preview_busy = False
         self._preview_last_idle = 0.0
+        self._stream = None          # LiveStream (rerun/live_stream.py) while it runs
+        self._stream_serial = None
+        self._stream_seq = -1
+        self._stream_failed: dict[str, float] = {}  # serial -> when video failed (retry later)
+        self._live_loop_on = False
         self._idle_energy: dict[str, tuple[int, int, float]] = {}
 
     def selected(self) -> str | None:
@@ -381,6 +719,34 @@ class App(tk.Tk):
             v = t.get(key, 0)
             tile.set(fmt_duration(v) if key == "seconds" else f"{v:,}")
         self._refresh_crests(name)
+        self._refresh_compendium_tiles()
+
+    def _refresh_compendium_tiles(self, force: bool = False):
+        """Dashboard: last full scan, units near / at target (recomputed when scans change)."""
+        c = getattr(self.m, "compendium", None)
+        if c is None or not hasattr(self, "comp_line"):
+            return
+        p = c.r.scans_path
+        try:
+            mt = p.stat().st_mtime
+        except OSError:
+            mt = 0
+        key = (mt, len(c.r.units), int(time.time() // 600))
+        if key == self._comp_cache_key and not force:
+            return
+        self._comp_cache_key = key
+        s = c.summary()
+        last = s["last_complete"]
+        text = "Compendium:  last full scan " + (
+            datetime.fromtimestamp(last).strftime("%d %b %H:%M") if last else "none yet")
+        if s["units"]:
+            text += f"  ·  {s['units']:,} units"
+        if s["with_target"]:
+            text += f"  ·  near target {s['near']:,}  ·  at target {s['done']:,}"
+        elif s["units"]:
+            text += "  ·  no targets set"
+        if self.comp_line.cget("text") != text:
+            self.comp_line.configure(text=text)
 
     def _refresh_crests(self, name: str | None):
         """Crest 4+ / Burst / Lv4 tiles from the crest ledger (recomputed only when it changes)."""
@@ -590,6 +956,15 @@ class App(tk.Tk):
                 self._preview_busy = False
         threading.Thread(target=work, daemon=True).start()
 
+    def _energy_shot(self, name: str) -> None:
+        """A full-size screenshot just for the idle energy reading (worker thread)."""
+        def work():
+            try:
+                self._read_idle_energy(name, self.m.screenshot(name))
+            except Exception:  # noqa: BLE001 - energy is optional
+                pass
+        threading.Thread(target=work, daemon=True).start()
+
     def _read_idle_energy(self, name: str, img: np.ndarray) -> None:
         """Energy for an idle instance, from its preview frame (worker thread;
         at most once a minute per instance)."""
@@ -613,13 +988,91 @@ class App(tk.Tk):
         self.m.config["live_view_auto"] = bool(self.live_auto.get())
         self.m.save_config()
 
+    # Smooth live view: a video stream of the emulator (rerun/live_stream.py) shown at
+    # live_view_fps (default 30) while the Dashboard is on screen; 0 turns it off.
+    def _live_fps(self) -> int:
+        try:
+            return max(0, min(60, int(self.m.config.get("live_view_fps", 30))))
+        except (TypeError, ValueError):
+            return 30
+
+    def _stop_stream(self):
+        if self._stream is not None:
+            self._stream.stop()
+        self._stream, self._stream_serial = None, None
+        if self.live_rate.cget("text"):
+            self.live_rate.configure(text="")
+
+    def _manage_stream(self, name: str | None) -> bool:
+        """Start / stop the video stream for the shown instance. True while it runs."""
+        want = (name is not None and self._live_fps() > 0 and self.live_auto.get()
+                and self.nb.index() == 0 and self.state() not in ("withdrawn", "iconic"))
+        serial = self.m.instances[name].serial if want else None
+        failed_at = self._stream_failed.get(serial) if serial else None
+        if not want or (failed_at and time.monotonic() - failed_at < STREAM_RETRY_S):
+            self._stop_stream()
+            return False
+        s = self._stream
+        if s is not None and s.failed:
+            self.m.log(name, f"Live View: video stream unavailable ({s.error}) - using screenshots, "
+                             f"retrying in {STREAM_RETRY_S // 60} min")
+            self._stream_failed[serial] = time.monotonic()
+            self._stop_stream()
+            return False
+        if s is None or self._stream_serial != serial or not s.alive:
+            self._stop_stream()
+            from .live_stream import LiveStream
+            img = self._preview_img
+            portrait = img is None or img.shape[0] >= img.shape[1]
+            try:
+                self._stream = LiveStream(self.m.adb_path(), serial, portrait=portrait).start()
+            except Exception as e:  # noqa: BLE001 - fall back to screenshots
+                self.m.log(name, f"Live View: video stream could not start ({e}) - using screenshots")
+                self._stream_failed[serial] = time.monotonic()
+                return False
+            self._stream_serial, self._stream_seq = serial, -1
+        if not self._live_loop_on:
+            self._live_loop_on = True
+            self.after(10, self._live_loop)
+        return True
+
+    def _live_loop(self):
+        """Draws the newest stream frame up to live_view_fps times a second."""
+        s = self._stream
+        if s is None:
+            self._live_loop_on = False
+            return
+        started = time.perf_counter()
+        if s.seq != self._stream_seq and s.frame is not None:
+            self._stream_seq = s.seq
+            self._preview_img = s.frame
+            self._draw_preview()
+        fps = self._live_fps() or 30
+        rate = f"{min(fps, round(s.fps())):d} fps" if s.seq > 0 else "starting…"
+        if self.live_rate.cget("text") != rate:
+            self.live_rate.configure(text=rate)
+        # next frame one period after this one started (drawing time included)
+        spent = (time.perf_counter() - started) * 1000
+        self.after(max(1, int(1000 / fps - spent)), self._live_loop)
+
     def _auto_preview(self):
-        """While a script runs, show the frames it already captures (no extra
-        ADB work); when idle, take a screenshot every few seconds - and only
-        while the Dashboard is actually on screen."""
+        """Live View. With the video stream (default): smooth frames at live_view_fps.
+        Otherwise, while a script runs, show the frames it already captures (no extra
+        ADB work); when idle, take a screenshot every few seconds - and only while the
+        Dashboard is actually on screen."""
+        name = self.selected() if self.live_auto.get() else None
+        if self._manage_stream(name):
+            inst = self.m.instances[name]
+            # idle energy still comes from a full screenshot (at most once a minute)
+            last = self._idle_energy.get(name)
+            if inst.status in ("idle", "error") and inst.ctx is None and \
+                    (not last or time.time() - last[2] >= 60) and \
+                    time.monotonic() - self._preview_last_idle >= 60:
+                self._preview_last_idle = time.monotonic()
+                self._energy_shot(name)
+            return
         if not self.live_auto.get() or self.nb.index() != 0 or self.state() == "withdrawn":
             return
-        name = self.selected()
         if not name:
             return
         inst = self.m.instances[name]
@@ -636,19 +1089,34 @@ class App(tk.Tk):
 
     def _draw_preview(self):
         c = self.preview
-        c.delete("all")
         W, H = c.winfo_width(), c.winfo_height()
         if self._preview_img is None:
+            c.delete("all")
+            self._preview_item = None
             c.create_text(W // 2, H // 2, justify="center", fill=C["gray"], font=F["footnote"],
                           text="No screenshot yet\nTurn on Auto or press Screenshot")
             return
-        self._preview_src = self._preview_img
-        self._preview_photo, _ = to_photo(self._preview_img, max(50, W), max(50, H))
-        c.create_image(W // 2, H // 2, image=self._preview_photo, anchor="center")
+        self._preview_src = img = self._preview_img
+        h, w = img.shape[:2]
+        scale = min(max(50, W) / w, max(50, H) / h, 1.0)
+        size = (max(1, int(w * scale)), max(1, int(h * scale)))
+        small = img if scale == 1.0 else cv2.resize(img, size, interpolation=cv2.INTER_AREA)
+        pil = Image.fromarray(cv2.cvtColor(small, cv2.COLOR_BGR2RGB))
+        photo = self._preview_photo
+        item = getattr(self, "_preview_item", None)
+        if item is not None and photo is not None and (photo.width(), photo.height()) == size \
+                and c.coords(item) == [float(W // 2), float(H // 2)]:
+            photo.paste(pil)   # same size and place: update in place (30 fps friendly)
+            return
+        c.delete("all")
+        self._preview_photo = ImageTk.PhotoImage(pil)
+        self._preview_item = c.create_image(W // 2, H // 2, image=self._preview_photo, anchor="center")
 
     # ================================================================ settings
     def _build_settings(self):
-        _, page, _ = self._page("Script Settings", "Settings", "settings", scroll=True)
+        _, page, shdr = self._page("Script Settings", "Settings", "settings", scroll=True)
+        ios.Button(shdr, "Import from another Rerun…", self.import_old_data, kind="plain",
+                   icon="download", small=True).pack(side="right")
         wrap = tk.Frame(page, bg=C["bg"])
         wrap.pack(fill="x", padx=px(20))
         g = ios.Group(wrap)
@@ -679,6 +1147,25 @@ class App(tk.Tk):
         ios.Button(g2.row("Setup check", "Checks ADB, your instances, screen size, templates "
                           "and the text reader, with a fix for anything missing."),
                    "Run", self.open_setup_check, kind="tinted", small=True).pack()
+
+        us = updates.settings(self.m.config)
+        g3 = ios.Group(wrap, header="Updates",
+                       footer="New templates and routines install by themselves (any you captured "
+                              "or edited are kept). A new Rerun asks first, then restarts; your "
+                              "settings and data stay.")
+        g3.pack(fill="x", pady=(0, px(24)))
+        self.upd_check = tk.BooleanVar(value=us["check"])
+        ios.Switch(g3.row("Check for updates", "When Rerun opens and every few hours."),
+                   self.upd_check, command=self._save_update_settings).pack()
+        self.upd_channel = ios.Select(g3.row("Channel", "Beta gets fixes first, with less testing."),
+                                      values=["Stable", "Beta"], command=self._save_update_settings)
+        self.upd_channel.set(us["channel"].title())
+        self.upd_channel.pack()
+        right = g3.row(f"Rerun {__version__}", " ")
+        ios.Button(right, "Check Now", self.check_updates, kind="tinted", small=True).pack()
+        # the row's grey subtitle doubles as the update status line
+        self.upd_status = right.master.winfo_children()[1].winfo_children()[1]
+        self._set_update_status(self._update_idle_text())
         self.form_vars: dict[str, tk.Variable] = {}
         self.set_script.current(1)
 
@@ -1238,46 +1725,67 @@ class App(tk.Tk):
             self.m.history.clear()
             self.refresh_history()
 
-    # ================================================================ units
+    # ================================================================ units (roster + compendium)
     def _build_units(self):
+        """One Units tab: the unit roster from your scans and the Compendium (quest clear
+        targets, progress, change since the last scan)."""
+        from .compendium import FILTERS
         _, page, hdr = self._page("Units", "Units", "people")
         ios.Button(hdr, "Export CSV", self.units_export, kind="tinted",
                    icon="download").pack(side="right")
-        ios.Button(hdr, "Correct Name", self.units_correct, kind="plain", icon="edit",
-                   small=True).pack(side="right", padx=(0, px(14)))
-        ios.Button(hdr, "GSCompanion", self.units_gsc, kind="plain", icon="link",
-                   small=True).pack(side="right", padx=(0, px(14)))
+        for text, cmd, icon, color in (("Global Target", self.comp_global, "edit", None),
+                                       ("Set Target", self.comp_target, "edit", None),
+                                       ("Correct Name", self.units_correct, "edit", None),
+                                       ("Remove", self.units_remove, "delete", "red"),
+                                       ("GS Companion", self.units_gsc, "link", None)):
+            kw = {"color": color} if color else {}
+            ios.Button(hdr, text, cmd, kind="plain", icon=icon, small=True,
+                       **kw).pack(side="right", padx=(0, px(14)))
         bar = tk.Frame(page, bg=C["bg"])
         bar.pack(fill="x", padx=px(20), pady=(0, px(10)))
         self.units_q = tk.StringVar()
-        ios.Field(bar, self.units_q, width=22).pack(side="left")
+        ios.Field(bar, self.units_q, width=20).pack(side="left")
         self.units_q.trace_add("write", lambda *a: self.refresh_units())
         self.units_el = ios.Select(bar, values=["All elements", "Fire", "Water", "Earth", "Light", "Dark"],
                                    accent=True, command=self.refresh_units)
         self.units_el.set("All elements")
-        self.units_el.pack(side="left", padx=px(16))
-        self.units_incomplete = tk.BooleanVar(value=False)
-        ios.Switch(bar, self.units_incomplete, command=self.refresh_units).pack(side="left")
-        self._label(bar, "Unread fields only").pack(side="left", padx=(px(6), 0))
-        self.units_summary = self._label(bar, "")
-        self.units_summary.pack(side="right")
+        self.units_el.pack(side="left", padx=(px(16), 0))
+        self.comp_show = ios.Select(bar, values=list(FILTERS), accent=True, command=self.refresh_units)
+        self.comp_show.set(FILTERS[0])
+        self.comp_show.pack(side="left", padx=px(16))
+        self._label(bar, "Near target from").pack(side="left")
+        self.comp_near = ios.Select(bar, values=["75%", "80%", "90%", "95%"], accent=True,
+                                    command=self._comp_near_changed)
+        self.comp_near.set(f"{self.m.compendium.targets.get('near_pct') or 90}%")
+        self.comp_near.pack(side="left", padx=(px(6), 0))
+        self.units_summary = self._label(page, "", anchor="w", justify="left")
+        self.units_summary.pack(fill="x", padx=px(24), pady=(0, px(6)))
 
         lc = ios.Card(page, pad=6, stretch=True)
         lc.pack(fill="both", expand=True, padx=px(20), pady=(0, px(14)))
-        cols = ("name", "element", "race", "quest_clears", "first_seen", "last_seen")
-        heads = ("Name", "Element", "Race", "Quest clears", "First seen", "Last seen")
+        cols = ("name", "element", "race", "clears", "target", "pct", "remaining", "delta")
+        heads = ("Unit", "Element", "Race", "Clears", "Target", "Progress", "Remaining", "Change")
         sb = ttk.Scrollbar(lc.body, orient="vertical", style="IOS.Vertical.TScrollbar")
-        self.units_tree = ttk.Treeview(lc.body, columns=cols, show="headings", style="IOS.Treeview",
-                                       selectmode="browse", yscrollcommand=sb.set)
+        # Taller rows with the unit's picture (GS Companion's thumbnail) in the first column.
+        ttk.Style(self).configure("Units.IOS.Treeview", rowheight=px(44), indent=0)
+        self.units_tree = ttk.Treeview(lc.body, columns=cols, show="tree headings",
+                                       style="Units.IOS.Treeview", selectmode="browse",
+                                       yscrollcommand=sb.set)
+        self.units_tree.heading("#0", text="")
+        self.units_tree.column("#0", width=px(52), minwidth=px(52), stretch=False, anchor="center")
+        self._unit_pics: dict[str, object] = {}   # name -> PhotoImage (or None: no picture)
         sb.configure(command=self.units_tree.yview)
         self._units_sort = ("name", False)
-        for c, h, w in zip(cols, heads, (260, 90, 110, 110, 110, 110)):
+        for c, h, w in zip(cols, heads, (240, 76, 84, 84, 100, 160, 90, 130)):
             self.units_tree.heading(c, text=h, command=lambda c=c: self._units_sort_by(c))
             self.units_tree.column(c, width=px(w), stretch=(c == "name"),
-                                   anchor="w" if c in ("name", "race") else "center")
+                                   anchor="w" if c in ("name", "race", "pct") else "center")
         self.units_tree.tag_configure("uncertain", foreground=C["orange"])
+        self.units_tree.tag_configure("done", foreground=C["green"])
+        self.units_tree.tag_configure("near", foreground=C["blue"])
         sb.pack(side="right", fill="y", pady=px(4))
         self.units_tree.pack(side="left", fill="both", expand=True)
+        self.units_tree.bind("<Double-1>", lambda e: self.comp_target())
         self.units_empty = tk.Label(lc.body, bg=C["card"], fg=C["secondary"], font=F["footnote"],
                                     justify="center",
                                     text="No units yet\nOpen Units in-game and run the Compendium Counter "
@@ -1286,34 +1794,73 @@ class App(tk.Tk):
 
     def _units_sort_by(self, col: str):
         cur, desc = self._units_sort
-        self._units_sort = (col, not desc if cur == col else col in ("quest_clears", "last_seen"))
+        self._units_sort = (col, not desc if cur == col else col in ("clears", "pct", "delta", "last_seen"))
         self.refresh_units()
 
+    def _comp_near_changed(self):
+        try:
+            self.m.compendium.set_near(int(self.comp_near.get().rstrip("%")))
+        except ValueError:
+            return
+        self.refresh_units()
+        self._refresh_compendium_tiles(force=True)
+
     def refresh_units(self):
-        r = self.m.units
+        from .compendium import bar
+        c = self.m.compendium
         el = self.units_el.get()
-        rows = r.rows(search=self.units_q.get(), sort=self._units_sort[0], desc=self._units_sort[1],
-                      element=None if el in ("", "All elements") else el,
-                      only_incomplete=self.units_incomplete.get())
+        rows = c.rows(search=self.units_q.get(), sort=self._units_sort[0], desc=self._units_sort[1],
+                      show=self.comp_show.get() or "All units",
+                      element=None if el in ("", "All elements") else el)
         self.units_tree.delete(*self.units_tree.get_children())
-        for u in rows:
-            def val(f):
-                v = r.value(u, f)
-                if v is None:
-                    return "–"
-                st = u["fields"][f].get("status")
-                return f"{v:,}" if isinstance(v, int) else (f"{v}?" if st == "uncertain" else str(v))
-            unsure = u.get("name_status") == "uncertain"
-            self.units_tree.insert("", "end", iid=u["name"], tags=("uncertain",) if unsure else (),
-                                   values=(u["name"] + (" ?" if unsure else ""), val("element"),
-                                           val("race"), val("quest_clears"),
-                                           datetime.fromtimestamp(u["first_seen"]).strftime("%d %b %Y"),
-                                           datetime.fromtimestamp(u["last_seen"]).strftime("%d %b %Y")))
+        for r in rows:
+            tgt = "" if not r["target"] else (f"{r['target']:,}" + (" (all)" if r["target_kind"] == "global" else ""))
+            clears = "–" if r["clears"] is None else f"{r['clears']:,}" + ("?" if r["status"] == "uncertain" else "")
+            el_txt = "–" if not r["element"] else r["element"] + ("?" if r["element_unsure"] else "")
+            tags = ("uncertain",) if r["uncertain"] else ((r["state"],) if r["state"] in ("done", "near") else ())
+            pic = self._unit_pic(r["name"], r["element"])
+            self.units_tree.insert("", "end", iid=r["name"], tags=tags, image=pic or "",
+                                   values=("  " + r["name"] + (" ?" if r["uncertain"] else ""), el_txt,
+                                           r["race"] or "–", clears, tgt, bar(r["pct"]),
+                                           "" if r["remaining"] is None else f"{r['remaining']:,}",
+                                           c.change_text(r)))
         if rows:
             self.units_empty.place_forget()
         else:
             self.units_empty.place(relx=0.5, rely=0.45, anchor="center")
-        self.units_summary.configure(text=r.summary_text().replace("**", ""))
+        text = self.m.units.summary_text().replace("**", "") + "   ·   " + \
+            c.summary_text().replace("**", "").replace("\n", "   ·   ")
+        if self.units_summary.cget("text") != text:
+            self.units_summary.configure(text=text)
+
+    # kept for callers of the former Compendium tab
+    refresh_compendium = refresh_units
+
+    def _unit_pic(self, name: str, element: str | None = None):
+        """The unit's thumbnail from GS Companion's saved pictures
+        (data/gscompanion/images/unit_thumbnail_<id>.png), matched by name - units carry
+        GS Companion's name after a clear match. None when there is no picture (story
+        units the site doesn't list, or no local data)."""
+        key = f"{name}|{element}"
+        if key in self._unit_pics:
+            return self._unit_pics[key]
+        photo = None
+        g = getattr(self.m, "gsc", None)
+        if g is not None:
+            try:
+                u = next((x for x in g.units if x["name"] == name), None)
+                if u is None:
+                    u = (g.match_unit(f"{name} ({element})") if element else None) or g.match_unit(name)
+                if u and u.get("unit_id"):
+                    p = g.dir / "images" / f"unit_thumbnail_{u['unit_id']}.png"
+                    if p.exists():
+                        size = px(38)
+                        with Image.open(p) as im:
+                            photo = ImageTk.PhotoImage(im.convert("RGBA").resize((size, size), Image.LANCZOS))
+            except Exception:  # noqa: BLE001 - a missing picture never breaks the list
+                photo = None
+        self._unit_pics[key] = photo
+        return photo
 
     def _units_selected(self) -> str | None:
         sel = self.units_tree.selection()
@@ -1331,25 +1878,149 @@ class App(tk.Tk):
         name = self._units_selected()
         if not name:
             return ios.alert(self, "Select a unit first.", "Correct Name")
-        right = ios.ask_string(self, "Correct Name",
-                               f"Rerun read this name as '{name}'. Type the correct name - future "
-                               "scans will remember it.", name)
+        # GS Companion's spelling, when it knows a close match, is offered (never applied
+        # without you pressing OK).
+        suggest = self._gsc_suggest(name)
+        msg = f"Rerun read this name as '{name}'. Type the correct name - future scans will remember it."
+        if suggest and suggest != name:
+            msg += f"\n\nGS Companion suggests: {suggest}"
+        right = ios.ask_string(self, "Correct Name", msg, suggest or name)
         if right and right.strip() and right.strip() != name:
             self.m.units.correct_name(name, right.strip())
+            self.m.compendium.rename(name, right.strip())
             self.flash(f"Saved: '{name}' is {right.strip()}", "ok")
             self.refresh_units()
+            self._companion_refresh()
+
+    def units_remove(self):
+        name = self._units_selected()
+        if not name:
+            return ios.alert(self, "Select a unit first.", "Remove Unit")
+        if ios.confirm(self, f"Remove '{name}' from the roster? Use this for misreadings. "
+                             "Earlier scan records are kept; a later scan adds the unit again "
+                             "if it is really on your account.", "Remove Unit?",
+                       ok="Remove", destructive=True):
+            self.m.units.remove(name)
+            self.flash(f"Removed '{name}'", "ok")
+            self.refresh_units()
+            self._companion_refresh()
 
     def units_gsc(self):
-        """GSCompanion as a reference you open yourself: Rerun copies the unit's name and
-        opens GSCompanion's Units page (nothing is downloaded from the site)."""
+        """Open the selected unit in the GS Companion tab (or its website when the tab or
+        its data is not available)."""
+        name = self._units_selected()
+        page = getattr(self, "companion", None)
+        if page is not None:
+            if not name:
+                self.nb.select(self._tab_companion)
+                return
+            if page.show_rerun_unit(name, self._unit_element(name)):
+                self.nb.select(self._tab_companion)
+                return
+            return self.flash(f"GS Companion has no unit matching '{name}' - correct the name "
+                              "first if it was misread", "info")
         import webbrowser
         from .units import GSC_UNITS_URL
-        name = self._units_selected()
         if name:
             self.clipboard_clear()
             self.clipboard_append(name)
             self.flash(f"Copied '{name}' - paste it into GSCompanion's search", "info")
         webbrowser.open(GSC_UNITS_URL)
+
+    def _unit_element(self, name: str) -> str | None:
+        u = self.m.units.units.get(name)
+        return self.m.units.value(u, "element") if u else None
+
+    def _gsc_suggest(self, name: str) -> str | None:
+        page = getattr(self, "companion", None)
+        if page is None:
+            return None
+        try:
+            return page.match_name(name, self._unit_element(name))
+        except Exception:  # noqa: BLE001 - a suggestion must never break correcting
+            return None
+
+    @staticmethod
+    def _parse_count(text: str | None) -> int | None | bool:
+        """'' -> None (clear), '500' / '1,000' -> int, anything else -> False."""
+        t = (text or "").replace(",", "").strip()
+        if not t:
+            return None
+        return int(t) if t.isdigit() else False
+
+    def comp_target(self):
+        name = self._units_selected()
+        if not name:
+            return ios.alert(self, "Select a unit first.", "Set Target")
+        c = self.m.compendium
+        cur = c.targets["units"].get(name)
+        text = ios.ask_string(self, "Set Target",
+                              f"Quest clear target for {name}. Leave empty to use the global "
+                              "target instead.", str(cur or ""))
+        if text is None:
+            return
+        n = self._parse_count(text)
+        if n is False:
+            return ios.alert(self, "Type a whole number, e.g. 500.", "Set Target")
+        c.set_target(name, n)
+        self.flash(f"{name}: target {n:,}" if n else f"{name}: uses the global target", "ok")
+        self.refresh_units()
+        self._refresh_compendium_tiles(force=True)
+        self._companion_refresh()
+
+    def comp_global(self):
+        c = self.m.compendium
+        text = ios.ask_string(self, "Global Target",
+                              "Quest clear target for every unit without its own target. "
+                              "Leave empty for none.", str(c.targets.get("global") or ""))
+        if text is None:
+            return
+        n = self._parse_count(text)
+        if n is False:
+            return ios.alert(self, "Type a whole number, e.g. 100.", "Global Target")
+        c.set_global(n)
+        self.flash(f"Global target {n:,}" if n else "Global target removed", "ok")
+        self.refresh_units()
+        self._refresh_compendium_tiles(force=True)
+        self._companion_refresh()
+
+    # ================================================================ GS Companion
+    def _build_companion(self):
+        """GS Companion (gsc_app/): Crest Palace guides, crests, units, team checker and farm
+        planner, linked to your roster both ways. Last tab, so the others keep their index.
+        Left out when gsc_app/ is missing."""
+        self.companion = None
+        try:
+            from gsc_app.page import GSCompanionPage
+        except ImportError:
+            return
+        page = GSCompanionPage(self.nb.content, self.m.root, flash=self.flash,
+                               rerun=RerunLink(self))
+        self.nb.add(page, "Companion", "search")
+        self.companion = page
+        self._tab_companion = len(self.nb._pages) - 1
+
+    def _companion_refresh(self):
+        page = getattr(self, "companion", None)
+        if page is not None:
+            try:
+                page.rerun_changed()
+            except Exception as e:  # noqa: BLE001 - never let the companion break Rerun
+                self.m.log("app", f"GS Companion refresh failed: {e}", level="error")
+
+    def show_in_units(self, name: str) -> bool:
+        """Select a roster unit in the Units tab (from GS Companion)."""
+        if name not in self.m.units.units:
+            return False
+        self.units_q.set("")
+        self.units_el.set("All elements")
+        self.comp_show.set("All units")
+        self.refresh_units()
+        self.nb.select(4)
+        if self.units_tree.exists(name):
+            self.units_tree.selection_set(name)
+            self.units_tree.see(name)
+        return True
 
     # ================================================================ discord
     def _build_discord(self):
@@ -1572,6 +2243,8 @@ class App(tk.Tk):
                     history_changed = True
                     if ev.get("entry", {}).get("kind") == "compendium":
                         self.after(50, self.refresh_units)  # a unit scan just finished
+                        self.after(90, lambda: self._refresh_compendium_tiles(force=True))
+                        self.after(120, self._companion_refresh)
                 elif t == "_preview":
                     self._preview_img = ev["img"]
                     self._draw_preview()
@@ -1584,8 +2257,11 @@ class App(tk.Tk):
                 elif t == "_setup":
                     self._show_setup_results(ev["checks"])
                 elif t == "_update":
-                    self.m.log("app", f"Rerun {ev['version']} is available: {ev['url']}")
-                    self.flash(f"Rerun {ev['version']} is available - see the Log for the link", "info")
+                    self._on_update_result(ev)
+                elif t == "_update_progress":
+                    self._set_update_status(ev["text"])
+                elif t == "_update_app":
+                    self._on_app_downloaded(ev)
                 elif t == "_hotkey":
                     ev["fn"]()
                 elif t == "_tray":
@@ -1598,6 +2274,8 @@ class App(tk.Tk):
         self.after(150, self._poll_events)
 
     def _tick(self):
+        if self._content_pending and not self._busy():
+            self._commit_content()
         if self.state() != "withdrawn":
             self.refresh_instances()
             self._auto_preview()
@@ -1669,6 +2347,8 @@ class App(tk.Tk):
         if running and not ios.confirm(self, "Scripts are still running. Stop them and quit?",
                                        "Quit Rerun?", ok="Stop & Quit", destructive=True):
             return
+        if self._app_ready:   # a downloaded update: swap it in as Rerun closes
+            return self._install_app(restart=False)
         self.m.stop_all()
         self.disconnect_discord()
         self.destroy()
@@ -1678,6 +2358,8 @@ class App(tk.Tk):
         keep the process alive after the window is gone)."""
         if not self._closing:
             self._closing = True
+            if getattr(self, "_stream", None) is not None:
+                self._stream.stop()   # ends the emulator's screenrecord
             self.m.stats.flush()
             tray = getattr(self, "tray", None)
             if tray is not None:
@@ -1709,5 +2391,29 @@ Alerts:  rare crests, Crest Bursts, hyper rare drops, failures, crashes and fini
 
 
 def run_app(root: str | Path) -> None:
-    app = App(Manager(root))
+    from .license_gate import _appearance, require_key
+    from .migrate import remember
+    from .migrate_ui import offer_import
+    # A new copy with no data: offer to bring it over from the previous Rerun (before
+    # sign-in, so the key comes along too). rerun/migrate.py
+    try:
+        imported = offer_import(root, _appearance(root))
+    except Exception as e:  # noqa: BLE001 - never block start-up on the import offer
+        imported = f"Could not look for older Rerun data: {e}"
+    lic = require_key(root)   # Rerun opens only with a valid key (rerun/license.py)
+    if lic is None:
+        return
+    remember(root)            # so the next update knows where your data is
+    updates.cleanup_after_update(root)
+    try:   # templates downloaded last time while scripts ran (rerun/updates.py)
+        updated = updates.commit_staged(root)
+    except Exception as e:  # noqa: BLE001 - never block start-up on an update
+        updated = f"Template update not installed: {e}"
+    app = App(Manager(root), license=lic)
+    if updated:
+        app.after(2500, lambda: app.flash(updated, "ok"))
+        app.m.log("app", updated)
+    if imported:
+        app.after(1500, lambda: app.flash(imported, "ok"))
+        app.m.log("app", imported)
     app.mainloop()

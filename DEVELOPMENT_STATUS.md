@@ -9,36 +9,54 @@
 - Python: `%LOCALAPPDATA%\Programs\Python\Python312\python.exe` (not on PATH)
 - Git: `C:\Program Files\Git\cmd\git.exe` (prepend to PATH in a fresh shell)
 
-## Phase 3 (Unit Roster) — BETA, 2026-11-14
-Built from real captures; live full scan pending: user stops farming, opens Units (top of list),
-starts Compendium Counter. Check: units/roster.json fills, uncertain names have debug/ frames,
-grid scrolling dedupes. GSCompanion: never fetch/cache its data (robots.txt blocks Anthropic
-crawlers) — link-out only. Phase 4 (Compendium) builds on units/scans.jsonl (quest_clears per scan).
+Note: the checkout is currently on branch `data/gscompanion` (another session's GSC app work,
+`gsc_app/`, is committed there too); `main` stops at fdac815.
 
-## Current phase
-Milestone A · Phase 2 COMPLETE (Start path live-verified 2026-11-14 14:33; Resume/relaunch/relogin
-simulator-only). Phase 3 Unit Roster BETA (built, live scan pending); Phase 4 Compendium next.
-Phase 2 live check: on Start, the log should show "Selecting Past Party", "Ticking Include AI"
-(or straight to Apply), "Past Party applied with Include AI - dialog closed"; capture the Past
-Party dialog as tests/fixtures/past_party_dialog.png.
+## Phase 3 (Unit Roster) — BETA, 2026-11-14
+Full live scan 15:22–16:40 (build 81e47c8): 191 units, all five elements, 189 with quest clears,
+27 names uncertain (incl. junk "wee", "ae", "sc" — removable with the Units tab's Remove button).
+Water/Earth elements from that scan are stored "uncertain" (icons not yet verified in that build);
+a rescan on 382e212 upgrades them. GSCompanion: link-out only from Rerun (robots.txt).
+Phase 4 (Compendium) builds on units/scans.jsonl (quest_clears per scan).
+
+## Phase 4 (Compendium) — BETA, 2026-11-14
+rerun/compendium.py + Compendium tab + dashboard line + /compendium. Targets in
+units/targets.json. Checked against a temp copy of the live data (191 units). Not live-verified in
+the installed app yet. Weekly automatic scans not done (no navigation to the Units list).
+
+## Units + Companion (2026-11-14, user request)
+Units and Compendium are one tab; the GS Companion app is the last tab (Companion), linked both
+ways. GS Companion unit names take priority over OCR names on a clear match (user decision,
+overrides the brief's "never overwrite" for names read by OCR; manual names/fields are never
+touched). Data stays local: data/gscompanion (git-ignored), copied next to the exe by build.py.
+The installed app needs that folder next to Rerun.exe for the tab and the names.
+Installed 17:11 (83b5283): 89 units renamed on start, 11 uncertain; backup
+backups/preinstall_20261114_171145 holds the roster before the renames.
+
+## Installed build
+2026-11-14 17:32: c5e9c31 (Units pictures + Live View 30 fps), exe only; 96 user files unchanged;
+relaunched, no crash.log, the Live View stream started. Backup backups/preinstall_20261114_173247.
+Not in this exe: the new app icon (another session's uncommitted work in rerun/appicon.py,
+rerun/assets/, build.py).
+
+## Crest start-from-Home (v1.0.3) — BETA (simulator only, not live-verified)
+Crest goes Home first on Start (setting `start_home`, default on), then walks Exploring > Crest
+Palace > palace tile > quest. The installed templates have no `crest_palace_target` /
+`crest_palace_<day>` tile, so Crest stops with a "missing template" message until one is captured
+(Templates tab) or the setting is turned off. Live check: log should read "Getting to the Home
+screen first" > "On the Home screen" > Exploring > Crest Palace > "Opened palace" > quest.
+Releases: `py tools/publish.py X.Y.Z --push` (tests, `build.py --release`, tag, GitHub release for
+King-clash/ReRun; only when the user asks). The signed in-app update system (rerun/updates.py) is
+separate and stays off until `UPDATE_URL` is set.
 
 ## Completed
-- Phase 0 (2026-11-14): recovery, git baseline f4df578, backups, docs, baseline 54/54.
-- Phase 1 (2026-11-14, BETA): crest ledger (rerun/crest_stats.py), reconstruction, dashboard
-  tiles, /crests. 65/65 tests. Not yet live-verified with the rebuilt exe.
-
-## Crest start-from-Home — BETA (simulator only, not live-verified)
-Crest now goes Home first on Start (setting `start_home`, default on). The user's installed
-templates have no `crest_palace_target` / `crest_palace_<day>` tile yet, so Crest will stop with a
-"missing template" message until one is captured (Templates tab) - or turn the setting off.
-Live check pending: Start from a quest page / popup, watch the log: "Getting to the Home screen
-first" > "On the Home screen" > Exploring > Crest Palace > "Opened palace" > quest.
-
-## Active task
-None open. Phase 2 is done; Phase 3 awaits its live scan.
+- Phase 0: recovery, git baseline f4df578, backups, docs.
+- Phase 1 (BETA): crest ledger, reconstruction, dashboard tiles, /crests; live-verified 13:57.
+- Phase 2 (COMPLETE, Start path live-verified 14:33; Resume/relaunch/relogin simulator-only).
+- Phase 3 (BETA): see above.
 
 ## Outstanding (Milestone A)
-3 Units (live scan) · 4 Compendium · 5 Compendium Farm · 6 Discord.
+5 Compendium Farm (BLOCKED: no Training/Exploring templates) · 6 Discord.
 
 ## Known issues / facts
 - History is capped at 2000 entries and deletes the oldest (with thumbnails) — all-time crest stats
@@ -67,6 +85,19 @@ the installed app: restart added 0 records; counted crests 76 = History 76. The 
 crest_log.jsonl keeps 11 duplicate "history" records from the 14:10 restart, ignored at read time
 (do not delete them).
 
+2026-11-14 16:41: build 382e212 installed (exe only; 95 user files hash-verified unchanged;
+relaunched, no crash.log). Rollback: `backups/preinstall_20261114_164106/Rerun.exe`.
+
+## Key system (2026-11-14, user request)
+Rerun needs a key (rerun/license.py, sign-in rerun/license_gate.py). Signing key:
+%LOCALAPPDATA%\Rerun Keygen\signing_key.txt (back it up; never commit). Public key in
+rerun/license.py. Key generator: tools/keygen.py / dist/Rerun Keygen/. Before installing a
+key-system build, the user needs a key for themselves (or the installed app stops at sign-in).
+Built to dist/Rerun (key system)/ because dist/Rerun/Rerun.exe was running.
+
 ## Next actions
-1. Live-verify that a crest after a potion refill is logged once (needs a farm that runs out of energy).
-2. Phase 3 live full scan (see top section), then Phase 4 Compendium.
+1. User: Remove the junk units and correct uncertain names in the Units tab (their decision).
+2. Live-verify that a crest after a potion refill is logged once (needs a farm that runs out of energy).
+3. Phase 4 build 387b9f1 installed 16:52 (exe only, 95 user files unchanged, no crash.log; backup
+   backups/preinstall_20261114_165231). User to check the Compendium tab and set targets.
+4. Phase 5 Compendium Farm: needs captures of Exploring > Tower of Initiation > Training > Cross Battle.

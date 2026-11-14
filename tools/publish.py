@@ -1,7 +1,7 @@
 """Publish a Rerun release:  py tools/publish.py 1.1.0 [--push]
 
 Steps: check the tree is clean and no secrets are tracked -> run all tests -> bump
-rerun/__init__.py -> build Rerun.exe -> zip it -> commit "Release vX" and tag vX.
+rerun/__init__.py -> build.py --release (clean zip) -> commit "Release vX" and tag vX.
 With --push (asks to confirm): push HEAD to origin/main and the tag, then create the GitHub release
 with the zip attached (needs the GitHub CLI `gh`, signed in).
 
@@ -61,12 +61,14 @@ def main() -> int:
     INIT.write_text(re.sub(r'__version__ = ".*"', f'__version__ = "{version}"',
                            INIT.read_text(encoding="utf-8")), encoding="utf-8")
 
-    print("Building...")
-    if run(sys.executable, "build.py", check=False).returncode != 0:
+    print("Building the clean release (build.py --release: leak check, blank config, bundled OCR)...")
+    if run(sys.executable, "build.py", "--release", check=False).returncode != 0:
         run("git", "checkout", "--", str(INIT))
-        die("build failed")
-    zip_base = ROOT / "dist" / f"Rerun-{version}"
-    zip_path = Path(shutil.make_archive(str(zip_base), "zip", ROOT / "dist" / "Rerun"))
+        die("release build failed or was not safe to share")
+    zip_path = ROOT / "release" / f"Rerun-{version}.zip"
+    if not zip_path.exists():
+        run("git", "checkout", "--", str(INIT))
+        die(f"expected {zip_path} after the build")
     print(f"Built {zip_path}")
 
     run("git", "add", "rerun/__init__.py")

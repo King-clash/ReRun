@@ -19,6 +19,7 @@ from .engine import Context, RoutineError, Runner, StopRoutine, load_routines, t
 from . import errlog
 from .crest_stats import CrestLedger
 from .history import History
+from .compendium import Compendium
 from .units import UnitRoster
 from .scripts import SCRIPTS
 from .scripts.base import Finished
@@ -41,6 +42,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "channel_id": 0,
         "ping_user_id": 0,
         "allowed_user_ids": [],
+        "status_board": True,   # one pinned live-status message per instance
     },
     "hotkeys": {"stop_all": "f12", "pause_all": "f11"},
     "appearance": "auto",       # auto | light | dark
@@ -50,7 +52,12 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "schedules": {},
     "summary": {"enabled": True, "time": "21:00"},  # daily Discord summary
     "setup_seen": False,
-    "update_repo": "King-clash/ReRun",  # GitHub "owner/name" (public) checked for new releases; "" = off
+    # Live View: frames per second of the emulator's video stream (rerun/live_stream.py);
+    # 0 = the old screenshot preview (one frame every few seconds when idle)
+    "live_view_fps": 30,
+    # rerun/updates.py: url "" = the address built into Rerun; channel stable | beta;
+    # check = look for updates at start and every few hours
+    "updates": {"url": "", "channel": "stable", "check": True},
 }
 
 LOG_KEEP = 3000
@@ -108,6 +115,7 @@ class Manager:
             added = {"error": repr(e)}
         self._crest_rebuild = added
         self.units = UnitRoster(self.root)
+        self.compendium = Compendium(self.units, self.history)
         self.discord = None  # set by DiscordBot.start()
         self.log_lines: list[str] = []
         self.log_entries: list[dict] = []  # same lines with instance + level, for filtering
@@ -116,6 +124,31 @@ class Manager:
         self.routines: dict[str, dict] = {}
         self.instances: dict[str, Instance] = {}
         self.reload()
+        self._setup_reference_names()
+
+    # ------------------------------------------------------------ GS Companion names
+    def _setup_reference_names(self) -> None:
+        """GS Companion unit names take priority over names read from the game when one
+        unit clearly matches (rerun/gsc_data.py reference_name). Needs the local data in
+        <root>/data/gscompanion/; without it scanned names stay as read."""
+        self.units.rename_listeners.append(self.compendium.rename)
+        self.gsc = None
+        self.reference_renames: list[tuple[str, str]] = []
+        try:
+            from .gsc_data import GSCData
+            g = GSCData(self.root)
+            if not g.available or not g.units:
+                return
+            self.gsc = g
+            self.units.reference = g.reference_name
+            self.units.reference_facts = g.unit_facts
+            self.reference_renames = self.units.adopt_reference_names(g.reference_name)
+        except Exception as e:  # noqa: BLE001 - never block startup on reference data
+            self.log("app", f"GS Companion names not applied: {e}", level="error")
+            return
+        if self.reference_renames:
+            self.log("app", f"Units: {len(self.reference_renames)} name(s) replaced with GS Companion's "
+                            "(old spellings kept as aliases; see units/renames.jsonl)")
 
     # ------------------------------------------------------------ config
     def reload(self) -> list[str]:
@@ -247,7 +280,31 @@ class Manager:
             if image is not None:
                 ok, buf = cv2.imencode(".png", image)
                 png = buf.tobytes() if ok else None
-            self.discord.send(f"[{instance}] {message}", png, ping)
+            if hasattr(self.discord, "alert"):
+                self.discord.alert(instance, message, png, ping)   # colour-coded embed + buttons
+            else:
+                self.discord.send(f"[{instance}] {message}", png, ping)
+
+    def energy(self, name: str, fresh: bool = False) -> tuple[int, int, float] | None:
+        """(current, max, when read) for an instance: what its running script last read,
+        else a cached reading; fresh=True reads it now from a screenshot (worker thread)."""
+        inst = self.instances.get(name)
+        if inst is None:
+            return None
+        cache = self.__dict__.setdefault("_energy", {})
+        e = inst.ctx.params.get("energy") if inst.ctx is not None else None
+        if e:
+            cache[name] = e
+            return e
+        if fresh:
+            try:
+                from .ocr import get_ocr, read_energy
+                r = read_energy(get_ocr(self.config.get("tesseract_path", "auto")), self.screenshot(name))
+            except Exception:  # noqa: BLE001 - no device / no OCR: unknown
+                r = None
+            if r:
+                cache[name] = (r[0], r[1], time.time())
+        return cache.get(name)
 
     def _set_status(self, inst: Instance, status: str, detail: str = "") -> None:
         inst.status = status
@@ -268,7 +325,11 @@ class Manager:
         return dev.screencap()
 
     # ------------------------------------------------------------ control
+    locked = False   # set by the app while its key is expired: nothing may start
+
     def start(self, name: str, script: str | None = None) -> str:
+        if self.locked:
+            return "Rerun's key has expired - enter a new key in Rerun to start scripts"
         with self._lock:
             inst = self.instances.get(name)
             if not inst:

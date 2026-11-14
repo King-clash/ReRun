@@ -11,9 +11,12 @@ py tests/test_features.py     # energy/potions, history, Queue, script wiring
 py tests/test_ocr.py          # Tesseract on real screenshots (needs ReStart's bin)
 py tests/test_app.py          # manager, engine, Discord, GUI start/close
 py tests/test_crest_stats.py  # Phase 1 crest ledger, stats, reconstruction
-py tests/test_past_party.py   # Phase 2 Past Party
-py tests/test_units.py        # Phase 3 unit roster
+py tests/test_past_party.py   # Phase 2
+py tests/test_units.py        # Phase 3 roster + unit page readers
+py tests/test_compendium.py   # Phase 4 targets, progress, change since last scan
+py tests/test_updates.py      # signed updates against a local web server (throwaway key)
 py tests/test_crest_home.py   # Crest starts from the Home screen
+py tests/test_errlog.py       # quiet-failure error.log
 ```
 
 Tests do not write to project data (verified 2026-11-14 by hashing all files before/after).
@@ -52,6 +55,11 @@ Crest Lv3, mailbox, errors). Also `debug_crest/` holds 3 real Equip Crest captur
 | 2026-11-14 | Crest double-count fix | 67/67 (13 test_crest_stats) |
 | 2026-11-14 | History re-import fix | 69/69 |
 | 2026-11-14 | Phase 2 Past Party | 81/81 (12 new test_past_party; test_app made deterministic) |
+| 2026-11-14 | Phase 4 Compendium | 107/107 (8 new test_compendium) + test_gsc_data 6/6 |
+| 2026-11-14 | Units+Compendium merge, Companion tab, GS Companion names | 118/118 (5 new test_reference_names) + gsc_app/test_page.py 16/16 |
+| 2026-11-14 | Updates keep your data (import from an older Rerun) | 139/139 (5 new test_migrate) + gsc_app 16/16; exe shows the import window on a fresh copy |
+| 2026-11-14 | Key system + key generator | 132/132 (11 new test_license) + gsc_app 16/16; exe: no/valid/expired key and keygen checked |
+| 2026-11-14 | Live View 30 fps (video stream) | 121/121 (3 new test_live_stream) + gsc_app 16/16; live: 30 fps drawn in 3 runs |
 
 **Live (installed exe, 2026-11-14 14:33–14:34):** Crest started from the party screen with Past
 Party on; the first run completed at 14:34:09 with no party fallback or failure in History.

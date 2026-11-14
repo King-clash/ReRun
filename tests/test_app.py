@@ -111,6 +111,7 @@ def test_discord_bot_requires_token():
 def test_gui_starts_and_closes():
     from rerun.gui import App
     m = Manager(temp_root())
+    m.config["live_view_fps"] = 0   # no video stream from a real emulator in tests
     app = App(m)
     errors = []
     app.report_callback_exception = lambda *a: errors.append(a)
@@ -140,8 +141,13 @@ def test_gui_starts_and_closes():
     app.after(900, lambda: (app.nb.select(3), app.refresh_history()))
     app.after(1100, lambda: (app.hist_kind.set("Crests"), app.refresh_history()))
     app.after(1200, lambda: (app.nb.select(4), app.units_q.set("a"), app.refresh_units()))
+    app.after(1250, lambda: (app.comp_show.set("Near target"), app.refresh_units(),
+                             app._refresh_compendium_tiles(force=True)))
     app.after(1300, lambda: app.nb.select(5))
     app.after(1500, lambda: (app.nb.select(6), app.log_level.set("Errors"), app._rebuild_log()))
+    # GS Companion tab (last) and its link back to Rerun
+    app.after(1600, lambda: (app.companion is not None and app.nb.select(app._tab_companion),
+                             app._companion_refresh()))
     app.after(1700, lambda: app.flash("hello", "ok"))
     app.after(1900, popover_open_close)
     app.after(30000, app.destroy)  # safety net if a step above never ran

@@ -36,11 +36,13 @@ rerun/
   unit_screens.py       Units-grid card finder + unit-page reader (OCR, element, quest clears)
   units.py              UnitRoster: units/roster.json, scans.jsonl, aliases.json
   crest_stats.py        CrestLedger / CrestStats (crest_log.jsonl)
-  updates.py            update check: latest GitHub release of `update_repo` vs __version__ (read-only)
   errlog.py             rate-limited error.log for errors that must not stop a script
   setup_check.py        Settings > Setup check
   restart_import.py     imports templates from a local ReStart install
-  tray.py, appicon.py   tray icon (pystray), generated app icon
+  tray.py, appicon.py   tray icon (pystray), app icon (assets/rerun_icon.png)
+  updates.py            signed update manifest: templates/routines (never over your edits,
+                        staged then committed while idle) and Rerun.exe self-replacement;
+                        published by tools/publish_update.py; Settings › Updates
   scripts/
     base.py             BaseScript: state machine loop (STATES -> handle_<state>), common popups,
                         watchdogs (stuck / no-progress / unknown screen), 24/7 crash relaunch +
@@ -81,6 +83,10 @@ listeners (`_poll_events`). There is no typed event bus yet (planned: Milestone 
 | history/history.jsonl | JSONL | kinds: crest (rarity, action), energy, failure, finished; **compacted to 2000** |
 | crest_log.jsonl (Phase 1) | JSONL | append-only crest ledger, never compacted — see below |
 | templates/_meta.json | JSON | per-template threshold, source (ReStart/user), generation, resolution |
+| units/roster.json, scans.jsonl, aliases.json (Phase 3) | JSON/JSONL | `rerun/units.py` UnitRoster: units with per-field provenance; every scan appended (with `complete`); learned name corrections |
+| units/renames.jsonl | JSONL | names replaced by GS Companion's (from, to, time); undo = Correct Name |
+| data/gscompanion/ | JSON + images | GS Companion reference data, local only (git-ignored); `rerun/gsc_data.py` GSCData, `gsc_app/` Companion tab |
+| units/targets.json (Phase 4) | JSON | `rerun/compendium.py` Compendium: global / per-unit quest clear targets, near-target %; progress and "+N since" computed from scans.jsonl |
 
 ## Crest ledger (Phase 1)
 
@@ -89,6 +95,30 @@ listeners (`_poll_events`). There is no typed event bus yet (planned: Milestone 
 (`lv3`, `lv3+`, `lv4`, `4+`, `burst`, `?`), action, palace (template / weekday), thumb, `source`
 (`live` / `history` reconstruction) and `confidence`. `CrestStats` computes today / session /
 all-time counts, rates, runs-since and breakdowns from it. Lv4 is never counted as 4+.
+
+## Updates and data
+
+User data lives next to Rerun.exe (`main.app_root`). `run_app`: `migrate_ui.offer_import`
+(only when this folder has no data and an earlier Rerun folder has) -> `require_key` ->
+`migrate.remember(root)` -> `App`. `migrate.import_data(src, dst, replace=False)` copies and
+never touches `src`. Data formats only ever gain fields; config is deep-merged with defaults.
+
+## Key system
+
+`main.py` -> `rerun.gui.run_app` -> `rerun.license_gate.require_key(root)` before `App` exists:
+the saved key in `license.json` if valid, else the sign-in window. `rerun/license.py` checks
+Ed25519-signed keys against the embedded `PUBLIC_KEY`; the private key only exists in
+`%LOCALAPPDATA%\Rerun Keygen\` for `tools/keygen.py`. `App(manager, license=...)` re-checks
+every minute (`_check_key`); on expiry `Manager.locked` blocks `start()`. Tests create `App`
+directly, without a key.
+
+## Live View
+
+`rerun/live_stream.py` LiveStream streams `adb exec-out screenrecord --output-format=h264 -`
+through a local TCP socket into `cv2.VideoCapture(..., CAP_FFMPEG)` on its own thread; the GUI
+(`_manage_stream`, `_live_loop`) draws the newest frame at `live_view_fps` while the Dashboard
+is visible, and falls back to screenshots when the stream fails. Scripts never use it: they
+keep taking full-size `screencap` frames for recognition.
 
 ## OCR
 

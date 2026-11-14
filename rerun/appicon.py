@@ -1,5 +1,6 @@
-"""Rerun's app icon, drawn in code (blue rounded square with a white loop arrow),
-used for the window, the tray and the .exe."""
+"""Rerun's app icon (glossy blue rounded square with a glowing loop arrow), used for the
+window, the tray and the .exe. It is loaded from assets/rerun_icon.png; if that file is
+missing, a plain version is drawn in code instead."""
 from __future__ import annotations
 
 import math
@@ -7,8 +8,17 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
+ICON_PNG = Path(__file__).resolve().parent / "assets" / "rerun_icon.png"
+
 
 def make_icon(size: int = 256) -> Image.Image:
+    if ICON_PNG.exists():
+        with Image.open(ICON_PNG) as im:
+            return im.convert("RGBA").resize((size, size), Image.LANCZOS)
+    return _drawn_icon(size)
+
+
+def _drawn_icon(size: int) -> Image.Image:
     ss = 4
     S = size * ss
     im = Image.new("RGBA", (S, S), (0, 0, 0, 0))

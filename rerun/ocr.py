@@ -15,6 +15,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -22,7 +23,11 @@ import cv2
 import numpy as np
 
 _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+# Rerun's own folder: next to Rerun.exe, or the project folder when run from source
+APP_DIR = Path(sys.executable).parent if getattr(sys, "frozen", False) \
+    else Path(__file__).resolve().parents[1]
 CANDIDATES = [
+    APP_DIR / "tesseract" / "tesseract.exe",   # bundled by `python build.py --release`
     Path(os.environ.get("LOCALAPPDATA", "")) / "ReStart" / "bin" / "tesseract.exe",
     Path(r"C:\Program Files\Tesseract-OCR\tesseract.exe"),
     Path(r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe"),
@@ -75,7 +80,8 @@ def find_tesseract(configured: str | None = None) -> tuple[Path, Path]:
             if (data / "eng.traineddata").is_file():
                 return exe, data
     raise OcrUnavailable(
-        "Text reading needs Tesseract OCR. Rerun uses the copy that comes with ReStart "
+        "Text reading needs Tesseract OCR. Rerun uses its own copy (the tesseract folder "
+        "next to Rerun.exe - copy it along if you moved Rerun.exe), else the one that comes with ReStart "
         "(%LOCALAPPDATA%\\ReStart\\bin) - run ReStart once so it unpacks - or install "
         "Tesseract and set 'tesseract_path' in config.yaml.")
 

@@ -26,7 +26,9 @@ import threading
 import time
 from pathlib import Path
 
-STATUS_RANK = {"uncertain": 0, "estimated": 1, "ocr": 2, "verified": 3, "manual": 4}
+STATUS_RANK = {"uncertain": 0, "estimated": 1, "ocr": 2, "reference": 3, "verified": 4, "manual": 5}
+# Unit names: "manual" (you typed it) > "reference" (GS Companion's spelling, clear match)
+#             > "ocr" > "uncertain".
 FIELDS = ["element", "race", "quest_clears", "level", "rarity", "awakening"]
 # What a Units-list scan can read from a unit's page. Level / rarity / awakening are not
 # shown there; they stay empty until a screen that shows them is calibrated.
@@ -54,6 +56,11 @@ class UnitRoster:
         self._lock = threading.Lock()
         self.units: dict[str, dict] = self._load_json(self.roster_path, {})
         self.aliases: dict[str, str] = self._load_json(self.alias_path, {})
+        # reference(name, element, race) -> reference name; set by the Manager when GS
+        # Companion data is present. Applied after every scan.
+        self.reference = None
+        self.reference_facts = None        # name -> {"element", "race"} from GS Companion
+        self.rename_listeners: list = []   # (old, new) callbacks, e.g. Compendium targets
 
     @staticmethod
     def _load_json(path: Path, default):
@@ -111,6 +118,105 @@ class UnitRoster:
             self._save()
         return right
 
+    def remove(self, name: str) -> bool:
+        """Delete a unit record you don't want (e.g. a misread). Scans in scans.jsonl
+        are kept as they were; aliases pointing at it are dropped."""
+        with self._lock:
+            if self.units.pop(name, None) is None:
+                return False
+            self.aliases = {a: c for a, c in self.aliases.items() if c != name}
+            self._save()
+        return True
+
+    # ------------------------------------------------------------ reference names
+    def _apply_facts(self, u: dict) -> bool:
+        """Race / element of a unit known by its reference name: GS Companion's value
+        replaces a misread or uncertain one ('(men' -> Human) and confirms a matching one.
+        Values you entered (manual) or verified are never touched. True if changed."""
+        if self.reference_facts is None or u.get("name_status") not in ("reference", "manual", "ocr"):
+            return False
+        try:
+            facts = self.reference_facts(u["name"]) or {}
+        except Exception:  # noqa: BLE001
+            return False
+        mine = (u["fields"].get("element") or {}).get("value")
+        if u.get("name_status") != "reference" and mine and facts.get("element") not in (None, mine):
+            return False  # same name, different element: not the same unit - leave it
+        changed = False
+        for f in ("element", "race"):
+            v = facts.get(f)
+            if not v:
+                continue
+            cur = u["fields"].get(f)
+            if cur and cur.get("status") in ("manual", "verified"):
+                continue
+            if cur and cur.get("value") == v:
+                if cur.get("status") != "reference":
+                    cur["status"] = "reference"
+                    changed = True
+                continue
+            new = {"value": v, "status": "reference", "t": time.time()}
+            if cur:
+                new["read"] = cur.get("value")
+            u["fields"][f] = new
+            changed = True
+        return changed
+
+    def _reference_for(self, ob: dict) -> str | None:
+        if self.reference is None:
+            return None
+        f = ob.get("fields") or {}
+        el = (f.get("element") or {}).get("value")
+        race = (f.get("race") or {}).get("value")
+        try:
+            return norm_name(self.reference(ob.get("name", ""), el, race) or "") or None
+        except Exception:  # noqa: BLE001 - reference data is optional
+            return None
+
+    def adopt_reference_names(self, lookup) -> list[tuple[str, str]]:
+        """Give scanned units the reference (GS Companion) name when it clearly matches.
+
+        lookup(name, element, race) -> reference name or None. Names you corrected
+        yourself (manual) are never changed. The old spelling becomes an alias, so the
+        next scan maps straight onto the new name, and every rename is logged in
+        units/renames.jsonl (undo: Correct Name back). A reference name already used by
+        another unit is left alone (two readings are never merged on a guess)."""
+        done: list[tuple[str, str]] = []
+        with self._lock:
+            for name in list(self.units):
+                u = self.units[name]
+                if u.get("name_status") == "manual":
+                    continue
+                f = u.get("fields", {})
+                el = (f.get("element") or {}).get("value")
+                race = (f.get("race") or {}).get("value")
+                try:
+                    ref = lookup(name, el, race)
+                except Exception:  # noqa: BLE001 - reference data is optional
+                    ref = None
+                ref = norm_name(ref or "")
+                if not ref or ref == name or ref in self.units:
+                    continue
+                self.units[ref] = {**self.units.pop(name), "name": ref, "name_status": "reference",
+                                   "read_as": u.get("read_as") or name}
+                self.aliases[name] = ref
+                for a, c in list(self.aliases.items()):
+                    if c == name:
+                        self.aliases[a] = ref
+                done.append((name, ref))
+            facts = [n for n, u in self.units.items() if self._apply_facts(u)]
+            if done or facts:
+                self._save()
+                t = time.time()
+                with (self.dir / "renames.jsonl").open("a", encoding="utf-8") as fh:
+                    for old, new in done:
+                        fh.write(json.dumps({"t": t, "from": old, "to": new, "source": "gscompanion"},
+                                            ensure_ascii=False) + "\n")
+        for old, new in done:
+            for cb in self.rename_listeners:
+                cb(old, new)
+        return done
+
     # ------------------------------------------------------------ editing
     def set_field(self, name: str, field: str, value, status: str = "manual") -> None:
         with self._lock:
@@ -120,9 +226,11 @@ class UnitRoster:
             self._save()
 
     # ------------------------------------------------------------ scans
-    def apply_scan(self, observed: list[dict], source: str, shot_dir: str | None = None) -> dict:
+    def apply_scan(self, observed: list[dict], source: str, shot_dir: str | None = None,
+                   complete: bool | None = None) -> dict:
         """Merge one scan. observed: [{"name", "name_conf", "fields": {f: {"value",
-        "confidence"}}, "shot"}]. Returns a summary with new units and changes."""
+        "confidence"}}, "shot"}]. complete: the scan reached the end of the list
+        (False = stopped early). Returns a summary with new units and changes."""
         t = time.time()
         scan_id = time.strftime("%Y%m%d_%H%M%S", time.localtime(t))
         summary = {"scan": scan_id, "seen": 0, "new": [], "changed": [], "uncertain": [],
@@ -133,13 +241,32 @@ class UnitRoster:
                 name, how, score = self.resolve_name(ob.get("name", ""), ob.get("name_conf", 100))
                 if not name:
                     continue
+                ref = self._reference_for(ob) if how in ("new", "uncertain", "fuzzy") else None
+                if ref and ref != name and (how != "fuzzy" or ref in self.units):
+                    # GS Companion knows this unit: file the reading under its name.
+                    read = norm_name(ob.get("name", ""))
+                    if read and read != ref:
+                        self.aliases[read] = ref
+                    name, how = ref, ("exact" if ref in self.units else "reference")
                 summary["seen"] += 1
                 if how == "uncertain":
                     summary["uncertain"].append(name)
+                read = norm_name(ob.get("name", ""))
+                cur = self.units.get(name)
+                if (how == "fuzzy" and cur is not None and cur.get("name_status") == "uncertain"
+                        and ob.get("name_conf", 0) >= MIN_NAME_CONF and read and read != name):
+                    # A confident reading replaces an earlier uncertain spelling (never a
+                    # manual one); the old spelling is kept as an alias.
+                    self.units[read] = {**self.units.pop(name), "name": read, "name_status": "ocr"}
+                    self.aliases[name] = read
+                    summary.setdefault("renamed", []).append((name, read))
+                    name = read
                 u = self.units.get(name)
                 if u is None:
                     u = self.units[name] = {"name": name, "first_seen": t, "last_seen": t,
                                             "fields": {}, "name_status": "uncertain" if how == "uncertain" else "ocr"}
+                    if how == "reference":
+                        u["name_status"], u["read_as"] = "reference", norm_name(ob.get("name", ""))
                     summary["new"].append(name)
                 u["last_seen"], u["last_scan"] = t, scan_id
                 if how == "fuzzy":
@@ -170,11 +297,14 @@ class UnitRoster:
                     else:
                         summary["kept"] += 1  # lower-trust reading never replaces a better value
                 stored_obs[name] = obs_fields
+                self._apply_facts(u)
             self._save()
+            rec = {"id": scan_id, "t": t, "source": source, "observed": stored_obs,
+                   "new": summary["new"]}
+            if complete is not None:
+                rec["complete"] = bool(complete)
             with self.scans_path.open("a", encoding="utf-8") as fh:
-                fh.write(json.dumps({"id": scan_id, "t": t, "source": source,
-                                     "observed": stored_obs, "new": summary["new"]},
-                                    ensure_ascii=False) + "\n")
+                fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
         return summary
 
     def scans(self) -> list[dict]:

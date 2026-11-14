@@ -99,6 +99,35 @@ it finds — two different adb versions kill each other's server.
 `python build.py` (needs `pip install pyinstaller`) makes `dist\Rerun\Rerun.exe` and copies your
 templates, routines, README and config next to it. The .exe keeps its own stats and history.
 
+Every build of Rerun, GS Companion and the Keygen (finished or failed) is listed in
+[BUILDS.md](BUILDS.md): when, version, git commit, how long it took, exe size and fingerprint,
+templates, OCR, zip size and the release leak check. `py tools/buildlog.py` rewrites it.
+
+**Sharing Rerun with other people:** use `python build.py --release`, never your own `dist\Rerun`
+(it holds your Discord token, stats, History, units and key). The release build makes
+`release\Rerun-<version>.zip` with the exe, templates, routines, README, a blank config and
+its own Tesseract (so text reading works without ReStart), and refuses to finish if any of
+your data or your Discord token got in. GS Companion data is left out. Testers need Windows
+10/11 64-bit, BlueStacks (ADB on, 1280×720, DPI 240) and a key from your keygen.
+
+## Publishing updates
+
+Rerun checks a signed update folder when it opens and every 6 hours (Settings › Updates).
+New templates and routines install by themselves once no script runs; a template or routine
+the user captured or edited is never overwritten. A newer Rerun.exe is offered, downloaded,
+checked and swapped in on restart (the old one stays as `Rerun.old.exe`).
+
+1. Set `UPDATE_URL` in `rerun/updates.py` to your host, e.g. `https://you.github.io/rerun-updates`,
+   and build (only builds with an address can update).
+2. Templates only: `py tools/publish_update.py`. A new app version: bump `__version__` in
+   `rerun/__init__.py`, `python build.py`, then
+   `py tools/publish_update.py --exe dist\Rerun\Rerun.exe --notes "What's new"`.
+   `--channel beta` publishes to Beta testers only.
+3. Upload the `updates_site\` folder so `<UPDATE_URL>/stable/manifest.json` is reachable.
+
+Releases are signed with the keygen's signing key; a release from anyone else, a changed file
+or an older release is refused.
+
 ## Tests
 
 ```
