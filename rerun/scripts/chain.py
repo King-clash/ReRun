@@ -102,7 +102,7 @@ Combine with a schedule (Settings > Schedule) to run the chain every day.
                 self.record("chain", f"Step {i} ({cls.NAME}) done")
                 if i < len(steps) or self.cfg.get("repeat"):
                     self.log("Restarting the game for the next step")
-                    self.restart_game()
+                    self.restart_game(scheduled=True)
                     self.sleep(8)
             rounds += 1
             if not self.cfg.get("repeat"):

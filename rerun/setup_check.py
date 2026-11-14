@@ -88,7 +88,8 @@ def run_checks(m) -> list[Check]:
             out.append(Check(f"{name}: Crest starts from wherever the game is", True,
                              "'Always start from the Home screen' is off."))
             continue
-        need = CrestScript.nav_missing(m.store.has, str(cfg.get("palace_name") or ""), ocr_ok)
+        prefs = ";".join(str(cfg.get(k) or "") for k in ("palace_name", "palace_by_day")).strip(";")
+        need = CrestScript.nav_missing(m.store.has, prefs, ocr_ok)
         out.append(Check(f"{name}: Crest can start from the Home screen", not need,
                          "Ready: it walks Home > Exploring > Crest Palace > palace > quest." if not need
                          else "Missing: " + ", ".join(need) + ". Capture it in the Templates tab, set "

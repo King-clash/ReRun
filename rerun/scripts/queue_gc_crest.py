@@ -48,7 +48,7 @@ TIPS
 
     def restart_to_home(self) -> None:
         self.log("Restarting the game to switch farms.")
-        self.restart_game()
+        self.restart_game(scheduled=True)
         self.sleep(8)
 
     def run(self) -> None:

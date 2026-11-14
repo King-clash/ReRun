@@ -21,8 +21,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from .. import textnav
-from .base import BASE_H, BASE_W, Finished, Setting, T, game_now
+from .. import qol, textnav
+from .base import BASE_H, BASE_W, Finished, Setting, T, game_weekday
 from .loop_farm import LOOP_SETTINGS, LOOP_TEMPLATES, LoopFarmScript
 
 RARITY_ORDER = ["lv3", "lv3+", "lv4", "4+"]
@@ -101,9 +101,14 @@ CREST HANDLING
                 help="On Start: reach the Home screen first (closing popups, pressing Back), then "
                      "walk Exploring > Crest Palace > the palace tile > quest. Off: start from "
                      "whatever screen the game is on."),
-        Setting("palace_name", "Palace to farm (name, optional)", "text", "",
-                help="Fallback when no palace picture matches (palaces rotate). Type a distinctive "
-                     "part of the name, e.g. 'Cursed Claw'. Needs the text reader."),
+        Setting("palace_name", "Palaces to farm, in order of preference (optional)", "text", "",
+                help="Fallback when no palace picture matches (palaces rotate). Distinctive parts of "
+                     "names separated by commas, best first: 'Cursed Claw, Whirlwind'. Crest opens the "
+                     "first one that is open today. Needs the text reader."),
+        Setting("palace_by_day", "Palaces per weekday (optional)", "text", "",
+                help="Overrides the list above on the days written here, e.g. "
+                     "'Mon: Cursed Claw, Whirlwind; Sat/Sun: Heavenly Light'. Days not listed use "
+                     "the list above. Weekday = the game's day (resets 6 AM UTC-6)."),
         Setting("quest_name", "Quest to farm (name, optional)", "text", "",
                 help="Fallback when no quest row picture matches, e.g. 'Experimental Scars'. "
                      "Empty: if the palace has exactly one quest, that one is opened."),
@@ -193,7 +198,7 @@ CREST HANDLING
 
     @staticmethod
     def tile_names_today() -> list[str]:
-        return [f"crest_palace_{WEEKDAYS[game_now().weekday()]}", "crest_palace_target"]
+        return [f"crest_palace_{WEEKDAYS[game_weekday()]}", "crest_palace_target"]
 
     def palace_tile_names(self) -> list[str]:
         return self.tile_names_today()
@@ -216,8 +221,10 @@ CREST HANDLING
 
     def check_nav_templates(self) -> None:
         """Before touching the game: everything the walk to the quest needs is captured."""
-        missing = self.nav_missing(self.has_template, str(self.cfg.get("palace_name") or ""),
-                                   self.ocr is not None)
+        prefs = ";".join(str(self.cfg.get(k) or "") for k in ("palace_name", "palace_by_day")).strip(";")
+        missing = self.nav_missing(self.has_template, prefs, self.ocr is not None)
+        for problem in qol.table_problems(str(self.cfg.get("palace_by_day") or "")):
+            self.log(f"Setting 'Palaces per weekday': {problem}")
         if missing:
             self.notify(f"{self.NAME}: can't start from the Home screen - missing template(s): "
                         f"{', '.join(missing)}. Capture them in the Templates tab, or turn off "
@@ -525,6 +532,7 @@ CREST HANDLING
             m = self.find("redeploy_button", screen)
             v = self.ctx.vision
             if m and v.brightness(screen, m) >= 0.75 * v.template_brightness("redeploy_button"):
+                self.energy_gate(screen)
                 self.log("Redeploying")
                 self.tap_match(m, settle=2.5)
                 return
@@ -612,21 +620,25 @@ CREST HANDLING
                 self.log(f"Opened palace ({name})")
                 self.palace = name
                 return
-        name = str(self.cfg.get("palace_name") or "").strip()
+        names = qol.names_for_day(game_weekday(), str(self.cfg.get("palace_by_day") or ""),
+                                  str(self.cfg.get("palace_name") or ""))
         words = self.ocr.screen_words(screen, min_conf=40) if self.ocr is not None else []
         shown = textnav.sample_text(words, 300, 1000)
-        if name and words:
-            hit = textnav.find_name(words, name, (300, 1000))
-            if hit:
-                self.log(f"Opened palace by name '{name}' (read: {', '.join(hit.matched)})")
-                self.palace = f"name:{name}"
-                self.tap(hit.x, hit.y, settle=3)
-                return
-            self.notify(f"Crest: the palace '{name}' is not on the Crest Palace screen (palaces rotate), "
-                        "or two palaces look alike. " + (f"I can read: {shown}. " if shown else "")
-                        + "Change 'Palace to farm' or capture its tile. Stopped.")
+        if names and words:
+            for rank, name in enumerate(names, 1):
+                hit = textnav.find_name(words, name, (300, 1000))
+                if hit:
+                    self.log(f"Opened palace by name '{name}' (choice {rank} of {len(names)}; "
+                             f"read: {', '.join(hit.matched)})")
+                    self.palace = f"name:{name}"
+                    self.tap(hit.x, hit.y, settle=3)
+                    return
+            self.notify("Crest: none of your palaces is on the Crest Palace screen today ("
+                        + ", ".join(names) + "; palaces rotate), or two palaces look alike. "
+                        + (f"I can read: {shown}. " if shown else "")
+                        + "Change 'Palaces to farm' or capture a tile. Stopped.")
             raise Finished("palace not on the list")
         self.notify("Crest: on the Crest Palace screen but no palace tile picture matched today and no "
-                    "'Palace to farm' name is set. " + (f"I can read: {shown}. " if shown else "")
-                    + "Capture crest_palace_target or set the name. Stopped.")
+                    "'Palaces to farm' name is set. " + (f"I can read: {shown}. " if shown else "")
+                    + "Capture crest_palace_target or set the names. Stopped.")
         raise Finished("palace not found")

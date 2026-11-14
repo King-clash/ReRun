@@ -99,6 +99,52 @@ def test_palace_not_on_the_list_stops_and_says_what_it_can_read():
     assert dev.taps == [] and notes and "Tower of Nowhere" in notes[0] and "I can read" in notes[0], notes
 
 
+def test_palace_preference_list_tries_names_in_order():
+    if _ocr() is None:
+        return
+    img = cv2.imread(str(FIX / "crest_palace_list.png"))
+    # first choice is not on the screen today: falls through to the second, then the third
+    s, dev, notes, logs = _script(img, {"palace_name": "Tower of Nowhere, Whirlwind, Cursed Claw"})
+    s.handle_crest_palace_screen(img)
+    (x, y), = dev.taps
+    assert 520 <= y <= 670, dev.taps                       # Whirlwind's banner
+    assert any("choice 2 of 3" in l for l in logs), logs
+    # when both are open, the FIRST in the list wins (not the one higher on the screen)
+    s, dev, notes, logs = _script(img, {"palace_name": "Heavenly Light, Cursed Claw"})
+    s.handle_crest_palace_screen(img)
+    assert 700 <= dev.taps[0][1] <= 850, dev.taps
+    # none open: stops and lists what it was looking for
+    s, dev, notes, logs = _script(img, {"palace_name": "Tower of Nowhere, Land of Nothing"})
+    try:
+        s.handle_crest_palace_screen(img)
+        raise AssertionError("should stop")
+    except Finished:
+        pass
+    assert dev.taps == [] and "Tower of Nowhere, Land of Nothing" in notes[0], notes
+
+
+def test_weekday_table_overrides_the_list_on_that_day():
+    if _ocr() is None:
+        return
+    import rerun.scripts.crest as crest_mod
+    img = cv2.imread(str(FIX / "crest_palace_list.png"))
+    table = "Mon: Whirlwind; Sat: Heavenly Light"
+    for weekday, lo, hi in ((0, 520, 670), (5, 700, 850), (2, 335, 490)):      # Wed -> list's Cursed Claw
+        orig = crest_mod.game_weekday
+        crest_mod.game_weekday = lambda d=weekday: d
+        try:
+            s, dev, notes, logs = _script(img, {"palace_name": "Cursed Claw", "palace_by_day": table})
+            s.handle_crest_palace_screen(img)
+        finally:
+            crest_mod.game_weekday = orig
+        assert lo <= dev.taps[0][1] <= hi, (weekday, dev.taps)
+
+
+def test_preflight_accepts_a_weekday_table_instead_of_a_tile_picture():
+    have = {"exploring_button", "quest_list", "crest_palace_icon"}
+    assert CrestScript.nav_missing(have.__contains__, "Mon: Cursed Claw") == []
+
+
 def test_quest_chosen_by_name_and_as_the_only_quest():
     if _ocr() is None:
         return

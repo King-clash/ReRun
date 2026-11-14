@@ -8,10 +8,12 @@ Quest page (Solo/Challenge) -> party screen (Past Party, Include AI, Apply)
 from __future__ import annotations
 
 import time
+from datetime import datetime
 
 import numpy as np
 
 from ..loop_count import set_loops
+from .. import qol
 from .base import BaseScript, Done, Finished, Setting, T
 from .energy import ENERGY_SETTINGS, ENERGY_TEMPLATES, NO_POTION, EnergyMixin
 
@@ -49,6 +51,17 @@ LOOP_SETTINGS = [
             help="Turns on Auto-Loop's own 'Refill energy with potions'. Fewer interruptions, "
                  "but the game picks the potion and Rerun can't count or cap it."),
     Setting("mode_247", "24/7 mode (recover crashes, survive daily reset)", "bool", False),
+    Setting("max_minutes", "Stop after this many minutes (0 = no limit)", "int", 0,
+            help="Rerun finishes the batch it is in, then stops instead of starting another."),
+    Setting("stop_at", "Stop at this time (HH:MM, optional)", "text", "",
+            help="Your PC's clock, 24-hour, e.g. 07:00: the next time it shows that, Rerun finishes the "
+                 "current batch and stops. Combined with the minutes above, whichever comes first wins."),
+    Setting("energy_floor", "Keep at least this much energy (0 = off)", "int", 0,
+            help="Stops (instead of using potions) when the next run would leave you below this, so "
+                 "you always have some energy for playing yourself. Checked between batches."),
+    Setting("max_restarts_per_day", "Max game restarts per day (0 = no limit)", "int", 0,
+            help="Counts restarts after crashes or no progress (not the daily relogin or maintenance). "
+                 "Over the limit Rerun stops and tells you instead of restarting again."),
 ]
 
 
@@ -79,6 +92,8 @@ class LoopFarmScript(EnergyMixin, BaseScript):
         self.drop_since = None
         self.target = int(self.cfg.get("runs") or 0)
         self.in_loop = False
+        self.time_deadline = self._time_deadline()
+        self._floor_checked_at = -1e9
         self.reset_party("start")
         self.past_party_missing_told = False
         self.last_drop = None  # unknown until the first frame
@@ -114,10 +129,60 @@ class LoopFarmScript(EnergyMixin, BaseScript):
         target = f"/{self.target}" if self.target else ""
         self.log(f"Run completed. {self.session_runs}{target} | Lifetime: {lifetime}")
 
+    def _time_deadline(self) -> float | None:
+        """Epoch seconds when 'Stop after N minutes' / 'Stop at HH:MM' says the farm should end."""
+        ends = []
+        minutes = int(self.cfg.get("max_minutes") or 0)
+        if minutes > 0:
+            ends.append(time.time() + minutes * 60)
+        stop_at = str(self.cfg.get("stop_at") or "").strip()
+        if stop_at:
+            nxt = qol.next_time_after(datetime.now(), stop_at)
+            if nxt is None:
+                self.log(f"Setting 'Stop at': '{stop_at}' is not a 24-hour HH:MM time - ignored")
+            else:
+                ends.append(nxt.timestamp())
+        if ends:
+            self.log("Time limit: stops after the batch that is running at "
+                     + datetime.fromtimestamp(min(ends)).strftime("%H:%M"))
+        return min(ends) if ends else None
+
+    def time_up(self) -> bool:
+        return getattr(self, "time_deadline", None) is not None and time.time() >= self.time_deadline
+
     def target_reached(self) -> bool:
-        return bool(self.target) and self.session_runs >= self.target
+        """Runs target hit, or the time limit passed: the batch in progress finishes, no new one starts."""
+        return (bool(self.target) and self.session_runs >= self.target) or self.time_up()
+
+    def energy_gate(self, screen, with_cost: bool = False) -> None:
+        """'Keep at least N energy': stop (never drink a potion) when the next run would leave
+        less. Reads the energy bar (and the quest's cost on the party screen) with the text reader;
+        unreadable = no stop. Looked at most every 20 s."""
+        floor = int(self.cfg.get("energy_floor") or 0)
+        if floor <= 0 or self.ocr is None:
+            return
+        now = time.monotonic()
+        if now - getattr(self, "_floor_checked_at", -1e9) < 20:
+            return
+        self._floor_checked_at = now
+        from ..ocr import read_energy, read_energy_cost
+        e = read_energy(self.ocr, screen)
+        if not e:
+            self.log("Energy floor: could not read the energy bar on this screen")
+            return
+        self.ctx.params["energy"] = (e[0], e[1], time.time())
+        cost = read_energy_cost(self.ocr, screen) if with_cost else None
+        if cost:
+            self._quest_cost = cost
+        cost = cost or getattr(self, "_quest_cost", 0)
+        if e[0] - cost < floor:
+            self.out_of_energy(f"energy is {e[0]}/{e[1]}"
+                               + (f" and the next run costs {cost}" if cost else "")
+                               + f"; you asked to keep at least {floor}")
 
     def finish(self, why: str = "") -> None:
+        if not why and self.time_up():
+            why = "Time limit reached."
         msg = f"{self.NAME} finished: {self.session_runs} run(s). {why}".strip()
         self.record("finished", msg)
         self.notify(msg, screenshot=False, ping=False)
@@ -211,6 +276,7 @@ class LoopFarmScript(EnergyMixin, BaseScript):
             self.tap_template("auto_button", screen)
             return
         self.check_energy_for_quest(screen)
+        self.energy_gate(screen, with_cost=True)
         self.log("Tapping Battle")
         self.tap_template("battle_button", screen, settle=2.0)
         self.progress()
@@ -329,7 +395,8 @@ class LoopFarmScript(EnergyMixin, BaseScript):
             return  # dimmed under a popup; that popup's own handler goes first
         self.in_loop = False
         if self.target_reached():
-            self.log("Target reached - closing results")
+            self.log("Time limit reached - closing results" if self.time_up()
+                     else "Target reached - closing results")
             # Seen live: one tap while the bar was still sliding in did nothing,
             # leaving the results open. Tap until the bar is really gone.
             for _ in range(3):
@@ -338,6 +405,7 @@ class LoopFarmScript(EnergyMixin, BaseScript):
                 if not self.results_bar_live(screen):
                     break
             self.finish()
+        self.energy_gate(screen)
         self.log("Loop finished - Redeploy")
         self.tap_template("results_redeploy", screen, settle=2.0)
         self.progress()

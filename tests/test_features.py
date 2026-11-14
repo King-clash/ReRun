@@ -173,7 +173,7 @@ def test_queue_switches_and_stops_on_rare_crest():
         ctx = ctx_for(np.zeros((1280, 720, 3), np.uint8))
         ctx.params["settings_of"] = lambda sid: {}
         s = no_wait(q.QueueScript(ctx, {"crest_minutes": 5}))
-        s.restart_game = lambda: None
+        s.restart_game = lambda **k: None
         try:
             s.run()
             raise AssertionError("queue should stop on the rare crest")
@@ -289,7 +289,7 @@ def test_chain_moves_on_only_when_nothing_needs_you():
         ctx = ctx_for(np.zeros((1280, 720, 3), np.uint8))
         s = no_wait(ChainScript(ctx, {"steps": "login_mail; crest 30m; arena; mines"}))
         restarts = []
-        s.restart_game = lambda: restarts.append(1)
+        s.restart_game = lambda **k: restarts.append(1)
         try:
             s.run()
             raise AssertionError("chain should stop at Arena")

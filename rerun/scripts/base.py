@@ -83,6 +83,11 @@ def game_now() -> datetime:
     return datetime.now(GAME_TZ)
 
 
+def game_weekday() -> int:
+    """Weekday (0 = Monday) of the GAME day, which starts at the 6 AM UTC-6 reset, not at midnight."""
+    return (game_now() - timedelta(hours=DAILY_RESET_HOUR)).weekday()
+
+
 def next_reset_after(ref: datetime, hour: int = DAILY_RESET_HOUR) -> datetime:
     cut = ref.replace(hour=hour, minute=0, second=0, microsecond=0)
     return cut if cut > ref else cut + timedelta(days=1)
@@ -484,7 +489,7 @@ class BaseScript:
                 while time.monotonic() < end:
                     self.sleep(min(30, end - time.monotonic()))
                     self.progress()
-                self.restart_game()
+                self.restart_game(scheduled=True)   # expected: the game was down for maintenance
                 return True
             self.record("popup", f"'{hit}' screen - stopped", screen)
             self.notify(f"{self.NAME}: the game says \"{said}\". Stopped - this needs you.")
@@ -542,7 +547,7 @@ class BaseScript:
             if game_now() >= self.next_reset:
                 self.log("Daily reset (6 AM UTC-6) - logging back in")
                 self.next_reset = next_reset_after(game_now())
-                self.restart_game()
+                self.restart_game(scheduled=True)   # the daily relogin is expected, not a failure
                 return True
         if time.monotonic() - self.last_progress > self.NO_PROGRESS_RESTART_S:
             mins = self.NO_PROGRESS_RESTART_S // 60
@@ -563,7 +568,24 @@ class BaseScript:
         except AdbError:
             return False
 
-    def restart_game(self) -> None:
+    def note_restart(self, scheduled: bool = False) -> None:
+        """Count a game restart against 'Max game restarts per day' and stop instead of restarting
+        again once the cap is passed (a crash loop must not run all night). Expected restarts - the
+        daily relogin, maintenance, switching farms - are free. The count is kept per game day."""
+        cap = int(self.cfg.get("max_restarts_per_day") or 0)
+        if scheduled or cap <= 0:
+            return
+        day = (game_now() - timedelta(hours=DAILY_RESET_HOUR)).strftime("%Y-%m-%d")
+        key = f"restarts.{day}"
+        done = self.ctx.stats.get(self.ctx.instance).get(key, 0)
+        if done >= cap:
+            self.notify(f"{self.NAME}: the game has already been restarted {done} time(s) today (your "
+                        f"limit is {cap}) - something keeps going wrong. Stopped instead of restarting again.")
+            raise Finished(f"restart limit reached ({cap} per game day)")
+        self.ctx.stats.incr(self.ctx.instance, key)
+
+    def restart_game(self, scheduled: bool = False) -> None:
+        self.note_restart(scheduled)
         dev = self.ctx.device
         dev.stop_game()
         self.sleep(3)
@@ -577,6 +599,7 @@ class BaseScript:
                 self.notify(f"{self.NAME}: the game closed or crashed - stopped (turn on 24/7 mode to auto-recover).")
                 raise StopRoutine("game not running")
             return
+        self.note_restart()
         self.log("Game is not running - relaunching")
         self.ctx.stats.incr(self.ctx.instance, "game_restarts")
         self.ctx.device.launch_game()
