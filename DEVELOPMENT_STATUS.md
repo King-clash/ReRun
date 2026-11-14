@@ -2,7 +2,8 @@
 
 **Read this first, then PROJECT_ROADMAP.md, ARCHITECTURE.md, TESTING.md.**
 
-- Source: `C:\Users\dandr\Documents\Rerun` (git, branch main, local only — never push)
+- Source: `C:\Users\dandr\Documents\Rerun` (git, branch main; local only until a GitHub repo exists — then push/release ONLY via
+  `py tools/publish.py X.Y.Z --push`, and only when the user asks)
 - Installed app: `C:\Users\dandr\Downloads\Rerun\Rerun` (Rerun.exe; holds the user's LIVE config,
   stats, history — never overwrite them; ask before closing Rerun)
 - Python: `%LOCALAPPDATA%\Programs\Python\Python312\python.exe` (not on PATH)
@@ -38,6 +39,16 @@ relaunched, no crash.log, the Live View stream started. Backup backups/preinstal
 Not in this exe: the new app icon (another session's uncommitted work in rerun/appicon.py,
 rerun/assets/, build.py).
 
+## Crest start-from-Home (v1.0.3) — BETA (simulator only, not live-verified)
+Crest goes Home first on Start (setting `start_home`, default on), then walks Exploring > Crest
+Palace > palace tile > quest. The installed templates have no `crest_palace_target` /
+`crest_palace_<day>` tile, so Crest stops with a "missing template" message until one is captured
+(Templates tab) or the setting is turned off. Live check: log should read "Getting to the Home
+screen first" > "On the Home screen" > Exploring > Crest Palace > "Opened palace" > quest.
+Releases: `py tools/publish.py X.Y.Z --push` (tests, `build.py --release`, tag, GitHub release for
+King-clash/ReRun; only when the user asks). The signed in-app update system (rerun/updates.py) is
+separate and stays off until `UPDATE_URL` is set.
+
 ## Completed
 - Phase 0: recovery, git baseline f4df578, backups, docs.
 - Phase 1 (BETA): crest ledger, reconstruction, dashboard tiles, /crests; live-verified 13:57.
@@ -57,7 +68,7 @@ rerun/assets/, build.py).
 - Phase 5 navigation templates (`templates/training`, `templates/exploring`) do not exist yet.
 
 ## Last successful tests
-2026-11-14 65/65 (see TESTING.md).
+2026-11-14 92/92 (`py run_tests.py`; see TESTING.md).
 
 ## Last commit
 See `git log` (Phase 1 commit follows e795766).

@@ -18,6 +18,7 @@ from typing import Any
 
 import numpy as np
 
+from .. import errlog
 from ..adb import AdbError
 from ..engine import Context, StopRoutine
 from ..vision import Match, MissingTemplate
@@ -231,7 +232,8 @@ class BaseScript:
         """The words on screen, for stuck/unknown reports ('' without OCR)."""
         try:
             return self.ocr.screen_text(screen) if self.ocr is not None else ""
-        except Exception:  # noqa: BLE001 - diagnostics must never break a script
+        except Exception as e:  # noqa: BLE001 - diagnostics must never break a script
+            errlog.note("base.screen_text", e)
             return ""
 
     def save_frame(self, tag: str, screen: np.ndarray | None = None) -> str | None:
@@ -306,8 +308,8 @@ class BaseScript:
                 e = read_energy(self.ocr, img)
                 if e:
                     self.ctx.params["energy"] = (e[0], e[1], time.time())
-            except Exception:  # noqa: BLE001 - informational only
-                pass
+            except Exception as e:  # noqa: BLE001 - informational only
+                errlog.note("base.energy_read", e)
             finally:
                 self._energy_busy = False
         import threading
@@ -430,7 +432,8 @@ class BaseScript:
         self._last_text_check = now
         try:
             words = self.ocr.screen_words(screen)
-        except Exception:  # noqa: BLE001 - the safety net must never break a script
+        except Exception as e:  # noqa: BLE001 - the safety net must never break a script
+            errlog.note("base.text_safety_net", e)
             return False
         text = _norm(" ".join(w.text for w in words))
         for phrases, action, buttons in TEXT_POPUPS:

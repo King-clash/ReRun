@@ -91,7 +91,7 @@ def test_energy_bar_reads_right_or_not_at_all():
 def test_crest_title_agrees_with_icon_on_real_screen():
     from rerun.scripts import CrestScript
     frame = img("equip_crest_lv3.png")
-    s = CrestScript(_ctx(frame), {})
+    s = CrestScript(_ctx(frame), {"start_home": False})
     s.on_start()
     box = s.find_orange_box(frame)
     assert s.read_crest_text(frame, box) == ("lv3", "Dark Resistance Lv3")
@@ -102,7 +102,7 @@ def test_crest_stops_when_title_and_icon_disagree():
     from rerun.scripts.base import Finished
     frame = img("equip_crest_lv3.png")
     ctx = _ctx(frame)
-    s = CrestScript(ctx, {})
+    s = CrestScript(ctx, {"start_home": False})
     s.on_start()
     s.sleep = lambda *a, **k: None
     s.read_crest_text = lambda screen, box: ("lv4", "Dark Resistance Lv4")

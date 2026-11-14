@@ -56,7 +56,7 @@ def run_party(cls, settings, screens=None, taps=None, start="party", stop_at="lo
 
 
 def test_crest_default_selects_past_party_with_ai_then_battles():
-    result, dev, ctx, s = run_party(CrestScript, {})
+    result, dev, ctx, s = run_party(CrestScript, {"start_home": False})
     assert result == "stopped: stopped by user", result
     assert dev.tapped[:4] == ["past_party_button", "include_ai_button", "apply_button",
                               "battle_button"], dev.tapped
@@ -74,7 +74,7 @@ def test_old_current_party_config_migrates_to_on_for_crest_only():
 
 
 def test_off_uses_current_party():
-    result, dev, ctx, s = run_party(CrestScript, {"past_party": False})
+    result, dev, ctx, s = run_party(CrestScript, {"past_party": False, "start_home": False})
     assert dev.tapped[0] == "battle_button", dev.tapped
     assert "past_party_button" not in dev.tapped
 
@@ -82,7 +82,7 @@ def test_off_uses_current_party():
 def test_include_ai_already_ticked_goes_straight_to_apply():
     taps = dict(PARTY_TAPS)
     taps[("party", "past_party_button")] = "dialog_ticked"
-    result, dev, ctx, s = run_party(CrestScript, {}, taps=taps)
+    result, dev, ctx, s = run_party(CrestScript, {"start_home": False}, taps=taps)
     assert dev.tapped[:3] == ["past_party_button", "apply_button", "battle_button"], dev.tapped
 
 
@@ -90,7 +90,7 @@ def test_never_applies_while_include_ai_is_unticked():
     """The tick doesn't register (game ignores the tap): Apply is never pressed, script stops."""
     taps = dict(PARTY_TAPS)
     del taps[("dialog", "include_ai_button")]
-    result, dev, ctx, s = run_party(CrestScript, {}, taps=taps)
+    result, dev, ctx, s = run_party(CrestScript, {"start_home": False}, taps=taps)
     assert result == "finished: Include AI could not be ticked", result
     assert "apply_button" not in dev.tapped, dev.tapped
     assert dev.tapped.count("include_ai_button") == 3
@@ -99,7 +99,7 @@ def test_never_applies_while_include_ai_is_unticked():
 def test_apply_that_does_not_close_the_dialog_stops():
     taps = dict(PARTY_TAPS)
     del taps[("dialog_ticked", "apply_button")]
-    result, dev, ctx, s = run_party(CrestScript, {}, taps=taps)
+    result, dev, ctx, s = run_party(CrestScript, {"start_home": False}, taps=taps)
     assert result == "finished: Past Party Apply did not take", result
     assert "battle_button" not in dev.tapped
 
@@ -108,7 +108,7 @@ def test_no_past_party_falls_back_to_current_party_and_notifies():
     screens = party_screens()
     screens["party"] = Screen([("battle_button", 500, 960)])  # no Past Party button
     taps = {("party", "battle_button"): "autoloop"}
-    result, dev, ctx, s = run_party(CrestScript, {}, screens=screens, taps=taps)
+    result, dev, ctx, s = run_party(CrestScript, {"start_home": False}, screens=screens, taps=taps)
     assert dev.tapped[0] == "battle_button", dev.tapped
     assert any("current party" in n for n in ctx.notes), ctx.notes
 
@@ -117,7 +117,7 @@ def test_past_party_dialog_never_opens_falls_back():
     taps = dict(PARTY_TAPS)
     taps[("party", "past_party_button")] = "party"           # tap does nothing
     taps[("party", "battle_button")] = "autoloop"
-    result, dev, ctx, s = run_party(CrestScript, {}, taps=taps)
+    result, dev, ctx, s = run_party(CrestScript, {"start_home": False}, taps=taps)
     assert dev.tapped.count("past_party_button") == 1, dev.tapped
     assert "battle_button" in dev.tapped
     assert any("dialog never opened" in n for n in ctx.notes), ctx.notes
@@ -162,7 +162,7 @@ def test_redeploy_does_not_reselect_past_party():
 
 
 def test_quest_entry_resume_and_relaunch_reset_the_party():
-    s = run_party(CrestScript, {})[3]
+    s = run_party(CrestScript, {"start_home": False})[3]
     assert s.party_done
     s.reset_party("new quest entry")
     assert not s.party_done
@@ -195,7 +195,7 @@ def test_pause_then_resume_reselects_past_party():
             else:
                 ctx.stop_event.set()
     dev.tap = tap.__get__(dev)
-    s = CrestScript(ctx, {})
+    s = CrestScript(ctx, {"start_home": False})
     run(s)
     assert dev.tapped.count("past_party_button") == 2, dev.tapped
     assert any("resumed" in m for m in ctx.logs), ctx.logs

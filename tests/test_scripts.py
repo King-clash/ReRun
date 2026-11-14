@@ -267,7 +267,7 @@ def run_crest(icon: str, keep: str = "4+ and Burst only", runs: int = 0):
     dev.tap = tap.__get__(dev)
     with tempfile.TemporaryDirectory() as d:
         ctx = make_ctx(Path(d), dev, CrestScript)
-        s = CrestScript(ctx, {"keep": keep, "runs": runs})
+        s = CrestScript(ctx, {"keep": keep, "runs": runs, "start_home": False})
         result = run(s)
     return result, dev, ctx
 
@@ -306,7 +306,7 @@ def test_crest_burst_stops():
     dev = Sim(screens, "burst", {})
     with tempfile.TemporaryDirectory() as d:
         ctx = make_ctx(Path(d), dev, CrestScript)
-        result = run(CrestScript(ctx, {}))
+        result = run(CrestScript(ctx, {"start_home": False}))
     assert result == "finished: crest burst", result
     assert any("Burst" in n for n in ctx.notes)
 
@@ -322,7 +322,7 @@ def test_crest_target_reached_uses_ok_not_redeploy():
     dev = Sim(screens, "equip", on_tap)
     with tempfile.TemporaryDirectory() as d:
         ctx = make_ctx(Path(d), dev, CrestScript)
-        s = CrestScript(ctx, {"runs": 1})
+        s = CrestScript(ctx, {"runs": 1, "start_home": False})
         s.on_start = (lambda orig: (lambda: (orig(), setattr(s, "session_runs", 1))))(s.on_start)
         result = run(s)
     assert result.startswith("finished"), result

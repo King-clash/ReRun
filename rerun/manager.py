@@ -16,6 +16,7 @@ import yaml
 
 from .adb import AdbError, Device, find_adb
 from .engine import Context, RoutineError, Runner, StopRoutine, load_routines, templates_used
+from . import errlog
 from .crest_stats import CrestLedger
 from .history import History
 from .compendium import Compendium
@@ -99,6 +100,7 @@ def deep_merge(base: dict, extra: dict) -> dict:
 class Manager:
     def __init__(self, root: str | Path):
         self.root = Path(root)
+        errlog.init(self.root)
         self.config_path = self.root / "config.yaml"
         self.store = TemplateStore(self.root / "templates")
         self.vision = Vision(self.store)
@@ -228,8 +230,8 @@ class Manager:
         for fn in list(self.listeners):
             try:
                 fn(event)
-            except Exception:  # a broken listener must never kill a worker
-                pass
+            except Exception as e:  # a broken listener must never kill a worker
+                errlog.note("manager.emit listener", e)
 
     def log(self, instance: str, msg: str, level: str | None = None) -> None:
         line = f"{time.strftime('%H:%M:%S')} [{instance}] {msg}"

@@ -11,6 +11,8 @@ from typing import Callable
 import cv2
 import numpy as np
 
+from . import errlog
+
 MAX_ENTRIES = 2000
 THUMB_MAX = (360, 200)  # w, h
 
@@ -58,8 +60,8 @@ class History:
         for fn in list(self.listeners):
             try:
                 fn(entry)
-            except Exception:  # noqa: BLE001 - a listener must never break a script
-                pass
+            except Exception as e:  # noqa: BLE001 - a listener must never break a script
+                errlog.note("history listener", e)
         return entry
 
     def _compact(self) -> None:
