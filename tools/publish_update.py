@@ -12,7 +12,7 @@ is UPDATE_URL in rerun/updates.py. Re-running keeps the files already there, so 
 only adds new ones. Without --exe the previous release's app entry is kept, so a
 template-only release never takes an app update away.
 
-Signs with the same private key as tools/keygen.py (%LOCALAPPDATA%\\Rerun Keygen\\
+Signs with the same private key as tools/keygen.py (Documents\\Rerun Keygen\\
 signing_key.txt), so only you can publish. The version offered for --exe is
 rerun/__init__.py's __version__: bump it before building the exe you publish.
 """

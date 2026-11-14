@@ -67,4 +67,6 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    sys.path.insert(0, str(ROOT))
+    from tools.buildlog import logged   # every build is listed in BUILDS.md
+    raise SystemExit(logged("GS Companion", DIST / f"{NAME}.exe", main))
