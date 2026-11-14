@@ -46,12 +46,13 @@ Crest farming session, confirm crest_log.jsonl gains "run" and live "drop" recor
 dashboard tiles move.
 
 Phase 1 recording verified live 13:57–14:01 (runs + crests + titles). Double-count fix installed
-14:10. History re-import fix built 14:14 (dist/) — install pending the user's OK to close Rerun.
-The installed crest_log.jsonl contains 11 duplicate "history" records from the 14:10 restart; the
-new build ignores them at read time (do not delete them).
+14:10; History re-import fix installed 14:16 (backup backups/preinstall_20261114_141610). Verified on
+the installed app: restart added 0 records; counted crests 76 = History 76. The installed
+crest_log.jsonl keeps 11 duplicate "history" records from the 14:10 restart, ignored at read time
+(do not delete them).
 
 ## Next actions
-1. Install the re-import fix build (exe only) when the user agrees; verify the dashboard all-time
-   crest total equals History's crest count, and that a crest after a potion refill is logged once.
+1. Live-verify that a crest after a potion refill is logged once (needs a farm that runs out of energy).
+2. Phase 2 Past Party verification flow (see Active task).
 2. Phase 2 Past Party verification flow (see Active task).
 3. Phase 3 needs real Units-list / Compendium screenshots — ask the user to open those screens.
