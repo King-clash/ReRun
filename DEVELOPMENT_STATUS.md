@@ -8,31 +8,24 @@
 - Python: `%LOCALAPPDATA%\Programs\Python\Python312\python.exe` (not on PATH)
 - Git: `C:\Program Files\Git\cmd\git.exe` (prepend to PATH in a fresh shell)
 
-## Phase 3 (Unit Roster) — BETA, 2026-11-14
-Built from real captures; live full scan pending: user stops farming, opens Units (top of list),
-starts Compendium Counter. Check: units/roster.json fills, uncertain names have debug/ frames,
-grid scrolling dedupes. GSCompanion: never fetch/cache its data (robots.txt blocks Anthropic
-crawlers) — link-out only. Phase 4 (Compendium) builds on units/scans.jsonl (quest_clears per scan).
+Note: the checkout is currently on branch `data/gscompanion` (another session's GSC app work,
+`gsc_app/`, is committed there too); `main` stops at fdac815.
 
-## Current phase
-Milestone A · Phase 2 COMPLETE (Start path live-verified 2026-11-14 14:33; Resume/relaunch/relogin
-simulator-only). Phase 3 Unit Roster next — needs real Units-list and Compendium screenshots.
-Phase 2 live check: on Start, the log should show "Selecting Past Party", "Ticking Include AI"
-(or straight to Apply), "Past Party applied with Include AI - dialog closed"; capture the Past
-Party dialog as tests/fixtures/past_party_dialog.png.
+## Phase 3 (Unit Roster) — BETA, 2026-11-14
+Full live scan 15:22–16:40 (build 81e47c8): 191 units, all five elements, 189 with quest clears,
+27 names uncertain (incl. junk "wee", "ae", "sc" — removable with the Units tab's Remove button).
+Water/Earth elements from that scan are stored "uncertain" (icons not yet verified in that build);
+a rescan on 382e212 upgrades them. GSCompanion: link-out only from Rerun (robots.txt).
+Phase 4 (Compendium) builds on units/scans.jsonl (quest_clears per scan).
 
 ## Completed
-- Phase 0 (2026-11-14): recovery, git baseline f4df578, backups, docs, baseline 54/54.
-- Phase 1 (2026-11-14, BETA): crest ledger (rerun/crest_stats.py), reconstruction, dashboard
-  tiles, /crests. 65/65 tests. Not yet live-verified with the rebuilt exe.
-
-## Active task
-Phase 2: rename the party setting to "Always re-select Past Party" (default on for Crest), with a
-migration from `party: Last Party/Current Party`; verify Include AI is ticked before Apply; re-apply
-on Start, relaunch, relogin, new quest entry and Resume, never on Redeploy.
+- Phase 0: recovery, git baseline f4df578, backups, docs.
+- Phase 1 (BETA): crest ledger, reconstruction, dashboard tiles, /crests; live-verified 13:57.
+- Phase 2 (COMPLETE, Start path live-verified 14:33; Resume/relaunch/relogin simulator-only).
+- Phase 3 (BETA): see above.
 
 ## Outstanding (Milestone A)
-Phase 2 Past Party · 3 Units · 4 Compendium · 5 Compendium Farm · 6 Discord.
+4 Compendium · 5 Compendium Farm (BLOCKED: no Training/Exploring templates) · 6 Discord.
 
 ## Known issues / facts
 - History is capped at 2000 entries and deletes the oldest (with thumbnails) — all-time crest stats
@@ -61,8 +54,10 @@ the installed app: restart added 0 records; counted crests 76 = History 76. The 
 crest_log.jsonl keeps 11 duplicate "history" records from the 14:10 restart, ignored at read time
 (do not delete them).
 
+2026-11-14 16:41: build 382e212 installed (exe only; 95 user files hash-verified unchanged;
+relaunched, no crash.log). Rollback: `backups/preinstall_20261114_164106/Rerun.exe`.
+
 ## Next actions
-1. Live-verify that a crest after a potion refill is logged once (needs a farm that runs out of energy).
-2. Phase 2 Past Party verification flow (see Active task).
-2. Phase 2 Past Party verification flow (see Active task).
-3. Phase 3 needs real Units-list / Compendium screenshots — ask the user to open those screens.
+1. User: Remove the junk units and correct uncertain names in the Units tab (their decision).
+2. Live-verify that a crest after a potion refill is logged once (needs a farm that runs out of energy).
+3. Phase 4 Compendium.

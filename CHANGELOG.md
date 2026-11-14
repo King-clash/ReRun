@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-14 — Third live scan saved; build 382e212 installed
+- Scan 15:22–16:40 saved: 191 units (Fire 41, Water 44, Earth 27, Light 41, Dark 38), 189 with
+  quest clears, 27 names uncertain (incl. the junk "wee", "ae", "sc" this build now prevents).
+- Installed 382e212 at 16:41 after the user quit Rerun: exe only, 95 user files hash-verified
+  unchanged, relaunched without crash.log. Backup `backups/preinstall_20261114_164106/`.
+
 ## 2026-11-14 — Units scan: third live scan review (unreadable pages, all elements)
 - Third live scan (15:22 onward) worked through 145+ units across Fire/Water/Earth/Light into Dark.
   18 names were flagged uncertain (correctly: long names over bright artwork, words run together).
