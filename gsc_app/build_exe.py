@@ -45,6 +45,8 @@ def main() -> int:
             "--distpath", str(DIST), "--workpath", str(work / "build"), "--specpath", str(work),
             "--paths", str(ROOT),
             "--add-data", f"{work / 'stage' / 'data'}{';' if sys.platform == 'win32' else ':'}data",
+            # App icon picture, loaded at run time for the window (and tray).
+            "--add-data", f"{ROOT / 'rerun' / 'assets'}{';' if sys.platform == 'win32' else ':'}rerun/assets",
             # Only Tk + Pillow are needed; see the stand-ins in __main__.py.
             "--exclude-module", "cv2", "--exclude-module", "numpy",
             "--exclude-module", "discord", "--exclude-module", "matplotlib",

@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-11-14 — New app icon
+- The window, tray and .exe icon is now a picture, `rerun/assets/rerun_icon.png` (512 px, glossy
+  blue rounded square with a glowing loop arrow, transparent corners). `rerun/appicon.py` loads
+  it; the old drawn icon is kept as a fallback if the file is missing.
+- `build.py` and `gsc_app/build_exe.py` bundle `rerun/assets` into the exe (`--add-data`).
+- Checked: `write_ico` writes all 7 sizes (16-256); the arrow still reads at 16 px. Not yet
+  rebuilt as an exe; pytest isn't installed here, so the test suite was not run.
+
 ## 2026-11-14 — Live View at 30 fps
 - Measured: an ADB screenshot takes ~180 ms on BlueStacks (5.6 fps at most), so the Live View
   (1 s tick; a screenshot every 3 s when idle) could never reach 30 fps that way.

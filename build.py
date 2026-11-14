@@ -27,6 +27,8 @@ def main() -> int:
         "--name", "Rerun", "--icon", str(icon),
         "--distpath", str(DIST), "--workpath", str(work / "build"),
         "--specpath", str(work),
+        # App icon picture, loaded at run time for the window (and tray).
+        "--add-data", f"{ROOT / 'rerun' / 'assets'}{';' if sys.platform == 'win32' else ':'}rerun/assets",
         # Back ends these libraries load by name at run time.
         "--hidden-import", "pystray._win32",
         "--hidden-import", "pynput.keyboard._win32",
