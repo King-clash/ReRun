@@ -41,6 +41,7 @@ ICONS = {
     "sync": "", "send": "", "chevron_down": "",
     "check": "", "history": "", "refresh": "",
 }
+ICONS.update({"people": "", "link": ""})  # Segoe Fluent: People, Link
 _cache: dict = {}
 _fonts: dict = {}
 
@@ -143,6 +144,12 @@ def _ttk_styles(root):
     s.map("IOS.Treeview", background=[("selected", C["blue"])],
           foreground=[("selected", "#FFFFFF")])
     s.layout("IOS.Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
+    # Column headers (Units table): quiet caption style on the card colour, both themes.
+    s.configure("IOS.Treeview.Heading", background=C["card"], foreground=C["secondary"],
+                font=F["footnote_semi"], relief="flat", borderwidth=0,
+                lightcolor=C["card"], darkcolor=C["card"], bordercolor=C["card"], padding=px(6))
+    s.map("IOS.Treeview.Heading", background=[("active", C["card"])],
+          foreground=[("active", C["label"])])
     for orient in ("Vertical", "Horizontal"):
         name = f"IOS.{orient}.TScrollbar"
         s.layout(name, [(f"{orient}.Scrollbar.trough", {"sticky": "nswe", "children": [

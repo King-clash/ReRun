@@ -18,6 +18,7 @@ from .adb import AdbError, Device, find_adb
 from .engine import Context, RoutineError, Runner, StopRoutine, load_routines, templates_used
 from .crest_stats import CrestLedger
 from .history import History
+from .units import UnitRoster
 from .scripts import SCRIPTS
 from .scripts.base import Finished
 from .stats import Stats, fmt_duration
@@ -103,6 +104,7 @@ class Manager:
         except Exception as e:  # noqa: BLE001 - never block startup on statistics
             added = {"error": repr(e)}
         self._crest_rebuild = added
+        self.units = UnitRoster(self.root)
         self.discord = None  # set by DiscordBot.start()
         self.log_lines: list[str] = []
         self.log_entries: list[dict] = []  # same lines with instance + level, for filtering
@@ -334,7 +336,7 @@ class Manager:
                 instance=name, device=dev, vision=self.vision, stats=self.stats,
                 routines=self.routines, base_resolution=(720, 1280),
                 log=self.log, notify=self.notify, history=self.history, data_dir=self.root,
-                crests=self.crests,
+                crests=self.crests, units=self.units,
             )
             # Queue runs other scripts with this instance's settings for them.
             ctx.params["settings_of"] = lambda sid, n=name: self.script_settings(n, sid)

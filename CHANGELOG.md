@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-11-14 — Phase 3: Unit Roster (BETA)
+- Source decision from real captures: the Units list grid has no readable text (portrait, element
+  icon, star badge, 'Lv' badge without a number). Tapping a card opens the unit's page (the same
+  page ReStart's compendium templates target): name, element icon, race, "Quest cleared: N". No
+  level/rarity text is shown there, so those stay empty (never invented).
+- `rerun/unit_screens.py`: grid card finder by fixed 5-column geometry (template matching alone
+  missed ~25% of cards: 21/30 and 23/28 on the fixtures; now 30/30 and 28/28); unit page reader
+  (white-text mask with a 3-threshold vote for the name over artwork, element by icon hue —
+  Fire/Light/Dark seen, Water/Earth marked uncertain until seen — race, quest clears).
+- `rerun/units.py`: UnitRoster (units/roster.json, scans.jsonl, aliases.json). Provenance per
+  field; status order manual > verified > ocr > estimated > uncertain; incomplete scans keep
+  values; fuzzy match onto known names; manual corrections learned as aliases; scan comparison;
+  CSV export; search/sort/filters.
+- Compendium Counter now uses the new reader, feeds the roster, saves partial results when stopped,
+  saves a frame for uncertain names. Old guess-based reader removed.
+- UI: new **Units** tab (search, element filter, unread-only, sortable columns, Export CSV, Correct
+  Name, GSCompanion). ios.py: table header style + People/Link icons.
+- GSCompanion: robots.txt disallows Anthropic's crawlers (ClaudeBot, Claude-Web, anthropic-ai) and
+  sets `use=reference`; no public API. Decision (user-approved options 2+3): no data is fetched or
+  cached; the GSCompanion button copies the unit name and opens gscompanion.com/units/ in the browser.
+- Discord `/units [search]`. tools/capture.py and tools/record_screens.py (read-only screenshot helpers).
+- Fixtures: units_grid_fire/dark/dark_2.png, unit_profile_ira.png. Tests: tests/test_units.py (11).
+  92/92 pass.
+
 ## 2026-11-14 — Phase 2: Always re-select Past Party (BETA)
 - Setting renamed: the "Party" choice (Last Party / Current Party) is now the switch
   **Always re-select Past Party** (`past_party`). Default ON for Crest (and every Auto-Loop farm),

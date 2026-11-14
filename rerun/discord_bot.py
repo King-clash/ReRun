@@ -12,6 +12,7 @@ Slash commands (only users in discord.allowed_user_ids may use control commands)
   /history [instance] [count]  recent crests, refills and problems
   /summary                     the last 24 hours (also posted daily)
   /crests  [instance]          4+ / Burst / Lv4 today, session, all-time, observed rates
+  /units   [search]            unit roster from your scans (newest first)
   /scripts                     list scripts
 """
 from __future__ import annotations
@@ -237,6 +238,27 @@ class DiscordBot:
                 await inter.response.send_message(embed=embed, file=discord.File(str(shot), shot.name))
             else:
                 await inter.response.send_message(embed=embed)
+
+        @tree.command(description="Your unit roster: totals, newest units, search by name")
+        async def units(inter: discord.Interaction, search: str | None = None):
+            r = getattr(m, "units", None)
+            if r is None or not r.units:
+                return await inter.response.send_message(
+                    "No units scanned yet - run the Compendium Counter on the Units list.")
+            rows = r.rows(search=search or "", sort="first_seen", desc=True)
+            lines = []
+            for u in rows[:15]:
+                el = r.value(u, "element") or "?"
+                qc = r.value(u, "quest_clears")
+                lines.append(f"**{u['name']}**{' (?)' if u.get('name_status') == 'uncertain' else ''}"
+                             f" · {el}" + (f" · {qc:,} clears" if qc is not None else ""))
+            head = r.summary_text()
+            if search:
+                head += f"\nMatching '{search}': {len(rows)}"
+            more = f"\n…and {len(rows) - 15} more" if len(rows) > 15 else ""
+            embed = discord.Embed(title="Units", description=(head + "\n\n" + "\n".join(lines) + more)[:4000],
+                                  color=0x2ECC71)
+            await inter.response.send_message(embed=embed)
 
         @tree.command(description="List available scripts")
         async def scripts(inter: discord.Interaction):

@@ -1,21 +1,20 @@
-"""Compendium Counter - ReStart's compendium scan.
+"""Compendium Counter / unit scan - ReStart's compendium scan.
 
-On the Units compendium grid Rerun opens each card, reads the unit's name
-and its quest clear count with OCR, goes back, and scrolls on until the end
-of the list. Units you don't own have no clear count and are skipped. The
-result is saved to compendium_report.csv (and shown in History)."""
+On the Units list grid Rerun opens each card, reads the unit's page (name,
+element, race, quest clears - see rerun/unit_screens.py), goes back, and
+scrolls on until the end of the list. Results go to the Unit Roster
+(units/roster.json + a scan record) and compendium_report.csv. Stopping early
+still saves what was read."""
 from __future__ import annotations
 
 import csv
-import re
 import time
 from pathlib import Path
 
 import numpy as np
 
+from ..engine import StopRoutine
 from .base import BaseScript, Done, Finished, Setting, T
-
-_NUM = re.compile(r"\d[\d,]*")
 
 
 class CompendiumCounterScript(BaseScript):
@@ -23,13 +22,18 @@ class CompendiumCounterScript(BaseScript):
     NAME = "Compendium Counter"
     BETA = True
     DESCRIPTION = "Scans the Units compendium and reports each unit's quest clear count."
-    INSTRUCTIONS = """COMPENDIUM COUNTER (BETA - not yet run on your game; uses text reading)
-Opens every unit in the Units compendium, reads its name and quest clear
-count, and writes them to compendium_report.csv in the Rerun folder.
+    INSTRUCTIONS = """COMPENDIUM COUNTER / UNIT SCAN (BETA - uses text reading)
+Opens every unit in your Units list, reads its name, element, race and quest
+clear count, and saves them to the Units tab (and compendium_report.csv).
+It only taps unit cards and Back - nothing is upgraded or spent.
 
 SETUP
-1. Open the Units compendium in-game (the grid of unit cards).
-2. Press Start. Units you don't own are skipped - their page has no count.
+1. Stop any farming on this instance.
+2. Open Units in-game (the grid of your unit cards) and scroll to the top.
+3. Press Start. Stopping early keeps everything read so far.
+
+Names the reader isn't sure about are marked uncertain (frame saved to
+debug/); fix them in the Units tab and Rerun remembers the correction.
 """
     SETTINGS = [Setting("max_units", "Stop after this many units (0 = all)", "int", 0)]
     TEMPLATES = [
@@ -49,13 +53,35 @@ SETUP
             self.notify("Compendium Counter needs the text reader (it comes with ReStart). Stopped.")
             raise Done("no text reader")
         self.rows: dict[str, int] = {}
+        self.seen: set[str] = set()
+        self.observed: list[dict] = []   # roster observations (rerun/units.py)
         self.done_cards: set[tuple[int, int]] = set()  # card spots already opened on this view
         self.opened: tuple[int, int] | None = None
         self.scrolls = 0
         self.limit = int(self.cfg.get("max_units") or 0)
         self.view_sig: bytes | None = None
+        self._saved = False
+
+    def run(self) -> None:
+        try:
+            super().run()
+        except StopRoutine:
+            # Stopped (by you or a watchdog): keep what was read, then stop as asked.
+            if getattr(self, "observed", None) and not self._saved:
+                self.save_roster()
+            raise
+
+    def save_roster(self) -> str:
+        self._saved = True
+        roster = getattr(self.ctx, "units", None)
+        if roster is None or not self.observed:
+            return ""
+        s = roster.apply_scan(self.observed, "units_list")
+        return (f" Roster: {s['seen']} read, {len(s['new'])} new"
+                + (f", {len(s['uncertain'])} uncertain" if s["uncertain"] else "") + ".")
 
     def report(self, why: str) -> None:
+        why = f"{why}{self.save_roster()}"
         path = Path(self.ctx.data_dir or ".") / "compendium_report.csv"
         if self.rows:
             with path.open("w", newline="", encoding="utf-8") as f:
@@ -72,11 +98,10 @@ SETUP
 
     # ---------------------------------------------------------------- grid
     def cards(self, screen) -> list[tuple[int, int]]:
-        found = self.ctx.vision.find_all(screen, "compendium_card_lv")
-        if self.has_template("compendium_card_lv_rainbow"):
-            found += self.ctx.vision.find_all(screen, "compendium_card_lv_rainbow")
-        # The 'Lv' tag sits on the card's lower-left; tap the card body above it.
-        return sorted({(m.center[0] + 30, m.center[1] - 40) for m in found}, key=lambda p: (p[1], p[0]))
+        # Fixed 5-column grid, every cell checked (badge matching alone missed
+        # ~25% of cards on real captures). See rerun/unit_screens.py.
+        from ..unit_screens import grid_cards
+        return grid_cards(screen, self.ctx.vision)
 
     def handle_grid(self, screen):
         if self.limit and len(self.rows) >= self.limit:
@@ -103,39 +128,31 @@ SETUP
         self.log("Scrolled")
 
     # ---------------------------------------------------------------- unit page
-    def read_unit(self, screen) -> tuple[str | None, int | None]:
-        words = self.ocr.screen_words(screen, min_conf=55)
-        # Clear count: the number right after a word starting with "clear".
-        count = None
-        for i, w in enumerate(words):
-            if w.text.lower().startswith("clear"):
-                for nxt in words[i + 1:i + 4]:
-                    if abs(nxt.y - w.y) < 20 and _NUM.fullmatch(nxt.text):
-                        count = int(nxt.text.replace(",", ""))
-                        break
-            if count is not None:
-                break
-        # Name: the longest line of words in the top part of the page.
-        lines: dict[int, list] = {}
-        for w in words:
-            if 150 < w.y < 420 and not _NUM.fullmatch(w.text):
-                lines.setdefault(w.y // 18, []).append(w)
-        name = None
-        if lines:
-            best = max(lines.values(), key=lambda ws: sum(len(x.text) for x in ws))
-            name = " ".join(x.text for x in sorted(best, key=lambda x: x.x))
-        return name, count
-
     def handle_detail(self, screen):
-        name, count = self.read_unit(screen)
-        if count is None:
-            self.log(f"No quest count on that page ({name or 'unnamed'}) - skipped.")
-        elif name in self.rows:
-            self.log(f"{name} already counted (seen again after scrolling)")
-        elif name:
-            self.rows[name] = count
+        from ..unit_screens import read_profile
+        ob = read_profile(self.ocr, screen)
+        roster = getattr(self.ctx, "units", None)
+        name = ob["name"]
+        if roster is not None and name:
+            name = roster.resolve_name(name, ob["name_conf"])[0]
+        count = ob["fields"]["quest_clears"]["value"]
+        if not name:
+            self.log("Couldn't read the unit's name - skipped.")
+        elif name in self.rows or name in self.seen:
+            self.log(f"{name} already read (seen again after scrolling)")
+        else:
+            self.seen.add(name)
+            el = ob["fields"]["element"]["value"] or "?"
+            unsure = " (name uncertain)" if ob["name_votes"] < 2 else ""
+            if count is None:
+                self.log(f"{name} [{el}]{unsure}: no quest count on the page")
+            else:
+                self.rows[name] = count
+                self.log(f"{name} [{el}]{unsure}: {count} clears")
+            if ob["name_votes"] < 2:
+                ob["shot"] = self.save_frame(f"unit_uncertain_{len(self.seen)}", screen)
+            self.observed.append(ob)
             self.count("units")
-            self.log(f"{name}: {count} clears")
             self.progress()
         self.ctx.device.back()
         self.sleep(1.2)

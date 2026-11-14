@@ -8,6 +8,12 @@
 - Python: `%LOCALAPPDATA%\Programs\Python\Python312\python.exe` (not on PATH)
 - Git: `C:\Program Files\Git\cmd\git.exe` (prepend to PATH in a fresh shell)
 
+## Phase 3 (Unit Roster) — BETA, 2026-11-14
+Built from real captures; live full scan pending: user stops farming, opens Units (top of list),
+starts Compendium Counter. Check: units/roster.json fills, uncertain names have debug/ frames,
+grid scrolling dedupes. GSCompanion: never fetch/cache its data (robots.txt blocks Anthropic
+crawlers) — link-out only. Phase 4 (Compendium) builds on units/scans.jsonl (quest_clears per scan).
+
 ## Current phase
 Milestone A · Phase 2 COMPLETE (Start path live-verified 2026-11-14 14:33; Resume/relaunch/relogin
 simulator-only). Phase 3 Unit Roster next — needs real Units-list and Compendium screenshots.

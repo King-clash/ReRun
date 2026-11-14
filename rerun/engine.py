@@ -90,6 +90,7 @@ class Context:
     history: Any = None                    # History store for crests/drops (optional)
     data_dir: Any = None                   # where debug frames are saved (defaults to cwd)
     crests: Any = None                     # CrestLedger (append-only crest/run log), optional
+    units: Any = None                      # UnitRoster (units/), optional
 
 
 class Runner:

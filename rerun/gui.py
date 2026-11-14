@@ -180,6 +180,8 @@ class App(tk.Tk):
         self._build_settings()
         self._build_templates()
         self._build_history()
+        self._build_units()
+        self._tab_discord = 5
         self._build_discord()
         self._build_log()
         self.status.configure(text="F12 stops everything  ·  F11 pauses or resumes all")
@@ -713,7 +715,8 @@ class App(tk.Tk):
                  "import": ("Import", self.tpl_import_restart),
                  "adb_help": ("How?", lambda: ios.alert(self, ADB_HELP, "Turn On ADB")),
                  "display_help": ("How?", lambda: ios.alert(self, DISPLAY_HELP, "Screen Size")),
-                 "discord_tab": ("Open", lambda: (self.nb.select(4), self._setup_win.destroy()))}
+                 "discord_tab": ("Open", lambda: (self.nb.select(self._tab_discord),
+                                                  self._setup_win.destroy()))}
         for i, c in enumerate(checks):
             if i:
                 tk.Frame(card.body, height=1, bg=C["sep"]).pack(fill="x", padx=(px(40), 0))
@@ -1214,6 +1217,119 @@ class App(tk.Tk):
             self.m.history.clear()
             self.refresh_history()
 
+    # ================================================================ units
+    def _build_units(self):
+        _, page, hdr = self._page("Units", "Units", "people")
+        ios.Button(hdr, "Export CSV", self.units_export, kind="tinted",
+                   icon="download").pack(side="right")
+        ios.Button(hdr, "Correct Name", self.units_correct, kind="plain", icon="edit",
+                   small=True).pack(side="right", padx=(0, px(14)))
+        ios.Button(hdr, "GSCompanion", self.units_gsc, kind="plain", icon="link",
+                   small=True).pack(side="right", padx=(0, px(14)))
+        bar = tk.Frame(page, bg=C["bg"])
+        bar.pack(fill="x", padx=px(20), pady=(0, px(10)))
+        self.units_q = tk.StringVar()
+        ios.Field(bar, self.units_q, width=22).pack(side="left")
+        self.units_q.trace_add("write", lambda *a: self.refresh_units())
+        self.units_el = ios.Select(bar, values=["All elements", "Fire", "Water", "Earth", "Light", "Dark"],
+                                   accent=True, command=self.refresh_units)
+        self.units_el.set("All elements")
+        self.units_el.pack(side="left", padx=px(16))
+        self.units_incomplete = tk.BooleanVar(value=False)
+        ios.Switch(bar, self.units_incomplete, command=self.refresh_units).pack(side="left")
+        self._label(bar, "Unread fields only").pack(side="left", padx=(px(6), 0))
+        self.units_summary = self._label(bar, "")
+        self.units_summary.pack(side="right")
+
+        lc = ios.Card(page, pad=6, stretch=True)
+        lc.pack(fill="both", expand=True, padx=px(20), pady=(0, px(14)))
+        cols = ("name", "element", "race", "quest_clears", "first_seen", "last_seen")
+        heads = ("Name", "Element", "Race", "Quest clears", "First seen", "Last seen")
+        sb = ttk.Scrollbar(lc.body, orient="vertical", style="IOS.Vertical.TScrollbar")
+        self.units_tree = ttk.Treeview(lc.body, columns=cols, show="headings", style="IOS.Treeview",
+                                       selectmode="browse", yscrollcommand=sb.set)
+        sb.configure(command=self.units_tree.yview)
+        self._units_sort = ("name", False)
+        for c, h, w in zip(cols, heads, (260, 90, 110, 110, 110, 110)):
+            self.units_tree.heading(c, text=h, command=lambda c=c: self._units_sort_by(c))
+            self.units_tree.column(c, width=px(w), stretch=(c == "name"),
+                                   anchor="w" if c in ("name", "race") else "center")
+        self.units_tree.tag_configure("uncertain", foreground=C["orange"])
+        sb.pack(side="right", fill="y", pady=px(4))
+        self.units_tree.pack(side="left", fill="both", expand=True)
+        self.units_empty = tk.Label(lc.body, bg=C["card"], fg=C["secondary"], font=F["footnote"],
+                                    justify="center",
+                                    text="No units yet\nOpen Units in-game and run the Compendium Counter "
+                                         "script:\nit reads each unit's page and fills this list.")
+        self.after(120, self.refresh_units)
+
+    def _units_sort_by(self, col: str):
+        cur, desc = self._units_sort
+        self._units_sort = (col, not desc if cur == col else col in ("quest_clears", "last_seen"))
+        self.refresh_units()
+
+    def refresh_units(self):
+        r = self.m.units
+        el = self.units_el.get()
+        rows = r.rows(search=self.units_q.get(), sort=self._units_sort[0], desc=self._units_sort[1],
+                      element=None if el in ("", "All elements") else el,
+                      only_incomplete=self.units_incomplete.get())
+        self.units_tree.delete(*self.units_tree.get_children())
+        for u in rows:
+            def val(f):
+                v = r.value(u, f)
+                if v is None:
+                    return "–"
+                st = u["fields"][f].get("status")
+                return f"{v:,}" if isinstance(v, int) else (f"{v}?" if st == "uncertain" else str(v))
+            unsure = u.get("name_status") == "uncertain"
+            self.units_tree.insert("", "end", iid=u["name"], tags=("uncertain",) if unsure else (),
+                                   values=(u["name"] + (" ?" if unsure else ""), val("element"),
+                                           val("race"), val("quest_clears"),
+                                           datetime.fromtimestamp(u["first_seen"]).strftime("%d %b %Y"),
+                                           datetime.fromtimestamp(u["last_seen"]).strftime("%d %b %Y")))
+        if rows:
+            self.units_empty.place_forget()
+        else:
+            self.units_empty.place(relx=0.5, rely=0.45, anchor="center")
+        self.units_summary.configure(text=r.summary_text().replace("**", ""))
+
+    def _units_selected(self) -> str | None:
+        sel = self.units_tree.selection()
+        return sel[0] if sel else None
+
+    def units_export(self):
+        path = filedialog.asksaveasfilename(parent=self, defaultextension=".csv",
+                                            initialfile="rerun_units.csv",
+                                            filetypes=[("CSV", "*.csv")])
+        if path:
+            Path(path).write_text(self.m.units.to_csv(), encoding="utf-8", newline="")
+            self.flash(f"Saved {Path(path).name}", "ok")
+
+    def units_correct(self):
+        name = self._units_selected()
+        if not name:
+            return ios.alert(self, "Select a unit first.", "Correct Name")
+        right = ios.ask_string(self, "Correct Name",
+                               f"Rerun read this name as '{name}'. Type the correct name - future "
+                               "scans will remember it.", name)
+        if right and right.strip() and right.strip() != name:
+            self.m.units.correct_name(name, right.strip())
+            self.flash(f"Saved: '{name}' is {right.strip()}", "ok")
+            self.refresh_units()
+
+    def units_gsc(self):
+        """GSCompanion as a reference you open yourself: Rerun copies the unit's name and
+        opens GSCompanion's Units page (nothing is downloaded from the site)."""
+        import webbrowser
+        from .units import GSC_UNITS_URL
+        name = self._units_selected()
+        if name:
+            self.clipboard_clear()
+            self.clipboard_append(name)
+            self.flash(f"Copied '{name}' - paste it into GSCompanion's search", "info")
+        webbrowser.open(GSC_UNITS_URL)
+
     # ================================================================ discord
     def _build_discord(self):
         _, page, hdr = self._page("Discord Bot", "Discord", "chat", scroll=True)
@@ -1433,6 +1549,8 @@ class App(tk.Tk):
                         self.flash(f"{ev['instance']}: {ev['detail']}", kind)
                 elif t == "history":
                     history_changed = True
+                    if ev.get("entry", {}).get("kind") == "compendium":
+                        self.after(50, self.refresh_units)  # a unit scan just finished
                 elif t == "_preview":
                     self._preview_img = ev["img"]
                     self._draw_preview()

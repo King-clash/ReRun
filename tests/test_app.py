@@ -139,8 +139,9 @@ def test_gui_starts_and_closes():
     app.after(600, lambda: (app.nb.select(2), app.refresh_checklist()))
     app.after(900, lambda: (app.nb.select(3), app.refresh_history()))
     app.after(1100, lambda: (app.hist_kind.set("Crests"), app.refresh_history()))
-    app.after(1300, lambda: app.nb.select(4))
-    app.after(1500, lambda: (app.nb.select(5), app.log_level.set("Errors"), app._rebuild_log()))
+    app.after(1200, lambda: (app.nb.select(4), app.units_q.set("a"), app.refresh_units()))
+    app.after(1300, lambda: app.nb.select(5))
+    app.after(1500, lambda: (app.nb.select(6), app.log_level.set("Errors"), app._rebuild_log()))
     app.after(1700, lambda: app.flash("hello", "ok"))
     app.after(1900, popover_open_close)
     app.after(30000, app.destroy)  # safety net if a step above never ran
