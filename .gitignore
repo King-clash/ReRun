@@ -1,0 +1,28 @@
+# Build output
+dist/
+build/
+*.spec
+__pycache__/
+*.pyc
+
+# User data and secrets - never commit (config.yaml holds the Discord token)
+config.yaml
+stats.json
+history/
+debug/
+debug_crest/
+crash.log
+*.log
+compendium_report.csv
+data/
+backups/
+screenshots/
+*.db
+*.db-journal
+*.sqlite
+
+# Editor / OS
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
