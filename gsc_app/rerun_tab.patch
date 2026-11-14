@@ -1,0 +1,28 @@
+--- a/rerun/gui.py
++++ b/rerun/gui.py
+@@ -184,6 +184,7 @@
+         self._tab_discord = 5
+         self._build_discord()
+         self._build_log()
++        self._build_companion()
+         self.status.configure(text="F12 stops everything  ·  F11 pauses or resumes all")
+ 
+         self.tray = Tray(lambda action: self.events.put({"type": "_tray", "action": action}))
+@@ -1329,6 +1330,17 @@
+             self.clipboard_append(name)
+             self.flash(f"Copied '{name}' - paste it into GSCompanion's search", "info")
+         webbrowser.open(GSC_UNITS_URL)
++
++    # ================================================================ GS Companion
++    def _build_companion(self):
++        """Crest Palace schedule, crests and per-unit crest picks (gsc_app/). Added as the
++        last tab so the Discord tab keeps its index. Skipped if gsc_app/ is missing."""
++        try:
++            from gsc_app.page import GSCompanionPage
++        except ImportError:
++            return
++        page = GSCompanionPage(self.nb.content, self.m.root, flash=self.flash)
++        self.nb.add(page, "Companion", "search")
+ 
+     # ================================================================ discord
+     def _build_discord(self):

@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-11-14 — Units scan: third live scan review (unreadable pages, all elements)
+- Third live scan (15:22 onward) worked through 145+ units across Fire/Water/Earth/Light into Dark.
+  18 names were flagged uncertain (correctly: long names over bright artwork, words run together).
+- Two pages caught while still fading in were stored as junk names ("wee", "ae") and a nameless
+  unicorn page (no icon, no name) as "sc". Fixes: read a page only when two frames 0.6 s apart
+  agree; a page with no element icon and no agreed name is skipped (frame kept in debug/), never
+  turned into a unit.
+- Element icon test now requires a vivid, shaded icon (plain parchment read as "Light" before).
+  Water (hue 103-105) and Earth (63) confirmed on real captures: all five elements now verified.
+- Units tab: Remove button (with confirmation) for misread entries; UnitRoster.remove keeps scan records.
+- Fixtures: unit_profile_water_nies, _earth_fosly, _light_kingsoul, _noname_unicorn, _fading.
+  Tests: 18 in test_units; 99/99 pass.
+
 ## 2026-11-14 — Units scan: grey Achievements button (second live scan)
 - Live 15:14: the scan read Clyde (and renamed the earlier garbled entry to "Clyde, the Crimson Sword
   God" as designed), then stopped on Rekyuon: units without achievements show a GREY Achievements

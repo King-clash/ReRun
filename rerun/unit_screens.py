@@ -70,10 +70,14 @@ def grid_cards(screen: np.ndarray, vision) -> list[tuple[int, int]]:
 # --------------------------------------------------------------------------- unit page
 ICON_BOX = (64, 703, 32, 32)        # element icon, left of the name
 CLEARED_BOX = (420, 1100, 280, 46)
-# OpenCV hue (0-180) of the element icon. Seen on real captures: fire 8, light 21,
-# dark 131-133. Water / earth are expected ranges not yet seen on this account.
-ELEMENTS = [("Fire", 0, 14, True), ("Light", 15, 32, True), ("Earth", 33, 85, False),
-            ("Water", 86, 125, False), ("Dark", 126, 165, True), ("Fire", 166, 180, True)]
+# OpenCV hue (0-180) of the element icon, all seen on real captures (2026-11-14 scan):
+# fire 8-9, light 16-21, earth 63, water 103-105, dark 131-133.
+ELEMENTS = [("Fire", 0, 14, True), ("Light", 15, 32, True), ("Earth", 33, 85, True),
+            ("Water", 86, 125, True), ("Dark", 126, 165, True), ("Fire", 166, 180, True)]
+# A real icon is vivid and shaded: >=638 px with S>140, median S >= 207, brightness spread ~53.
+# Plain parchment (a page with no icon, seen on a nameless unicorn) is flat: median S 180,
+# spread 13. A page still fading in has a faint icon (251 px).
+ICON_MIN_PX, ICON_MIN_SAT, ICON_MIN_V_SPREAD = 550, 195, 25
 _CLEARED = re.compile(r"cleared\s*[:;.]?\s*([\d,]+)", re.I)
 
 
@@ -190,9 +194,10 @@ def read_name(ocr, screen: np.ndarray) -> tuple[str, float, int]:
 def read_element(screen: np.ndarray) -> tuple[str | None, float]:
     x, y, w, h = ICON_BOX
     hsv = cv2.cvtColor(screen[y:y + h, x:x + w], cv2.COLOR_BGR2HSV).reshape(-1, 3)
-    px = hsv[(hsv[:, 1] > 80) & (hsv[:, 2] > 80)]
-    if len(px) < 120:
-        return None, 0.0
+    px = hsv[(hsv[:, 1] > 140) & (hsv[:, 2] > 80)]
+    if (len(px) < ICON_MIN_PX or float(np.median(px[:, 1])) < ICON_MIN_SAT
+            or float(np.std(px[:, 2])) < ICON_MIN_V_SPREAD):
+        return None, 0.0  # no icon (or not drawn yet)
     hue = float(np.median(px[:, 0]))
     for name, lo, hi, seen in ELEMENTS:
         if lo <= hue <= hi:

@@ -50,6 +50,7 @@ debug/); fix them in the Units tab and Rerun remembers the correction.
     MAX_SCROLLS = 80
     VIEW_CHANGED = 6.0   # mean grey difference (0-255) of the grid thumbnail = a different view
     MAX_DUPES = 6        # already-read units in a row before forcing a scroll
+    SETTLED_DIFF = 3.0   # mean pixel change between two frames 0.6 s apart = page still moving
 
     def on_start(self) -> None:
         if self.ocr is None:
@@ -66,6 +67,7 @@ debug/); fix them in the Units tab and Rerun remembers the correction.
         self._saved = False
         self.force_scroll = False
         self.dupe_streak = 0
+        self.skipped = 0
 
     def run(self) -> None:
         try:
@@ -87,6 +89,8 @@ debug/); fix them in the Units tab and Rerun remembers the correction.
 
     def report(self, why: str) -> None:
         why = f"{why}{self.save_roster()}"
+        if self.skipped:
+            why += f" {self.skipped} unreadable page(s) skipped (frames in debug/)."
         path = Path(self.ctx.data_dir or ".") / "compendium_report.csv"
         if self.rows:
             with path.open("w", newline="", encoding="utf-8") as f:
@@ -163,7 +167,24 @@ debug/); fix them in the Units tab and Rerun remembers the correction.
     # ---------------------------------------------------------------- unit page
     def handle_detail(self, screen):
         from ..unit_screens import read_profile
+        # Seen live: a page was read while still fading in (background showing through).
+        # Only read once two frames a moment apart agree.
+        self.sleep(0.6)
+        again = self.grab()
+        if np.abs(again.astype(np.int16) - screen.astype(np.int16)).mean() > self.SETTLED_DIFF:
+            self.log("Unit page still appearing - waiting")
+            return
+        screen = again
         ob = read_profile(self.ocr, screen)
+        if ob["fields"]["element"]["value"] is None and ob["name_votes"] < 2:
+            # No element icon and no agreed name: not a readable unit page (seen live: a
+            # nameless unicorn page). Never invent a unit from it; keep the frame to review.
+            shot = self.save_frame(f"unit_unreadable_{len(self.seen) + 1}", screen)
+            self.log(f"Unit page without a readable name or element - skipped (frame {shot})")
+            self.skipped += 1
+            self.ctx.device.back()
+            self.sleep(1.2)
+            return
         roster = getattr(self.ctx, "units", None)
         name = ob["name"]
         if roster is not None and name:

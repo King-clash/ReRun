@@ -111,6 +111,16 @@ class UnitRoster:
             self._save()
         return right
 
+    def remove(self, name: str) -> bool:
+        """Delete a unit record you don't want (e.g. a misread). Scans in scans.jsonl
+        are kept as they were; aliases pointing at it are dropped."""
+        with self._lock:
+            if self.units.pop(name, None) is None:
+                return False
+            self.aliases = {a: c for a, c in self.aliases.items() if c != name}
+            self._save()
+        return True
+
     # ------------------------------------------------------------ editing
     def set_field(self, name: str, field: str, value, status: str = "manual") -> None:
         with self._lock:

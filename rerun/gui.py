@@ -1224,6 +1224,8 @@ class App(tk.Tk):
                    icon="download").pack(side="right")
         ios.Button(hdr, "Correct Name", self.units_correct, kind="plain", icon="edit",
                    small=True).pack(side="right", padx=(0, px(14)))
+        ios.Button(hdr, "Remove", self.units_remove, kind="plain", color="red", icon="delete",
+                   small=True).pack(side="right", padx=(0, px(14)))
         ios.Button(hdr, "GSCompanion", self.units_gsc, kind="plain", icon="link",
                    small=True).pack(side="right", padx=(0, px(14)))
         bar = tk.Frame(page, bg=C["bg"])
@@ -1316,6 +1318,18 @@ class App(tk.Tk):
         if right and right.strip() and right.strip() != name:
             self.m.units.correct_name(name, right.strip())
             self.flash(f"Saved: '{name}' is {right.strip()}", "ok")
+            self.refresh_units()
+
+    def units_remove(self):
+        name = self._units_selected()
+        if not name:
+            return ios.alert(self, "Select a unit first.", "Remove Unit")
+        if ios.confirm(self, f"Remove '{name}' from the roster? Use this for misreadings. "
+                             "Earlier scan records are kept; a later scan adds the unit again "
+                             "if it is really on your account.", "Remove Unit?",
+                       ok="Remove", destructive=True):
+            self.m.units.remove(name)
+            self.flash(f"Removed '{name}'", "ok")
             self.refresh_units()
 
     def units_gsc(self):

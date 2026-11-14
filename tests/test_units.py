@@ -264,6 +264,65 @@ def test_unit_page_with_grey_achievements_is_recognised_and_read():
     assert ob["name"] == "Rekyuon" and ob["fields"]["race"]["value"] == "Spirit", ob
 
 
+def test_all_five_elements_and_pages_without_an_icon():
+    """Live scan 15:22-16:20: water/earth icons seen for the first time; a nameless
+    unicorn page (plain parchment, no icon) and a page still fading in were read as units."""
+    import cv2
+    from rerun.unit_screens import read_element
+    want = {"unit_profile_ira.png": "Dark", "unit_profile_clyde.png": "Fire",
+            "unit_profile_water_nies.png": "Water", "unit_profile_earth_fosly.png": "Earth",
+            "unit_profile_light_kingsoul.png": "Light",
+            "unit_profile_noname_unicorn.png": None, "unit_profile_fading.png": None}
+    for fx, el in want.items():
+        got, conf = read_element(cv2.imread(str(FIX / fx)))
+        assert got == el, (fx, got)
+        assert conf == (90.0 if el else 0.0), (fx, conf)
+
+
+def test_unreadable_unit_page_is_skipped_not_invented():
+    import cv2
+    from rerun.adb import FakeDevice
+    from rerun.engine import Context
+    from rerun.scripts.compendium_counter import CompendiumCounterScript
+    from rerun.stats import Stats
+    import tests.test_scripts as ts
+    v, ocr = _vision(), _ocr()
+    if v is None or ocr is None:
+        print("  (skipped: templates or Tesseract missing)")
+        return
+    ts.fast()
+    page = cv2.imread(str(FIX / "unit_profile_noname_unicorn.png"))
+
+    class Dev(FakeDevice):
+        backs = 0
+
+        def screencap(self):
+            return page
+
+        def back(self):
+            self.backs += 1
+
+    with tempfile.TemporaryDirectory() as d:
+        ctx = Context(instance="t", device=Dev([page]), vision=v, stats=Stats(), routines={},
+                      base_resolution=(720, 1280), log=lambda i, m: None,
+                      notify=lambda i, m, image=None, ping=False: None, data_dir=d, units=UnitRoster(d))
+        ctx.params["tesseract_path"] = "auto"
+        s = CompendiumCounterScript(ctx, {})
+        s.on_start()
+        s.handle_detail(page)
+        assert s.observed == [] and s.skipped == 1 and ctx.device.backs == 1
+        assert list(Path(d).glob("debug/*unit_unreadable*")), "frame not kept for review"
+
+
+def test_remove_unit():
+    with tempfile.TemporaryDirectory() as d:
+        r = UnitRoster(d)
+        r.apply_scan([ob("wee", conf=40), ob("Celia", level=1)], "units_list")
+        r.correct_name("Ce", "Celia")
+        assert r.remove("wee") and not r.remove("wee")
+        assert list(UnitRoster(d).units) == ["Celia"] and len(r.scans()) == 1
+
+
 def test_animated_grid_does_not_reopen_the_same_card():
     """Seen live 2026-11-14 15:00: the Units screen animates, an exact pixel signature
     never matched, and the first card was reopened forever."""
