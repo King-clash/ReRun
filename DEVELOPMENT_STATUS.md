@@ -32,6 +32,12 @@ The installed app needs that folder next to Rerun.exe for the tab and the names.
 Installed 17:11 (83b5283): 89 units renamed on start, 11 uncertain; backup
 backups/preinstall_20261114_171145 holds the roster before the renames.
 
+## Installed build
+2026-11-14 17:32: c5e9c31 (Units pictures + Live View 30 fps), exe only; 96 user files unchanged;
+relaunched, no crash.log, the Live View stream started. Backup backups/preinstall_20261114_173247.
+Not in this exe: the new app icon (another session's uncommitted work in rerun/appicon.py,
+rerun/assets/, build.py).
+
 ## Completed
 - Phase 0: recovery, git baseline f4df578, backups, docs.
 - Phase 1 (BETA): crest ledger, reconstruction, dashboard tiles, /crests; live-verified 13:57.
