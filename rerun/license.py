@@ -7,7 +7,7 @@ followed by the 64-byte signature, written in base32 as RERUN-XXXXXXXX-... (any 
 spaces and dashes are ignored when it is typed or pasted).
 
 Only the key generator (tools/keygen.py) holds the private signing key, on your own PC
-(%LOCALAPPDATA%\\Rerun Keygen\\signing_key.txt, never in git or in Rerun.exe). Rerun holds
+(Documents\\Rerun Keygen\\signing_key.txt, never in git or in Rerun.exe). Rerun holds
 just the public key below, so it can check keys but nobody can make new ones from it.
 
 The accepted key is kept in <Rerun folder>/license.json with the latest time Rerun saw,

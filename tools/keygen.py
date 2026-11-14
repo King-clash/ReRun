@@ -7,7 +7,8 @@ Choose a time frame (presets, a custom length, or "until a date"), optionally lo
 to one PC (the PC ID shown on Rerun's sign-in screen), add a note for your records, and
 press Generate. Every key made is listed (and saved in issued_keys.csv).
 
-Your signing key lives only on this PC: %LOCALAPPDATA%\\Rerun Keygen\\signing_key.txt.
+Your signing key lives only on this PC: Documents\\Rerun Keygen\\signing_key.txt (moved there from
+%LOCALAPPDATA%\\Rerun Keygen automatically).
 Anyone with that file can make Rerun keys - keep it private and keep a backup ("Back up
 signing key…"): without it no new keys can be made for the Rerun builds that trust it.
 """
@@ -30,7 +31,11 @@ from rerun import ed25519  # noqa: E402
 from rerun.license import (ANY_PC, PUBLIC_KEY, format_pc, make_key, parse_key,  # noqa: E402
                            parse_pc)
 
-HOME = Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "Rerun Keygen"
+# Documents\Rerun Keygen: never redirected by Windows. (AppData\Local was: a key created
+# from a packaged app - e.g. Claude's tools - landed in that app's private copy of
+# AppData, so the generator started from Explorer found "no signing key".)
+HOME = Path(os.environ.get("USERPROFILE") or Path.home()) / "Documents" / "Rerun Keygen"
+LEGACY_HOME = Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "Rerun Keygen"
 SECRET_FILE = "signing_key.txt"
 LOG_FILE = "issued_keys.csv"
 LOG_FIELDS = ["issued", "expires", "time_frame", "pc", "note", "key_id", "key"]
@@ -98,8 +103,44 @@ def describe_end(t: float) -> str:
 
 # ---------------------------------------------------------------- signing key + log
 class Keygen:
-    def __init__(self, home: Path = HOME):
+    def __init__(self, home: Path = HOME, legacy: Path | None = None):
         self.home = Path(home)
+        if legacy is None and self.home == HOME:
+            legacy = LEGACY_HOME
+        self._adopt_legacy(legacy)
+
+    def _adopt_legacy(self, legacy: Path | None) -> None:
+        """A signing key (and key list) still in the old AppData folder is copied here once.
+        Never overwrites a key that is already here."""
+        if not legacy or self.secret_path.exists():
+            return
+        old = Path(legacy) / SECRET_FILE
+        try:
+            raw = bytes.fromhex(old.read_text(encoding="utf-8").strip())
+        except (OSError, ValueError):
+            return
+        if len(raw) != 32:
+            return
+        self.home.mkdir(parents=True, exist_ok=True)
+        self.secret_path.write_text(raw.hex(), encoding="utf-8")
+        log = Path(legacy) / LOG_FILE
+        if log.exists() and not (self.home / LOG_FILE).exists():
+            (self.home / LOG_FILE).write_text(log.read_text(encoding="utf-8"), encoding="utf-8")
+
+    def why_no_secret(self) -> str:
+        """Plain reason when secret() is None (missing / unreadable / damaged)."""
+        p = self.secret_path
+        if not p.exists():
+            return f"There is no signing key at {p}."
+        try:
+            txt = p.read_text(encoding="utf-8").strip()
+        except OSError as e:
+            return f"The signing key at {p} can't be read: {e}"
+        try:
+            n = len(bytes.fromhex(txt))
+        except ValueError:
+            return f"The file at {p} is not a signing key (it should be 64 letters/digits)."
+        return f"The signing key at {p} is the wrong length ({n} bytes, expected 32)."
 
     @property
     def secret_path(self) -> Path:
@@ -208,9 +249,19 @@ def run_gui(home: Path = HOME) -> None:
     body.pack(fill="both", expand=True, padx=px(20), pady=(0, px(16)))
 
     if kg.secret() is None:
+        reason = kg.why_no_secret()
+        try:
+            kg.home.mkdir(parents=True, exist_ok=True)
+            with (kg.home / "keygen_error.log").open("a", encoding="utf-8") as fh:
+                fh.write(time.strftime("%Y-%m-%d %H:%M:%S ") + reason + "\n")
+        except OSError:
+            pass
         tk.Label(body, bg=C["bg"], fg=C["secondary"], font=F["body"], justify="center",
-                 text=f"No signing key on this PC.\n\nExpected: {kg.secret_path}\n\n"
+                 wraplength=px(620),
+                 text=f"No usable signing key.\n\n{reason}\n\n"
                       "Import your backup of signing_key.txt to make keys here.").pack(pady=px(40))
+        ios.Button(body, "Try again", lambda: (win.destroy(), run_gui(home)), kind="gray").pack(
+            pady=(0, px(10)))
 
         def do_import():
             p = filedialog.askopenfilename(parent=win, title="Your Rerun signing key",

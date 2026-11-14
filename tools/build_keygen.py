@@ -1,6 +1,6 @@
 """Build the key generator:  py tools/build_keygen.py  ->  dist/Rerun Keygen/Rerun Keygen.exe
 
-The exe holds no signing key: it reads yours from %LOCALAPPDATA%\\Rerun Keygen\\ (or lets you
+The exe holds no signing key: it reads yours from Documents\\Rerun Keygen\\ (or lets you
 import a backup), so the exe itself is harmless to copy. Keep it for yourself anyway."""
 from __future__ import annotations
 
@@ -38,4 +38,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    if "--out" in sys.argv:   # e.g. while dist/Rerun Keygen/Rerun Keygen.exe is open
+        DIST = Path(sys.argv[sys.argv.index("--out") + 1]).resolve()
+    sys.path.insert(0, str(ROOT))
+    from tools.buildlog import logged   # every build is listed in BUILDS.md
+    raise SystemExit(logged("Rerun Keygen", DIST / "Rerun Keygen.exe", main))
