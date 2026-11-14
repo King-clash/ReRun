@@ -99,6 +99,13 @@ it finds — two different adb versions kill each other's server.
 `python build.py` (needs `pip install pyinstaller`) makes `dist\Rerun\Rerun.exe` and copies your
 templates, routines, README and config next to it. The .exe keeps its own stats and history.
 
+**Sharing Rerun with other people:** use `python build.py --release`, never your own `dist\Rerun`
+(it holds your Discord token, stats, History, units and key). The release build makes
+`release\Rerun-<version>.zip` with the exe, templates, routines, README, a blank config and
+its own Tesseract (so text reading works without ReStart), and refuses to finish if any of
+your data or your Discord token got in. GS Companion data is left out. Testers need Windows
+10/11 64-bit, BlueStacks (ADB on, 1280×720, DPI 240) and a key from your keygen.
+
 ## Publishing updates
 
 Rerun checks a signed update folder when it opens and every 6 hours (Settings › Updates).

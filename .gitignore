@@ -42,3 +42,7 @@ updates_site/
 content_state.json
 Rerun.update.exe*
 Rerun.old.exe
+
+# Clean release for sharing (python build.py --release)
+release/
+/tesseract/

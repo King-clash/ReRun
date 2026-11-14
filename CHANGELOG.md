@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-11-14 — Clean release build for other PCs, with Tesseract bundled
+- `python build.py --release` → `release/Rerun/` + `release/Rerun-<version>.zip` (git-ignored):
+  exe, templates, routines, README, content baseline, and a config made from
+  config.example.yaml with every Discord field blanked. No stats, History, units, crest log,
+  key, debug or GS Companion data.
+- Checked before zipping: no personal file or folder, and none of the Discord tokens found in
+  your own configs (config.yaml, dist/*/config.yaml*, backups) appears in any text file; the
+  build stops with "NOT SAFE TO SHARE" otherwise.
+- Tesseract 5.5.0 (UB Mannheim build, from ReStart's copy) bundled in `tesseract/` next to the
+  exe: tesseract.exe + the 34 DLLs it imports (read from the PE headers) + eng.traineddata
+  (29 MB) and THIRD_PARTY_NOTICES.txt. `rerun/ocr.py` looks there first.
+- Checked: release built (94 MB zip); test_ocr 11/11 using only the bundled copy with ReStart
+  hidden and PATH reduced to Windows' folders; the release exe starts from a fresh folder
+  (no crash.log). Not yet tried on a second PC.
+
 ## 2026-11-14 — Updates: templates without a new exe, and a self-updating Rerun.exe
 - New `rerun/updates.py`: one manifest per channel (stable/beta) on any static host, signed
   with the keygen's Ed25519 key (own domain prefix, so it can never pass as a Rerun key).
