@@ -108,6 +108,21 @@ def remember(folder: str | Path, path: Path = REGISTRY) -> None:
         pass
 
 
+def mark_declined(folder: str | Path, path: Path = REGISTRY) -> None:
+    """'Start fresh' was chosen for this folder: don't ask again."""
+    try:
+        d = _load_registry(path)
+        d.setdefault("declined", []).append(str(Path(folder).resolve()))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(d, indent=1), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def was_declined(folder: str | Path, path: Path = REGISTRY) -> bool:
+    return str(Path(folder).resolve()) in _load_registry(path).get("declined", [])
+
+
 def _scan(home: Path) -> list[Path]:
     """Folders with Rerun.exe or main.py next to Rerun data, a few levels below the usual
     places (cheap: stops at SEARCH_DEPTH, skips hidden and big system folders)."""
@@ -141,8 +156,8 @@ def find_previous(current: str | Path, path: Path = REGISTRY,
     seen, found = set(), []
     for f in list(_load_registry(path).get("folders", {})) + [str(p) for p in _scan(home or Path.home())]:
         p = Path(f).resolve()
-        if p == cur or p in seen or not p.is_dir() or not has_user_data(p):
-            continue
+        if p == cur or p in seen or not p.is_dir() or not has_user_data(p) or (p / ".git").exists():
+            continue  # (.git: Rerun's source folder, not an install)
         seen.add(p)
         found.append(p)
     return sorted(found, key=data_time, reverse=True)
@@ -195,14 +210,24 @@ def _templates(src: Path, dst: Path) -> int:
     return n
 
 
-def import_data(src: str | Path, dst: str | Path) -> dict:
-    """Copy your data from an older Rerun folder into this one (src is never changed)."""
+def import_data(src: str | Path, dst: str | Path, replace: bool = False) -> dict:
+    """Copy your data from an older Rerun folder into this one (src is never changed).
+    replace=True (Settings › Import): this folder's own data is first moved to
+    backups/before_import_<time>/ so the other folder's data replaces it whole."""
     src, dst = Path(src).resolve(), Path(dst).resolve()
     if src == dst:
         raise ValueError("That is this Rerun's own folder")
     if not has_user_data(src):
         raise ValueError(f"No Rerun data found in {src}")
     done: dict[str, int] = {}
+    if replace:
+        keep = dst / "backups" / time.strftime("before_import_%Y%m%d_%H%M%S")
+        for name in USER_FILES + [d for d in USER_DIRS if d != "data"]:
+            if (dst / name).exists() and (src / name).exists():
+                keep.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(dst / name), str(keep / name))
+        if keep.exists():
+            done["backup"] = 1
     cfg = src / "config.yaml"
     if cfg.exists():
         if (dst / "config.yaml").exists():
@@ -240,4 +265,4 @@ def summary(done: dict) -> str:
 
 
 __all__ = ["has_user_data", "remember", "find_previous", "import_data", "summary", "describe",
-           "richness", "facts", "REGISTRY"]
+           "richness", "facts", "mark_declined", "was_declined", "REGISTRY"]

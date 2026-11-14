@@ -88,6 +88,13 @@ listeners (`_poll_events`). There is no typed event bus yet (planned: Milestone 
 (`live` / `history` reconstruction) and `confidence`. `CrestStats` computes today / session /
 all-time counts, rates, runs-since and breakdowns from it. Lv4 is never counted as 4+.
 
+## Updates and data
+
+User data lives next to Rerun.exe (`main.app_root`). `run_app`: `migrate_ui.offer_import`
+(only when this folder has no data and an earlier Rerun folder has) -> `require_key` ->
+`migrate.remember(root)` -> `App`. `migrate.import_data(src, dst, replace=False)` copies and
+never touches `src`. Data formats only ever gain fields; config is deep-merged with defaults.
+
 ## Key system
 
 `main.py` -> `rerun.gui.run_app` -> `rerun.license_gate.require_key(root)` before `App` exists:

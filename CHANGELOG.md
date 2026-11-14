@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-11-14 — Updates keep your data
+- Replacing Rerun.exe in its folder always kept everything (data lives next to the exe; new
+  settings are merged into config.yaml). A new copy started from another folder started empty.
+- `rerun/migrate.py`: every start records its folder (%LOCALAPPDATA%\Rerun\installs.json). A
+  copy with none of your data looks for earlier Rerun folders (that list + Downloads, Desktop,
+  Documents, 3 levels; the source folder with .git is skipped) and `rerun/migrate_ui.py` asks
+  "Bring your data over?" before sign-in (so the key comes too), listing each folder with its
+  units / History / crest records / last use, the fullest preselected; Import, Start fresh
+  (not asked again for that folder) or Choose folder…. Closing the window asks again next time.
+- Copied, never moved: config.yaml (the new one kept as config.before_import.yaml), stats,
+  crest log + screenshots, History, Units (roster, scans, names, targets, renames), license.json,
+  summary state, GS Companion data (not raw/), templates you captured or tuned, your routines.
+  Files the new copy already has are kept. migrated_from.json records what was copied.
+- Settings › "Import from another Rerun…": replaces this copy's data with another folder's
+  (this copy's data moved to backups/before_import_<time>/ first), then Rerun closes.
+- On this PC it finds Downloads\Rerun\Rerun (191 units, 88 History, 105 crest records) and
+  dist\Rerun (24 History, 46 crest records). Two folders are not merged: one is chosen.
+- Tests: tests/test_migrate.py (5). 139/139 + gsc_app 16/16. Exe: a fresh copy shows the window
+  and writes nothing before you choose.
+
 ## 2026-11-14 — Work In Progress notice and key countdown
 - After every sign-in (app start, a new key after expiry, Change key) Rerun shows a
   "Work In Progress" notice with an OK button.

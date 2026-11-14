@@ -230,6 +230,36 @@ class App(tk.Tk):
             self.after(500, self.connect_discord)
         self.protocol("WM_DELETE_WINDOW", self.on_close)
 
+    # data from an older Rerun (rerun/migrate.py) ---------------------------------
+    def import_old_data(self):
+        """Settings › Import from another Rerun…: copy its data in, then restart Rerun."""
+        from .migrate import describe, has_user_data, import_data, summary
+        d = filedialog.askdirectory(parent=self, title="Folder of your other Rerun")
+        if not d:
+            return
+        if not has_user_data(d):
+            return ios.alert(self, "That folder has no Rerun data (no stats, History, units or key).",
+                             "Import")
+        if any(i.status in ("running", "paused", "starting") for i in self.m.instances.values()):
+            return ios.alert(self, "Stop your scripts first, then import.", "Import")
+        if not ios.confirm(self, f"Copy the data from\n{d}\n{describe(d)}\n\nIt replaces this Rerun's "
+                                 "settings, stats, crest log, History, units and key. This Rerun's "
+                                 "current data is moved to backups/before_import_… first, and the "
+                                 "other folder is not changed. Rerun closes afterwards; start it "
+                                 "again to load the data.", "Import Data?", ok="Import"):
+            return
+        self.m.stats.flush()
+        try:
+            done = import_data(d, self.m.root, replace=True)
+        except (OSError, ValueError) as e:
+            return ios.alert(self, f"Could not import: {e}", "Import")
+        # closing must not write this session's stats over the imported ones
+        self.m.stats.flush = lambda *a, **k: None
+        ios.alert(self, f"Copied: {summary(done)}.\n\nRerun closes now - start it again.", "Import")
+        self.m.stop_all()
+        self.disconnect_discord()
+        self.destroy()
+
     # key (rerun/license.py) ---------------------------------------------------
     def _show_key_status(self):
         lic = self.license
@@ -906,7 +936,9 @@ class App(tk.Tk):
 
     # ================================================================ settings
     def _build_settings(self):
-        _, page, _ = self._page("Script Settings", "Settings", "settings", scroll=True)
+        _, page, shdr = self._page("Script Settings", "Settings", "settings", scroll=True)
+        ios.Button(shdr, "Import from another Rerun…", self.import_old_data, kind="plain",
+                   icon="download", small=True).pack(side="right")
         wrap = tk.Frame(page, bg=C["bg"])
         wrap.pack(fill="x", padx=px(20))
         g = ios.Group(wrap)
@@ -2152,9 +2184,21 @@ Alerts:  rare crests, Crest Bursts, hyper rare drops, failures, crashes and fini
 
 
 def run_app(root: str | Path) -> None:
-    from .license_gate import require_key
+    from .license_gate import _appearance, require_key
+    from .migrate import remember
+    from .migrate_ui import offer_import
+    # A new copy with no data: offer to bring it over from the previous Rerun (before
+    # sign-in, so the key comes along too). rerun/migrate.py
+    try:
+        imported = offer_import(root, _appearance(root))
+    except Exception as e:  # noqa: BLE001 - never block start-up on the import offer
+        imported = f"Could not look for older Rerun data: {e}"
     lic = require_key(root)   # Rerun opens only with a valid key (rerun/license.py)
     if lic is None:
         return
+    remember(root)            # so the next update knows where your data is
     app = App(Manager(root), license=lic)
+    if imported:
+        app.after(1500, lambda: app.flash(imported, "ok"))
+        app.m.log("app", imported)
     app.mainloop()
