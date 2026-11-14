@@ -9,7 +9,10 @@
 - Git: `C:\Program Files\Git\cmd\git.exe` (prepend to PATH in a fresh shell)
 
 ## Current phase
-Milestone A · Phase 2 — Always re-select Past Party (next)
+Milestone A · Phase 2 done as BETA (2026-11-14); Phase 3 Unit Roster next.
+Phase 2 live check: on Start, the log should show "Selecting Past Party", "Ticking Include AI"
+(or straight to Apply), "Past Party applied with Include AI - dialog closed"; capture the Past
+Party dialog as tests/fixtures/past_party_dialog.png.
 
 ## Completed
 - Phase 0 (2026-11-14): recovery, git baseline f4df578, backups, docs, baseline 54/54.

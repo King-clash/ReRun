@@ -46,6 +46,12 @@ Crest Lv3, mailbox, errors). Also `debug_crest/` holds 3 real Equip Crest captur
 | 2026-11-14 | Phase 1 crest ledger | 65/65 (54 original + 11 new test_crest_stats); no new failures |
 
 | 2026-11-14 | Crest double-count fix | 67/67 (13 test_crest_stats) |
+| 2026-11-14 | History re-import fix | 69/69 |
+| 2026-11-14 | Phase 2 Past Party | 81/81 (12 new test_past_party; test_app made deterministic) |
+
+`py tests/test_past_party.py` — Phase 2. The real party screen (party_reigrad.png) matches
+past_party_button 0.96 lit; under the error popup it is dimmed (8 vs 131). No real capture of the
+Past Party dialog (Include AI / Apply) exists yet — save one as a fixture on the first live run.
 
 **Live (installed exe, 2026-11-14 13:57–14:01):** Phase 1 ledger recorded 3 runs + 4 crests with
 titles, matching History exactly; exposed the double count fixed above (fix not yet live-verified).

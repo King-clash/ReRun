@@ -36,7 +36,8 @@ def test_manager_basics():
     m.save_script_settings("Instance 1", "crest", {"runs": 50, "keep": "Lv4 and better"})
     m2 = Manager(root)
     s = m2.script_settings("Instance 1", "crest")
-    assert s["runs"] == 50 and s["keep"] == "Lv4 and better" and s["party"] == "Last Party"
+    # Phase 2: 'party' choice became 'Always re-select Past Party' (on by default for Crest)
+    assert s["runs"] == 50 and s["keep"] == "Lv4 and better" and s["past_party"] is True
     # instance editing
     m2.set_instances([{"name": "A", "serial": "127.0.0.1:5555", "script": "any_quest"},
                       {"name": "B", "serial": "127.0.0.1:5565", "script": "crest"}])
@@ -129,6 +130,10 @@ def test_gui_starts_and_closes():
         assert pops, "popover did not open"
         for p in pops:
             p.destroy()
+        # Close only after this step ran: with fixed timers a slow (busy) PC let
+        # app.update() above process the destroy timer mid-step (flaky TclError).
+        app.after(200, lambda: app.nb.select(0))
+        app.after(700, app.destroy)
 
     app.after(300, lambda: (app.nb.select(1), app._load_settings_form()))
     app.after(600, lambda: (app.nb.select(2), app.refresh_checklist()))
@@ -138,8 +143,7 @@ def test_gui_starts_and_closes():
     app.after(1500, lambda: (app.nb.select(5), app.log_level.set("Errors"), app._rebuild_log()))
     app.after(1700, lambda: app.flash("hello", "ok"))
     app.after(1900, popover_open_close)
-    app.after(2100, lambda: app.nb.select(0))
-    app.after(2600, app.destroy)
+    app.after(30000, app.destroy)  # safety net if a step above never ran
     app.mainloop()
     assert not errors, errors
     assert len(app._hist_rows) == 1, app._hist_rows

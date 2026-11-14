@@ -30,8 +30,9 @@ TIPS
 """
     SETTINGS = [
         *LOOP_SETTINGS[:1],
-        Setting("party", "Party", "choice", "Current Party", ["Current Party", "Last Party"],
-                "Current Party (recommended here) uses the party set for the quest."),
+        Setting("past_party", "Always re-select Past Party", "bool", False,
+                help="Off (recommended here) uses the party set for the quest. On: Past Party + "
+                     "Include AI + Apply on every Start, quest entry, Resume and relaunch."),
         *LOOP_SETTINGS[2:],
     ]
     TEMPLATES = LOOP_TEMPLATES + [

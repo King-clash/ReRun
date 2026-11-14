@@ -151,6 +151,12 @@ CREST HANDLING
         self.palace = None  # set when 24/7 mode opens a palace tile
         self.log(f"Keeping crests: {self.cfg['keep']}")
 
+    @classmethod
+    def past_party_from_old(cls, party: str) -> bool:
+        # 'Always re-select Past Party' is on by default for Crest farming, also
+        # for configs saved with the old 'Current Party' choice.
+        return True
+
     # ------------------------------------------------------------ crest ledger
     def same_crest_again(self, rarity: str, text: str | None) -> bool:
         """A new crest only appears after a run finishes. Seeing a crest of the
@@ -403,7 +409,7 @@ CREST HANDLING
             self.finish()
         if self.tap_template("quest_list_entry", screen, settle=2):
             self.log("Quest list - opening the quest")
-            self.party_done = False
+            self.reset_party("new quest entry")
 
     def handle_home_screen(self, screen):
         if not self.cfg.get("mode_247"):

@@ -149,7 +149,7 @@ class BaseScript:
     def __init__(self, ctx: Context, settings: dict | None = None):
         self.ctx = ctx
         self.cfg = {s.key: s.default for s in self.SETTINGS}
-        self.cfg.update(settings or {})
+        self.cfg.update(self.migrate_settings(dict(settings or {})))
         self.state = "unknown"
         self.prev_state = "unknown"
         self.last_progress = time.monotonic()
@@ -255,11 +255,25 @@ class BaseScript:
             raise StopRoutine("stopped by user")
         if self.deadline is not None and time.monotonic() >= self.deadline:
             raise WindowElapsed("time window elapsed")
+        paused = False
         while self.ctx.pause_event.is_set():
+            paused = True
             if self.ctx.stop_event.is_set():
                 raise StopRoutine("stopped by user")
             time.sleep(0.2)
             self.last_progress = time.monotonic()  # pausing is not "stuck"
+        if paused:
+            self.log("Resumed")
+            self.on_resume()
+
+    def on_resume(self) -> None:
+        """Called once when a pause ends (the game may have been touched meanwhile)."""
+
+    @classmethod
+    def migrate_settings(cls, saved: dict) -> dict:
+        """Upgrade settings saved by an older Rerun (read-time only; config.yaml is
+        rewritten in the new form the next time the user saves Settings)."""
+        return saved
 
     def sleep(self, seconds: float, jitter: float = 0.0) -> None:
         end = time.monotonic() + seconds + (random.uniform(0, jitter) if jitter else 0)

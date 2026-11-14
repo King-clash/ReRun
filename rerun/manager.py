@@ -168,6 +168,8 @@ class Manager:
         cls = SCRIPTS.get(script)
         defaults = {s.key: s.default for s in cls.SETTINGS} if cls else {}
         saved = self.config.get("script_settings", {}).get(instance, {}).get(script, {})
+        if cls:
+            saved = cls.migrate_settings(dict(saved))
         return {**defaults, **saved}
 
     def save_script_settings(self, instance: str, script: str, values: dict) -> None:

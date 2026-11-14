@@ -40,9 +40,10 @@ LOOP_TEMPLATES = [
 
 LOOP_SETTINGS = [
     Setting("runs", "Number of runs (0 = no limit)", "int", 0),
-    Setting("party", "Party", "choice", "Last Party", ["Last Party", "Current Party"],
-            "Last Party re-selects the party from your previous run (with its AI). "
-            "Current Party uses whatever is set in-game."),
+    Setting("past_party", "Always re-select Past Party", "bool", True,
+            help="On every Start, new quest entry, Resume, crash relaunch and daily-reset relogin: "
+                 "Past Party, tick Include AI, Apply - each step checked on screen. Not on Redeploy. "
+                 "Off: uses whatever party is set in-game."),
     *ENERGY_SETTINGS,
     Setting("game_refill", "Let the game refill energy mid-loop", "bool", False,
             help="Turns on Auto-Loop's own 'Refill energy with potions'. Fewer interruptions, "
@@ -78,12 +79,14 @@ class LoopFarmScript(EnergyMixin, BaseScript):
         self.drop_since = None
         self.target = int(self.cfg.get("runs") or 0)
         self.in_loop = False
-        self.party_done = False
+        self.reset_party("start")
+        self.past_party_missing_told = False
         self.last_drop = None  # unknown until the first frame
         self.failures = 0
         self.potions_used = self.crystals_used = 0
         cap = int(self.cfg.get("potion_limit") or 0)
-        self.log(f"Target runs: {self.target or 'no limit'} | Party: {self.cfg['party']} | "
+        party = "re-select Past Party + Include AI" if self.wants_past_party() else "current party"
+        self.log(f"Target runs: {self.target or 'no limit'} | Party: {party} | "
                  f"Refill: {self.cfg.get('potion')}{f' (max {cap})' if cap else ''} | "
                  f"Crystals: {'on' if self.cfg.get('crystal_refresh') else 'off'}")
 
@@ -126,13 +129,83 @@ class LoopFarmScript(EnergyMixin, BaseScript):
             self.finish()
         self.log("Quest page - tapping Solo")
         self.tap_template("solo_quest_button", screen) or self.tap_template("challenge_button", screen)
+        self.reset_party("new quest entry")
+
+    # ------------------------------------------------------------ party
+    # Past Party -> Include AI ticked -> Apply, each step checked on a fresh
+    # frame. Re-done on Start, quest entry, Resume, relaunch and relogin; never
+    # on Redeploy (the game keeps the same party there).
+    PARTY_WAIT_TICKS = 6   # frames to wait for the Past Party button / dialog
+    MAX_PARTY_TAPS = 3     # Include AI / Apply taps before giving up
+
+    @classmethod
+    def migrate_settings(cls, saved: dict) -> dict:
+        """Old 'party' choice -> 'Always re-select Past Party' switch."""
+        saved = super().migrate_settings(saved)
+        has_setting = any(s.key == "past_party" for s in cls.SETTINGS)
+        if has_setting and "past_party" not in saved and "party" in saved:
+            saved = {**saved, "past_party": cls.past_party_from_old(saved["party"])}
+        return saved
+
+    @classmethod
+    def past_party_from_old(cls, party: str) -> bool:
+        return party == "Last Party"
+
+    def wants_past_party(self) -> bool:
+        return bool(self.cfg.get("past_party")) and self.has_template("past_party_button")
+
+    def reset_party(self, why: str) -> None:
+        if getattr(self, "party_done", False) and self.wants_past_party():
+            self.log(f"Past Party will be re-selected ({why})")
         self.party_done = False
+        self.party_phase = None     # None | "opened" (Past Party tapped, waiting for its dialog)
+        self.party_wait = 0
+        self.ai_taps = 0
+        self.apply_taps = 0
+
+    def on_resume(self) -> None:
+        super().on_resume()
+        self.reset_party("resumed")
+
+    def on_relaunch(self) -> None:
+        super().on_relaunch()
+        self.reset_party("game relaunched")
+
+    def party_fallback(self, reason: str) -> None:
+        """No usable Past Party: carry on with the current party and say so once."""
+        self.party_done = True
+        self.party_phase = None
+        self.log(f"{reason} - using the current party")
+        self.record("party", f"{reason} - used the current party")
+        if not getattr(self, "past_party_missing_told", False):
+            self.past_party_missing_told = True
+            self.notify(f"{self.NAME}: {reason}. Continuing with the current party.", ping=False)
+
+    def select_past_party(self, screen) -> bool:
+        """On the party screen. True while the Past Party step is still in progress."""
+        if self.party_done or not self.wants_past_party():
+            return False
+        self.party_wait += 1
+        if self.party_phase == "opened":
+            if self.party_wait <= self.PARTY_WAIT_TICKS:
+                return True  # waiting for the Past Party dialog
+            self.party_fallback("Tapped Past Party but its dialog never opened")
+            return False
+        m = self.find("past_party_button", screen)
+        if m and not self.dimmed(screen, m):
+            self.log("Selecting Past Party")
+            self.tap_match(m, settle=1.0)
+            self.party_phase, self.party_wait = "opened", 0
+            return True
+        if self.party_wait < self.PARTY_WAIT_TICKS:
+            return True  # the screen may still be sliding in
+        self.party_fallback("No Past Party available on the party screen"
+                            + (" (button greyed out)" if m else ""))
+        return False
 
     def handle_battle_button(self, screen):
-        if self.cfg["party"] == "Last Party" and not self.party_done and self.has_template("past_party_button"):
-            if self.tap_template("past_party_button", screen, settle=1.0):
-                self.log("Selecting Past Party")
-                return
+        if self.select_past_party(screen):
+            return
         if self.find("auto_button", screen):
             self.log("Turning Auto on")
             self.tap_template("auto_button", screen)
@@ -165,13 +238,45 @@ class LoopFarmScript(EnergyMixin, BaseScript):
 
     def handle_include_ai_button(self, screen):
         # The template is the *unticked* box, so this only ever ticks it.
-        self.log("Including past AI settings")
-        self.tap_template("include_ai_button", screen)
+        self.party_phase = "dialog"
+        if self.ai_taps >= self.MAX_PARTY_TAPS:
+            self.record("failure", "Include AI could not be ticked in the Past Party dialog", screen)
+            self.notify(f"{self.NAME}: tapped Include AI {self.ai_taps} times but it still shows "
+                        "unticked. Stopped before applying the party.")
+            raise Finished("Include AI could not be ticked")
+        self.ai_taps += 1
+        self.log("Ticking Include AI")
+        self.tap_template("include_ai_button", screen, settle=0.8)
 
     def handle_apply_button(self, screen):
-        if self.tap_template("apply_button", screen, settle=1.0):
-            self.log("Party applied")
-            self.party_done = True
+        self.party_phase = "dialog"
+        # Never Apply on the strength of an earlier tap: look again first.
+        fresh = self.grab()
+        if self.find("include_ai_button", fresh):
+            self.log("Include AI is not ticked yet - not applying")
+            return
+        if self.apply_taps >= self.MAX_PARTY_TAPS:
+            self.record("failure", "Past Party dialog stayed open after Apply", fresh)
+            self.notify(f"{self.NAME}: tapped Apply {self.apply_taps} times but the Past Party "
+                        "dialog stayed open. Stopped.")
+            raise Finished("Past Party Apply did not take")
+        if not self.tap_template("apply_button", fresh, settle=1.0):
+            return
+        self.apply_taps += 1
+        # Verify: the dialog closes and the party screen (Battle) is back.
+        for _ in range(4):
+            after = self.grab()
+            if not self.find("apply_button", after):
+                if self.find("battle_button", after) or self.find("past_party_button", after):
+                    self.log("Past Party applied with Include AI - dialog closed, party screen back")
+                else:
+                    self.log("Past Party applied with Include AI - dialog closed")
+                self.party_done = True
+                self.party_phase = None
+                self.progress()
+                return
+            self.sleep(0.7)
+        self.log("Past Party dialog still open after Apply - checking again")
 
     def handle_looping_button(self, screen):
         if self.cfg.get("game_refill") and self.cfg.get("potion") != NO_POTION \
@@ -256,7 +361,7 @@ class LoopFarmScript(EnergyMixin, BaseScript):
         m = self.wait_for(["restart_btn"], 8)
         if m:
             self.tap_match(m, settle=2)
-        self.party_done = False
+        self.reset_party("quest restarted after a wipe")
         self.in_loop = False
         if self.failures >= 5 and self.failures > self.session_runs:
             self.notify(f"{self.NAME}: {self.failures} failures - your team may not clear this quest. Stopped.")

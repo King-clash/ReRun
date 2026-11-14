@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-11-14 — Phase 2: Always re-select Past Party (BETA)
+- Setting renamed: the "Party" choice (Last Party / Current Party) is now the switch
+  **Always re-select Past Party** (`past_party`). Default ON for Crest (and every Auto-Loop farm),
+  OFF for Any Quest / Secret Equip.
+- Config migration (read-time, non-destructive): `party: Last Party` → on, `Current Party` → off,
+  except Crest, which is on (per the Phase 2 brief). An explicit `past_party` always wins. config.yaml
+  is rewritten in the new form only when the user saves Settings. Scripts without the switch
+  (Multiplayer Farm) are unaffected.
+- Verified flow (rerun/scripts/loop_farm.py): Past Party (must be visible and lit) → Include AI
+  ticked (unticked box tapped, max 3, else stop) → re-check on a fresh frame → Apply → confirm the
+  dialog closed and the party screen is back (max 3 Applies, else stop).
+- Fallbacks: no / greyed Past Party button, or its dialog never opens → continue with the current
+  party, notify once per session, History entry.
+- Re-applied on: Start, new quest entry (Solo/Challenge, crest quest list, restart after wipe),
+  Resume from Pause (new BaseScript.on_resume hook), crash relaunch and daily-reset relogin
+  (on_relaunch). Not on Redeploy.
+- New BaseScript hooks: `migrate_settings` (also applied in Manager.script_settings), `on_resume`.
+- Tests: tests/test_past_party.py (12, incl. a real-screenshot check); test_app updated for the
+  rename and made deterministic (its fixed timers raced on a busy PC — flaky TclError). 81/81 pass.
+
 ## 2026-11-14 — Fix: History rebuild re-imported live crests on restart (Phase 1 bug)
 - Installed the double-count fix (exe only, user files unchanged; backup
   `backups/preinstall_20261114_141002/`). On that restart the History rebuild imported 11 crests the
