@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased — Phase C: reliability (BETA, simulator + real fixtures)
+- **Home button first:** Crest's "start from Home" taps the bottom bar's Home button (new template
+  `home_nav_button`, threshold 0.9, matches the real Crest Palace and quest list screens) when it is
+  visible and lit, and presses Back only otherwise (or after 4 taps that change nothing). Back from
+  inside a battle is still untested on the real game, so keeping Home-button-first matters.
+- **Persistent log:** every Log-tab line is also appended to `rerun.log` (1 MB x 4 files, rotated;
+  opened per line so no file stays locked). `rerun/runlog.py`.
+- **Session summary:** when a script ends, History + Log get one line: how long, why it ended, runs,
+  crests, potions, game restarts ("Session ended after 42 min (Crest): stopped: ... | 7 run(s), ...").
+- **Closest known screens:** "stuck", "unrecognised for 5 minutes" and "couldn't reach Home" reports now
+  say which templates the frame resembled most (e.g. `exploring_button 0.62`).
+- **Error audit:** `tools/except_audit.py` lists every broad `except Exception` and whether it tells anyone
+  (65 total; silent ones 34 -> 25; the rest are cosmetic: tray, DPI, title-bar colour, or already return an
+  error text). Failures in idle energy reads, unit pictures, name suggestions and GS Companion reference
+  matching now go to `error.log`.
+- Tests: tests/test_runlog.py (4), 3 more in tests/test_crest_home.py.
+
 ## Unreleased — Crest finds the palace and quest by name (BETA)
 - Palaces rotate and every quest looks different, so hand-captured tile/row pictures break.
   New Crest settings **Palace to farm** and **Quest to farm** (names, optional). Pictures are still

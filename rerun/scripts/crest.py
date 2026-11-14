@@ -128,6 +128,9 @@ CREST HANDLING
           optional=True),
         T("quest_list_entry3", "Same, for a third palace (optional).", optional=True),
         T("quest_list_entry4", "Same, for a fourth palace (optional).", optional=True),
+        T("home_nav_button", "The 'Home' button in the bottom bar (shown on most screens but not on "
+                             "Home itself); lets 'start from Home' tap it instead of pressing Back.",
+          optional=True),
         T("exploring_button", "'Exploring' button on the Home screen (24/7 mode).", optional=True),
         T("crest_palace_icon", "Crest Palace entry on the Exploring screen (24/7 mode).", optional=True),
         T("crest_palace_icon2", "Same entry while a 'Campaign!' badge covers it.", optional=True),
@@ -221,6 +224,18 @@ CREST HANDLING
                         "'Always start from the Home screen'.", screenshot=False)
             raise Finished("Home navigation templates missing: " + ", ".join(missing))
 
+    HOME_MAX_NAV_TAPS = 4   # Home-button taps per Start before falling back to the Back key
+
+    def _tap_home_button(self, screen) -> bool:
+        """Tap the bottom bar's Home button when it is visible and lit (not dimmed by a popup)."""
+        if not self.has_template("home_nav_button"):
+            return False
+        m = self.find("home_nav_button", screen)
+        if not m or self.dimmed(screen, m):
+            return False
+        self.tap_match(m, settle=1.5)
+        return True
+
     def go_home(self) -> None:
         """Get the game to the Home screen from wherever it is: dismiss known popups with their
         handlers, press Back on everything else, and stop (with a screenshot) if Home can't be
@@ -231,7 +246,7 @@ CREST HANDLING
             self.recover_crash()  # relaunches in 24/7 mode, otherwise stops with a clear message
         popups = {e[0] for e in self.COMMON_STATES} | {"ok_button", "crest_fragment", "select_crest_ok2"}
         end = time.monotonic() + self.HOME_TIMEOUT_S
-        backs = 0
+        backs = home_taps = 0
         while time.monotonic() < end:
             screen = self.grab()
             state = self.detect_state(screen)
@@ -252,6 +267,9 @@ CREST HANDLING
             if state in popups:
                 self.log(f"Start: closing {state}")
                 getattr(self, f"handle_{state}")(screen)
+            elif home_taps < self.HOME_MAX_NAV_TAPS and self._tap_home_button(screen):
+                home_taps += 1
+                self.log(f"Start: on '{state}' - tapped the Home button ({home_taps})")
             else:
                 backs += 1
                 if backs > self.HOME_MAX_BACKS:
@@ -260,7 +278,9 @@ CREST HANDLING
                 self.ctx.device.back()
             self.sleep(1.2)
         saved = self.save_frame("no_home")
+        close = self.closest_screens(self.screen_img) if self.screen_img is not None else ""
         self.notify(f"{self.NAME}: couldn't reach the Home screen from where the game is. Stopped."
+                    + (f" Closest known screens: {close}." if close else "")
                     + (f" Frame saved to {saved}." if saved else ""))
         raise Finished("could not reach the Home screen")
 

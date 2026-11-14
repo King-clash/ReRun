@@ -16,7 +16,7 @@ import yaml
 
 from .adb import AdbError, Device, find_adb
 from .engine import Context, RoutineError, Runner, StopRoutine, load_routines, templates_used
-from . import errlog
+from . import errlog, runlog
 from .crest_stats import CrestLedger
 from .history import History
 from .compendium import Compendium
@@ -101,6 +101,7 @@ class Manager:
     def __init__(self, root: str | Path):
         self.root = Path(root)
         errlog.init(self.root)
+        runlog.init(self.root)
         self.config_path = self.root / "config.yaml"
         self.store = TemplateStore(self.root / "templates")
         self.vision = Vision(self.store)
@@ -112,6 +113,7 @@ class Manager:
         try:  # repeatable: rebuilds crests from History once, never twice
             added = self.crests.reconstruct(self.history.entries, self.stats.all(), self.history.thumbs)
         except Exception as e:  # noqa: BLE001 - never block startup on statistics
+            errlog.note("manager.crest_rebuild", e)
             added = {"error": repr(e)}
         self._crest_rebuild = added
         self.units = UnitRoster(self.root)
@@ -244,6 +246,7 @@ class Manager:
                 del self.log_lines[:-LOG_KEEP]
                 del self.log_entries[:-LOG_KEEP]
         self.emit({"type": "log", **entry})
+        runlog.write(instance, msg, level)
 
     def reset_stats(self, name: str | None = None) -> str:
         self.stats.reset(name)
@@ -300,7 +303,8 @@ class Manager:
             try:
                 from .ocr import get_ocr, read_energy
                 r = read_energy(get_ocr(self.config.get("tesseract_path", "auto")), self.screenshot(name))
-            except Exception:  # noqa: BLE001 - no device / no OCR: unknown
+            except Exception as e:  # noqa: BLE001 - no device / no OCR: unknown
+                errlog.note("manager.energy_read", e)
                 r = None
             if r:
                 cache[name] = (r[0], r[1], time.time())
@@ -392,6 +396,7 @@ class Manager:
 
     def _worker(self, inst: Instance) -> None:
         name = inst.name
+        started_at, before, reason = None, {}, "finished"
         try:
             dev = self.device(name)
             dev.connect()
@@ -408,6 +413,7 @@ class Manager:
             inst.ctx = ctx
             self._set_status(inst, "running", inst.script)
             self.stats.mark_started(name)
+            started_at, before = time.time(), dict(self.stats.get(name))
             if inst.script.startswith(CUSTOM_PREFIX):
                 Runner(ctx, inst.script[len(CUSTOM_PREFIX):]).run()
             else:
@@ -416,27 +422,59 @@ class Manager:
             self._set_status(inst, "idle", "finished")
         except Finished as e:
             self.log(name, f"Finished: {e}")
+            reason = f"finished: {e}"
             self._set_status(inst, "idle", str(e))
         except StopRoutine as e:
             self.log(name, f"Stopped ({e})")
+            reason = f"stopped: {e}"
             if str(e) != "stopped by user" and str(e) != "stopped":
                 self.notify(name, f"Stopped: {e}", ping=True)
             self._set_status(inst, "idle", str(e))
         except MissingTemplate as e:
             self.log(name, str(e))
+            reason = f"missing template: {e}"
             self.notify(name, str(e), ping=True)
             self._set_status(inst, "error", str(e))
         except (AdbError, RoutineError) as e:
             self.log(name, f"Error: {e}")
+            reason = f"error: {e}"
             self.notify(name, f"Error: {e}", ping=True)
             self._set_status(inst, "error", str(e))
         except Exception as e:  # noqa: BLE001 - report anything unexpected
             self.log(name, "Unexpected error:\n" + traceback.format_exc())
+            reason = f"crashed: {e!r}"
             self.notify(name, f"Crashed: {e!r}", ping=True)
             self._set_status(inst, "error", repr(e))
         finally:
             self.stats.mark_stopped(name)
+            if started_at is not None:
+                self._record_session(inst, started_at, before, reason)
             inst.ctx = None
+
+    def _record_session(self, inst: Instance, started_at: float, before: dict, reason: str) -> None:
+        """One History + Log line per run of a script: how long, why it ended, what it achieved.
+        Answers 'why did it stop' the next morning. Never raises."""
+        try:
+            name = inst.name
+            after = self.stats.get(name)
+            delta = {k: after.get(k, 0) - before.get(k, 0) for k in after
+                     if after.get(k, 0) != before.get(k, 0)}
+            mins = max(0, int((time.time() - started_at) / 60))
+            parts = []
+            for label, pick in (("run(s)", lambda k: k.endswith(".runs")),
+                                ("crest(s)", lambda k: ".crest_" in k),
+                                ("potion(s)", lambda k: "potion" in k.rsplit(".", 1)[-1]),
+                                ("game restart(s)", lambda k: k.endswith("game_restarts"))):
+                n = sum(v for k, v in delta.items() if pick(k))
+                if n > 0:
+                    parts.append(f"{n} {label}")
+            cls = SCRIPTS.get(inst.script)
+            title = cls.NAME if cls else inst.script
+            detail = f"Session ended after {mins} min ({title}): {reason}"                      + (" | " + ", ".join(parts) if parts else "")
+            self.history.add(name, inst.script, "session", detail)
+            self.log(name, detail)
+        except Exception as e:  # noqa: BLE001 - a summary must never break shutdown
+            errlog.note("manager.session_summary", e)
 
     # ------------------------------------------------------------ schedule + summary
     def start_scheduler(self) -> None:

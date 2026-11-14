@@ -15,7 +15,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageTk
 
-from . import __version__, ios, updates
+from . import __version__, errlog, ios, updates
 from .adb import discover_bluestacks_instances
 from .appicon import make_icon
 from .ios import C, F, px
@@ -33,7 +33,7 @@ APPEARANCE = {"auto": "Automatic", "light": "Light", "dark": "Dark"}
 ALL_INSTANCES = "All instances"
 LOG_LEVELS = {"All": None, "Warnings": {"warn", "error"}, "Errors": {"error"}}
 HISTORY_KINDS = {"All": None, "Crests": {"crest"}, "Energy": {"energy"},
-                 "Problems": {"failure"}, "Other": {"finished", "drop", "arena", "raid", "mines",
+                 "Problems": {"failure"}, "Other": {"finished", "session", "drop", "arena", "raid", "mines",
                                                    "grand_crusade", "yuna", "queue"}}
 IDLE_PREVIEW_EVERY_S = 3.0
 STREAM_RETRY_S = 60     # after the Live View video failed, try it again this much later
@@ -961,8 +961,8 @@ class App(tk.Tk):
         def work():
             try:
                 self._read_idle_energy(name, self.m.screenshot(name))
-            except Exception:  # noqa: BLE001 - energy is optional
-                pass
+            except Exception as e:  # noqa: BLE001 - energy is optional
+                errlog.note("gui.idle_energy", e)
         threading.Thread(target=work, daemon=True).start()
 
     def _read_idle_energy(self, name: str, img: np.ndarray) -> None:
@@ -974,7 +974,8 @@ class App(tk.Tk):
         try:
             from .ocr import get_ocr, read_energy
             e = read_energy(get_ocr(self.m.config.get("tesseract_path", "auto")), img)
-        except Exception:  # noqa: BLE001 - no OCR: simply not shown
+        except Exception as e:  # noqa: BLE001 - no OCR: simply not shown
+            errlog.note("gui.read_idle_energy", e)
             return
         if e:
             self._idle_energy[name] = (e[0], e[1], time.time())
@@ -1857,7 +1858,8 @@ class App(tk.Tk):
                         size = px(38)
                         with Image.open(p) as im:
                             photo = ImageTk.PhotoImage(im.convert("RGBA").resize((size, size), Image.LANCZOS))
-            except Exception:  # noqa: BLE001 - a missing picture never breaks the list
+            except Exception as e:  # noqa: BLE001 - a missing picture never breaks the list
+                errlog.note("gui.unit_picture", e)
                 photo = None
         self._unit_pics[key] = photo
         return photo
@@ -1937,7 +1939,8 @@ class App(tk.Tk):
             return None
         try:
             return page.match_name(name, self._unit_element(name))
-        except Exception:  # noqa: BLE001 - a suggestion must never break correcting
+        except Exception as e:  # noqa: BLE001 - a suggestion must never break correcting
+            errlog.note("gui.name_suggestion", e)
             return None
 
     @staticmethod

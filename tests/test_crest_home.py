@@ -159,6 +159,76 @@ def test_second_palaces_row_picture_is_used():
     assert dev.tapped[0] == "quest_list_entry2" and dev.tapped[-1] == "solo_quest_button", dev.tapped
 
 
+def test_home_button_is_tapped_instead_of_pressing_back():
+    fast()
+    scr = screens()
+    scr["party"] = Screen([("battle_button", 500, 960), ("home_nav_button", 20, 1160)])
+    dev = Sim(scr, "party", {**TAPS, ("party", "home_nav_button"): "home"})
+    dev.back_presses = 0
+    dev.back = (lambda self: setattr(self, "back_presses", self.back_presses + 1)).__get__(dev)
+    holder = {}
+    orig = Sim.tap
+
+    def tap(self, x, y):
+        orig(self, x, y)
+        if self.tapped[-1] == "solo_quest_button":
+            holder["ctx"].stop_event.set()
+    dev.tap = tap.__get__(dev)
+    ctx = make_ctx(Path(tempfile.mkdtemp()), dev, CrestScript)
+    holder["ctx"] = ctx
+    run(CrestScript(ctx, {}))
+    assert dev.tapped[0] == "home_nav_button" and dev.back_presses == 0, (dev.tapped, dev.back_presses)
+    assert "exploring_button" in dev.tapped
+
+
+def test_home_button_that_does_nothing_falls_back_to_back_after_a_few_taps():
+    fast()
+    scr = screens()
+    scr["party"] = Screen([("battle_button", 500, 960), ("home_nav_button", 20, 1160)])
+    dev = Sim(scr, "party", TAPS)       # tapping the button changes nothing
+    dev.back_presses = 0
+
+    def back(self):
+        self.back_presses += 1
+        self.go("home")
+    dev.back = back.__get__(dev)
+    ctx = make_ctx(Path(tempfile.mkdtemp()), dev, CrestScript)
+    holder = {"ctx": ctx}
+    orig = Sim.tap
+
+    def tap(self, x, y):
+        orig(self, x, y)
+        if self.tapped[-1] == "solo_quest_button":
+            holder["ctx"].stop_event.set()
+    dev.tap = tap.__get__(dev)
+    run(CrestScript(ctx, {}))
+    assert dev.tapped[:CrestScript.HOME_MAX_NAV_TAPS] == ["home_nav_button"] * CrestScript.HOME_MAX_NAV_TAPS
+    assert dev.back_presses == 1, dev.back_presses
+
+
+def test_real_home_button_found_when_lit_and_ignored_when_dimmed():
+    import cv2
+    from rerun.adb import FakeDevice
+    from rerun.engine import Context
+    from rerun.stats import Stats
+    from rerun.vision import TemplateStore, Vision
+    store = TemplateStore(ROOT / "templates")
+    if not store.has("home_nav_button"):
+        return
+    v = Vision(store)
+    lit = cv2.imread(str(ROOT / "tests" / "fixtures" / "crest_palace_list.png"))
+    for img, expect in ((lit, True), ((lit * 0.45).astype("uint8"), False)):
+        dev = FakeDevice([img])
+        ctx = Context(instance="t", device=dev, vision=v, stats=Stats(), routines={},
+                      base_resolution=(720, 1280), log=lambda *a: None, notify=lambda *a, **k: None)
+        s = CrestScript(ctx, {"start_home": False})
+        s.sleep = lambda *a, **k: None
+        assert s._tap_home_button(img) is expect
+        assert (len(dev.taps) == 1) is expect
+        if expect:
+            assert dev.taps[0] == (60, 1215), dev.taps
+
+
 def test_dimmed_home_is_not_the_home_screen():
     """A popup over Home dims the Exploring button: Crest must not count that as Home."""
     import cv2

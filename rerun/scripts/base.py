@@ -228,6 +228,26 @@ class BaseScript:
                                                  else self.grab())
         return self.ocr.read_number(img[max(0, y):y + h, max(0, x):x + w])
 
+    def closest_screens(self, screen: np.ndarray, n: int = 3) -> str:
+        """'exploring_button 0.62, home_nav_button 0.41': which known screens this frame resembles
+        most (best template scores, even below the match threshold). Makes a 'stuck' or
+        'unrecognised' report actionable: a score just under the threshold means re-capture
+        that template; low scores everywhere mean a screen Rerun has never seen."""
+        try:
+            names = list(dict.fromkeys(t for e in self.COMMON_STATES + self.STATES for t in e[1]))
+            scores = []
+            for name in names:
+                try:
+                    m = self.ctx.vision.score(screen, name)
+                except MissingTemplate:
+                    continue
+                if m is not None:
+                    scores.append((m.score, name))
+            return ", ".join(f"{name} {sc:.2f}" for sc, name in sorted(scores, reverse=True)[:n])
+        except Exception as e:  # noqa: BLE001 - diagnostics must never break a script
+            errlog.note("base.closest_screens", e)
+            return ""
+
     def describe_screen(self, screen: np.ndarray) -> str:
         """The words on screen, for stuck/unknown reports ('' without OCR)."""
         try:
@@ -404,9 +424,11 @@ class BaseScript:
                 if self.repeat >= self.MAX_REPEAT:
                     saved = self.save_frame(f"stuck_{state}", screen)
                     words = self.describe_screen(screen)
+                    close = self.closest_screens(screen)
                     self.notify(f"{self.NAME} is stuck: it handled '{state}' {self.repeat} times in a "
                                 "row and the screen didn't change. Stopped - please check the emulator."
                                 + (f" Screen says: \"{words[:200]}\"." if words else "")
+                                + (f" Closest known screens: {close}." if close else "")
                                 + (f" Frame saved to {saved}." if saved else ""))
                     raise StopRoutine(f"stuck on {state}")
             self._watch_unknown(state, screen)
@@ -487,8 +509,10 @@ class BaseScript:
             self._unknown_saved = True
             saved = self.save_frame("unrecognised", screen)
             words = self.describe_screen(screen)
+            close = self.closest_screens(screen)
             self.log(f"Screen unrecognised for {self.UNKNOWN_SNAPSHOT_S // 60} min - saved {saved}. "
                      + (f"Screen says: \"{words[:200]}\". " if words else "")
+                     + (f"Closest known screens: {close}. " if close else "")
                      + "If it's a popup, capture its button in the Templates tab.")
 
     def check_setup(self) -> None:

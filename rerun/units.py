@@ -26,6 +26,8 @@ import threading
 import time
 from pathlib import Path
 
+from . import errlog
+
 STATUS_RANK = {"uncertain": 0, "estimated": 1, "ocr": 2, "reference": 3, "verified": 4, "manual": 5}
 # Unit names: "manual" (you typed it) > "reference" (GS Companion's spelling, clear match)
 #             > "ocr" > "uncertain".
@@ -137,7 +139,8 @@ class UnitRoster:
             return False
         try:
             facts = self.reference_facts(u["name"]) or {}
-        except Exception:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001
+            errlog.note("units.reference_facts", e)
             return False
         mine = (u["fields"].get("element") or {}).get("value")
         if u.get("name_status") != "reference" and mine and facts.get("element") not in (None, mine):
@@ -170,7 +173,8 @@ class UnitRoster:
         race = (f.get("race") or {}).get("value")
         try:
             return norm_name(self.reference(ob.get("name", ""), el, race) or "") or None
-        except Exception:  # noqa: BLE001 - reference data is optional
+        except Exception as e:  # noqa: BLE001 - reference data is optional
+            errlog.note("units.reference_name", e)
             return None
 
     def adopt_reference_names(self, lookup) -> list[tuple[str, str]]:
@@ -192,7 +196,8 @@ class UnitRoster:
                 race = (f.get("race") or {}).get("value")
                 try:
                     ref = lookup(name, el, race)
-                except Exception:  # noqa: BLE001 - reference data is optional
+                except Exception as e:  # noqa: BLE001 - reference data is optional
+                    errlog.note("units.adopt_reference", e)
                     ref = None
                 ref = norm_name(ref or "")
                 if not ref or ref == name or ref in self.units:
