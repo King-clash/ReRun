@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — Phase D: tests and CI
+- `run_tests.py` runs suites in parallel (`--jobs`, default 4) with a timing table: 63 s instead of ~225 s
+  (3 runs in a row, all 20 suites pass). `--ci` skips suites needing a real Tesseract.
+- `pyproject.toml`: ruff on real-bug classes only (syntax, undefined names, unused imports/variables).
+  Found no real bugs; 6 unused imports removed.
+- `.github/workflows/tests.yml`: lint + compile + tests on every PR/push to main (Windows). Not yet run on GitHub.
+- The real-screen cases found live (palace list, quest list, Home button, dimmed Home) are fixtures + tests
+  from Phase B/C; "every state is detected and handled" already covers all scripts including the BETA ones.
+
 ## Unreleased — Phase C: reliability (BETA, simulator + real fixtures)
 - **Home button first:** Crest's "start from Home" taps the bottom bar's Home button (new template
   `home_nav_button`, threshold 0.9, matches the real Crest Palace and quest list screens) when it is

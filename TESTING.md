@@ -4,7 +4,11 @@ Interpreter: `%LOCALAPPDATA%\Programs\Python\Python312\python.exe` (Python 3.12.
 on PATH — the Microsoft Store alias intercepts it). Each suite is a plain script:
 
 ```
-py run_tests.py               # runs every suite below, one pass/fail
+py run_tests.py               # every suite below, 4 at a time (~1 min), timing table, one pass/fail
+py run_tests.py --jobs 1      # one at a time (easier to read a failure)
+py run_tests.py --ci          # what GitHub Actions runs (skips test_ocr: needs a real Tesseract)
+py run_tests.py test_units    # only suites whose name contains this
+py -m ruff check .            # lint: syntax errors, undefined names, unused imports (pyproject.toml)
 py tests/test_scripts.py      # every script against a simulated game (FakeDevice)
 py tests/test_real_screens.py # real 720x1280 screenshots in tests/fixtures (needs templates)
 py tests/test_features.py     # energy/potions, history, Queue, script wiring
@@ -77,3 +81,10 @@ titles, matching History exactly; exposed the double count fixed above (fix not 
 Phase 1 also checked by rendering the dashboard against a temp copy of the user's backed-up live
 History (52 crest entries + 30 pre-ledger runs rebuilt). That is a screenshot of real data, not a live
 farming test: the live Crest hooks will be verified the next time the rebuilt exe farms.
+
+## CI (GitHub Actions) - added in Phase D, not yet run on GitHub
+`.github/workflows/tests.yml` runs on every pull request and push to `main` (Windows, Python 3.12):
+ruff, compileall, then `py run_tests.py --ci --jobs 4`. It has never run: the first PR after it is merged
+is its first real test, so check that run and fix the workflow if needed.
+To make it protect `main` (GitHub > Settings > Branches > Add rule for `main`): tick "Require status
+checks to pass before merging" and pick the `tests` check; optionally "Require a pull request before merging".

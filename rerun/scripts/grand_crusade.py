@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import time
 
-from .base import BaseScript, Done, Finished, Setting, T
+from .base import BaseScript, Done, Setting, T
 
 NO_STAMINA = ["Stop", "Wait and retry"]
 

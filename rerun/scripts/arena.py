@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import random
 
-from .base import BaseScript, Done, Finished, Setting, T
+from .base import BaseScript, Done, Setting, T
 
 
 class ArenaScript(BaseScript):

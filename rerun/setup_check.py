@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .adb import AdbError, discover_bluestacks_instances, find_adb
+from .adb import AdbError, discover_bluestacks_instances
 
 
 @dataclass

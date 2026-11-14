@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import time
 
-from .base import BaseScript, Done, Finished, Setting, T
+from .base import BaseScript, Done, Setting, T
 
 RAID_RESULT_TEMPLATES = [
     T("raid_defeated", "'Defeated!' banner after a raid boss falls.", optional=True),

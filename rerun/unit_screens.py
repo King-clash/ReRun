@@ -12,7 +12,6 @@ Calibrated on tests/fixtures/units_grid_*.png and unit_profile_ira.png.
 from __future__ import annotations
 
 import re
-from collections import Counter
 
 import cv2
 import numpy as np

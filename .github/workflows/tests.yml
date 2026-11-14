@@ -1,0 +1,31 @@
+name: tests
+
+# Runs on every pull request and on pushes to main. Windows, because Rerun is a Windows app
+# (Tkinter, ADB paths, PyInstaller). Suites that need a real Tesseract or an emulator are skipped
+# here (run_tests.py --ci); they still run on your PC with `py run_tests.py`.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  tests:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.lock
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.lock ruff
+      - name: Lint (real-bug classes only)
+        run: python -m ruff check .
+      - name: Compile everything
+        run: python -m compileall -q rerun tools tests gsc_app main.py build.py run_tests.py
+      - name: Test suites
+        run: python run_tests.py --ci --jobs 4
