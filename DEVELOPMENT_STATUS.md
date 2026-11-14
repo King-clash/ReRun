@@ -65,5 +65,6 @@ relaunched, no crash.log). Rollback: `backups/preinstall_20261114_164106/Rerun.e
 ## Next actions
 1. User: Remove the junk units and correct uncertain names in the Units tab (their decision).
 2. Live-verify that a crest after a potion refill is logged once (needs a farm that runs out of energy).
-3. Install the Phase 4 build (user quits Rerun), check the Compendium tab on live data.
+3. Phase 4 build 387b9f1 installed 16:52 (exe only, 95 user files unchanged, no crash.log; backup
+   backups/preinstall_20261114_165231). User to check the Compendium tab and set targets.
 4. Phase 5 Compendium Farm: needs captures of Exploring > Tower of Initiation > Training > Cross Battle.

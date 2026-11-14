@@ -15,6 +15,8 @@
 - Weekly scans: not automated. A scan needs the game on the Units list and Rerun cannot navigate
   there yet; the existing scheduler never starts on a busy instance.
 - Tests: tests/test_compendium.py (8); test_app covers the new tab. 107/107 (+6 GSC data).
+- Installed 16:52 after the user quit Rerun: exe only, 95 user files hash-verified unchanged,
+  relaunched without crash.log. Backup `backups/preinstall_20261114_165231/`.
 
 ## 2026-11-14 — Third live scan saved; build 382e212 installed
 - Scan 15:22–16:40 saved: 191 units (Fire 41, Water 44, Earth 27, Light 41, Dark 38), 189 with
