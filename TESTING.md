@@ -4,12 +4,15 @@ Interpreter: `%LOCALAPPDATA%\Programs\Python\Python312\python.exe` (Python 3.12.
 on PATH — the Microsoft Store alias intercepts it). Each suite is a plain script:
 
 ```
+py run_tests.py               # runs every suite below, one pass/fail
 py tests/test_scripts.py      # every script against a simulated game (FakeDevice)
 py tests/test_real_screens.py # real 720x1280 screenshots in tests/fixtures (needs templates)
 py tests/test_features.py     # energy/potions, history, Queue, script wiring
 py tests/test_ocr.py          # Tesseract on real screenshots (needs ReStart's bin)
 py tests/test_app.py          # manager, engine, Discord, GUI start/close
 py tests/test_crest_stats.py  # Phase 1 crest ledger, stats, reconstruction
+py tests/test_past_party.py   # Phase 2 Past Party
+py tests/test_units.py        # Phase 3 unit roster
 ```
 
 Tests do not write to project data (verified 2026-11-14 by hashing all files before/after).

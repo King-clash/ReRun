@@ -3,7 +3,7 @@
 Produces dist/Rerun/Rerun.exe - one self-contained file (a one-file build has
 no deep internal folders, so it also builds inside long paths that Windows'
 260-character limit would otherwise break). Your templates, custom routines,
-README and config are copied next to it, so the .exe works exactly like
+README and an example config are copied next to it, so the .exe works exactly like
 `python main.py`."""
 from __future__ import annotations
 
@@ -44,9 +44,9 @@ def main() -> int:
         src = ROOT / folder
         if src.is_dir():
             shutil.copytree(src, DIST / folder, dirs_exist_ok=True)
-    for f in ("README.md", "config.yaml"):
-        if (ROOT / f).exists():
-            shutil.copy2(ROOT / f, DIST / f)
+    # Never ship config.yaml: it holds the Discord token. The app writes a fresh one on first run.
+    shutil.copy2(ROOT / "README.md", DIST / "README.md")
+    shutil.copy2(ROOT / "config.example.yaml", DIST / "config.example.yaml")
     print(f"\nBuilt {DIST / 'Rerun.exe'}")
     return 0
 

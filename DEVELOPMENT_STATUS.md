@@ -16,7 +16,7 @@ crawlers) — link-out only. Phase 4 (Compendium) builds on units/scans.jsonl (q
 
 ## Current phase
 Milestone A · Phase 2 COMPLETE (Start path live-verified 2026-11-14 14:33; Resume/relaunch/relogin
-simulator-only). Phase 3 Unit Roster next — needs real Units-list and Compendium screenshots.
+simulator-only). Phase 3 Unit Roster BETA (built, live scan pending); Phase 4 Compendium next.
 Phase 2 live check: on Start, the log should show "Selecting Past Party", "Ticking Include AI"
 (or straight to Apply), "Past Party applied with Include AI - dialog closed"; capture the Past
 Party dialog as tests/fixtures/past_party_dialog.png.
@@ -27,12 +27,10 @@ Party dialog as tests/fixtures/past_party_dialog.png.
   tiles, /crests. 65/65 tests. Not yet live-verified with the rebuilt exe.
 
 ## Active task
-Phase 2: rename the party setting to "Always re-select Past Party" (default on for Crest), with a
-migration from `party: Last Party/Current Party`; verify Include AI is ticked before Apply; re-apply
-on Start, relaunch, relogin, new quest entry and Resume, never on Redeploy.
+None open. Phase 2 is done; Phase 3 awaits its live scan.
 
 ## Outstanding (Milestone A)
-Phase 2 Past Party · 3 Units · 4 Compendium · 5 Compendium Farm · 6 Discord.
+3 Units (live scan) · 4 Compendium · 5 Compendium Farm · 6 Discord.
 
 ## Known issues / facts
 - History is capped at 2000 entries and deletes the oldest (with thumbnails) — all-time crest stats
@@ -44,7 +42,7 @@ Phase 2 Past Party · 3 Units · 4 Compendium · 5 Compendium Farm · 6 Discord.
 - Phase 5 navigation templates (`templates/training`, `templates/exploring`) do not exist yet.
 
 ## Last successful tests
-2026-11-14 65/65 (see TESTING.md).
+2026-11-14 92/92 (`py run_tests.py`; see TESTING.md).
 
 ## Last commit
 See `git log` (Phase 1 commit follows e795766).
@@ -63,6 +61,4 @@ crest_log.jsonl keeps 11 duplicate "history" records from the 14:10 restart, ign
 
 ## Next actions
 1. Live-verify that a crest after a potion refill is logged once (needs a farm that runs out of energy).
-2. Phase 2 Past Party verification flow (see Active task).
-2. Phase 2 Past Party verification flow (see Active task).
-3. Phase 3 needs real Units-list / Compendium screenshots — ask the user to open those screens.
+2. Phase 3 live full scan (see top section), then Phase 4 Compendium.

@@ -11,14 +11,14 @@ Package: `jp.goodsmile.grandsummonersglobal_android`.
 
 ```
 main.py                 entry point (python main.py / Rerun.exe); writes crash.log on failure
-build.py                one-file PyInstaller build -> dist/Rerun/Rerun.exe (+ templates, routines, README, config)
+build.py                one-file PyInstaller build -> dist/Rerun/Rerun.exe (+ templates, routines, README, config.example.yaml; never config.yaml)
 config.yaml             user config (instances, per-script settings, Discord token) — NOT in git
 config.example.yaml     tokenless copy of the default config
 stats.json              lifetime counters per instance ("<script>.<key>": n) — user data
 history/                history.jsonl + thumbs/ — user data
 templates/              ReStart-compatible template PNGs + _meta.json (thresholds, provenance, resolution)
 routines/               user YAML routines (rerun/engine.py)
-tests/                  five script-style suites + fixtures/ (real 720x1280 game screenshots)
+tests/                  script-style suites (run all: py run_tests.py) + fixtures/ (real 720x1280 game screenshots)
 rerun/
   gui.py                App(tk.Tk): pages Dashboard, Settings, Templates, History, Discord, Log
   ios.py                iOS-style widget kit (Card, switches, alerts, tab bar, toasts, light/dark)
@@ -32,6 +32,9 @@ rerun/
   history.py            History: append-only jsonl with thumbnails, capped at 2000 (compacts!)
   stats.py              Stats: counters + uptime, saved to stats.json
   discord_bot.py        DiscordBot: alerts (text + screenshot), slash commands
+  unit_screens.py       Units-grid card finder + unit-page reader (OCR, element, quest clears)
+  units.py              UnitRoster: units/roster.json, scans.jsonl, aliases.json
+  crest_stats.py        CrestLedger / CrestStats (crest_log.jsonl)
   setup_check.py        Settings > Setup check
   restart_import.py     imports templates from a local ReStart install
   tray.py, appicon.py   tray icon (pystray), generated app icon
