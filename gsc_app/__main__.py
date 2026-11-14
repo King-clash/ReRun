@@ -21,6 +21,7 @@ if getattr(sys, "frozen", False):
     CONFIG = EXE_DIR / "config.yaml"
     SETTINGS = EXE_DIR / "GS Companion settings.json"
     RERUN_DIR = EXE_DIR  # change it in the app: Units > "Rerun folder…"
+    DATA_OUT = EXE_DIR / "data" / "gscompanion"  # "Update data" writes here
     # rerun.crest_stats imports OpenCV/numpy for screenshot saving, which this app never
     # uses; the exe leaves them out (≈ 70 MB), so give those imports empty stand-ins.
     for _m in ("cv2", "numpy"):
@@ -30,6 +31,7 @@ else:
     CONFIG = ROOT / "config.yaml"
     SETTINGS = ROOT / "data" / "gscompanion" / "companion_settings.json"
     RERUN_DIR = ROOT
+    DATA_OUT = None  # data/gscompanion/ itself
     sys.path.insert(0, str(ROOT))
 
 from PIL import ImageTk  # noqa: E402
@@ -71,7 +73,8 @@ def main() -> None:
     win.minsize(px(980), px(620))
     icon = ImageTk.PhotoImage(make_icon(64))
     win.iconphoto(True, icon)
-    page = GSCompanionPage(win, ROOT, settings_path=SETTINGS, rerun_dir=RERUN_DIR)
+    page = GSCompanionPage(win, ROOT, settings_path=SETTINGS, rerun_dir=RERUN_DIR,
+                           data_out=DATA_OUT)
     geo = page.s["geometry"]
     if isinstance(geo, dict) and geo.get("zoomed"):
         win.geometry(f"{px(1320)}x{px(860)}")

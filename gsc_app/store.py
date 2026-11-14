@@ -11,8 +11,8 @@ import json
 from pathlib import Path
 
 DEFAULTS = {
-    "view": "Palace", "size": "Medium", "sash": None, "geometry": None,
-    "diff": "All difficulties", "kind": "All kinds", "element": "All elements",
+    "view": "Today", "size": "Medium", "sash": None, "geometry": None,
+    "kind": "All kinds", "element": "All elements",
     "unit_filter": "All units", "starred": [], "plan": [], "compare": [], "rerun_dir": None,
     # crests a unit already has: {"Shirou Emiya": ["ATK UP"]} (Planner / Today skip them)
     "have": {},
