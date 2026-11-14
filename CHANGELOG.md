@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-14 — Work In Progress notice and key countdown
+- After every sign-in (app start, a new key after expiry, Change key) Rerun shows a
+  "Work In Progress" notice with an OK button.
+- Dashboard header: a live countdown of the key's time left ("Key: 29d 23:59:28 left";
+  orange under a day, red under an hour; "Key: Lifetime"), updated every second. When it
+  reaches zero, scripts stop at once (no longer up to a minute later). Key checks are now
+  scheduled one at a time.
+- Tests: test_license 13 (timer text; signed-in app shows the notice and the countdown).
+  134/134 + gsc_app 16/16. Exe rebuilt to dist/Rerun (key system)/ and started with a test key.
+
 ## 2026-11-14 — Key system and key generator
 - Rerun now opens only with a valid key (user request). `rerun/license.py`: a key is 21 bytes
   (version, issued, expires or lifetime, optional PC lock, random id) signed with Ed25519

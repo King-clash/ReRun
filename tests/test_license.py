@@ -188,6 +188,41 @@ def test_sign_in_screen():
         root.destroy()
 
 
+def test_dashboard_timer_text():
+    from rerun.gui import App
+    from rerun.license import License
+    lic = License("k", NOW, NOW + 29 * 86400 + 3 * 3600 + 4 * 60 + 5, ANY_PC, "id")
+    assert App.key_timer_text(lic, NOW) == ("Key: 29d 03:04:05 left", "secondary")
+    assert App.key_timer_text(lic, lic.expires - 5400) == ("Key: 01:30:00 left", "orange")
+    assert App.key_timer_text(lic, lic.expires - 59) == ("Key: 00:00:59 left", "red")
+    assert App.key_timer_text(lic, lic.expires + 10)[0] == "Key: 00:00:00 left"
+    assert App.key_timer_text(License("k", NOW, 0, ANY_PC, "id"))[0] == "Key: Lifetime"
+
+
+def test_signed_in_app_shows_notice_and_countdown():
+    import shutil
+    from rerun import gui, ios
+    from rerun.license import License
+    from rerun.manager import Manager
+    root = Path(tempfile.mkdtemp())
+    shutil.copytree(ROOT / "routines", root / "routines")
+    m = Manager(root)
+    m.config["live_view_fps"] = 0
+    shown = []
+    old_alert = ios.alert
+    ios.alert = lambda master, text, title="Rerun": shown.append(title)
+    try:
+        app = gui.App(m, license=License("k", time.time(), time.time() + 2 * 86400 + 60, ANY_PC, "id"))
+        app._start_hotkeys = lambda: None
+        texts = []
+        app.after(2500, lambda: (texts.append(app.key_timer.cget("text")), app.tray.stop(), app.destroy()))
+        app.mainloop()
+    finally:
+        ios.alert = old_alert
+    assert shown == ["Work In Progress"], shown
+    assert texts and texts[0].startswith("Key: 2d "), texts
+
+
 def test_real_public_key_is_set():
     assert lic_mod.PUBLIC_KEY != bytes(32) and len(lic_mod.PUBLIC_KEY) == 32
 

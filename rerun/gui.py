@@ -210,7 +210,9 @@ class App(tk.Tk):
             self._show_key_status()
             self.status.configure(cursor="hand2")
             self.status.bind("<Button-1>", lambda e: self.change_key())
-            self.after(60_000, self._check_key)
+            self._schedule_key_check()
+            self.after(1000, self._tick_key_timer)
+            self.after(600, self._wip_notice)
 
         self.tray = Tray(lambda action: self.events.put({"type": "_tray", "action": action}))
         self._tray_on = self.tray.start()
@@ -237,7 +239,50 @@ class App(tk.Tk):
             self.status.configure(text=text)
         self.title("Rerun" if lic.lifetime else f"Rerun  ·  key: {lic.describe()}")
 
+    WIP_TEXT = ("Rerun is a Work In Progress.\n\nSome features are still in Beta and may not "
+                "behave as expected. Keep an eye on it while it plays, and report anything odd.")
+
+    def _wip_notice(self):
+        """Shown every time you sign in (app start and after entering a new key)."""
+        if not self._closing:
+            ios.alert(self, self.WIP_TEXT, "Work In Progress")
+
+    @staticmethod
+    def key_timer_text(lic, now: float | None = None) -> tuple[str, str]:
+        """('Key: 29d 23:59:12 left', colour key) for the Dashboard countdown."""
+        if lic.lifetime:
+            return "Key: Lifetime", "green"
+        left = max(0, int(lic.remaining(now)))
+        d, rest = divmod(left, 86400)
+        h, rest = divmod(rest, 3600)
+        m, s = divmod(rest, 60)
+        clock = f"{h:02d}:{m:02d}:{s:02d}"
+        text = f"Key: {d}d {clock} left" if d else f"Key: {clock} left"
+        return text, ("red" if left < 3600 else "orange" if left < 86400 else "secondary")
+
+    def _tick_key_timer(self):
+        """Dashboard countdown of the key's time left, every second."""
+        if self._closing or self.license is None:
+            return
+        text, color = self.key_timer_text(self.license)
+        if self.key_timer.cget("text") != text:
+            self.key_timer.configure(text=text, fg=C[color])
+        if not self.license.lifetime and self.license.remaining() <= 0 and not self.m.locked:
+            self._schedule_key_check(10)   # ended: stop at once rather than within the minute
+        self.after(1000, self._tick_key_timer)
+
+    def _schedule_key_check(self, ms: int = 60_000):
+        """One pending key check at a time."""
+        pending = getattr(self, "_key_check_id", None)
+        if pending:
+            try:
+                self.after_cancel(pending)
+            except tk.TclError:
+                pass
+        self._key_check_id = self.after(ms, self._check_key)
+
     def _check_key(self):
+        self._key_check_id = None
         """Every minute: remember the time (clock check) and stop when the key runs out."""
         from .license import KeyError_, KeyStore, fmt_left
         if self._closing or self.license is None:
@@ -253,7 +298,7 @@ class App(tk.Tk):
             self._key_warned = True
             self.flash(f"Your Rerun key runs out in {fmt_left(left)}", "info")
         self._show_key_status()
-        self.after(60_000, self._check_key)
+        self._schedule_key_check()
 
     def _key_expired(self, reason: str):
         """Key no longer valid: stop every script, block remote starts, ask for a new key."""
@@ -273,7 +318,8 @@ class App(tk.Tk):
         self._key_warned = False
         self.flash("Signed in: " + lic.describe(), "ok")
         self._show_key_status()
-        self.after(60_000, self._check_key)
+        self.after(300, self._wip_notice)
+        self._schedule_key_check()
 
     def change_key(self):
         """Click on the status line: enter another key (Cancel keeps the current one)."""
@@ -290,6 +336,7 @@ class App(tk.Tk):
         self._key_warned = False
         self.flash("Key changed: " + lic.describe(), "ok")
         self._show_key_status()
+        self.after(300, self._wip_notice)
 
     # small helpers --------------------------------------------------------
     def _page(self, title: str, tab: str, icon: str, scroll: bool = False):
@@ -313,6 +360,9 @@ class App(tk.Tk):
         ios.Button(hdr, "Stop All", self.stop_all, kind="tinted", color="red",
                    icon="stop").pack(side="right", padx=(px(8), 0))
         ios.Button(hdr, "Start All", self.start_all, kind="tinted", icon="play").pack(side="right")
+        # Countdown of the signed-in key's time left (empty when Rerun runs without a key check)
+        self.key_timer = tk.Label(hdr, text="", bg=C["bg"], fg=C["secondary"], font=F["body_semi"])
+        self.key_timer.pack(side="right", padx=(0, px(18)))
 
         body = tk.Frame(page, bg=C["bg"])
         body.pack(fill="both", expand=True, padx=px(20), pady=(0, px(14)))
