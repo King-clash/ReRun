@@ -154,6 +154,24 @@ class StatTile(ios.Card):
             self.value.configure(text=text)
 
 
+class RerunLink:
+    """What GS Companion may ask of Rerun (gsc_app/page.py, `rerun=`): read-only facts
+    about your roster and a way to show a unit in the Units tab. It never writes."""
+
+    def __init__(self, app: "App"):
+        self.app = app
+
+    @property
+    def root(self):
+        return self.app.m.root
+
+    def unit_line(self, roster_name: str) -> str | None:
+        return self.app.m.compendium.unit_line(roster_name)
+
+    def show_unit(self, roster_name: str) -> bool:
+        return self.app.show_in_units(roster_name)
+
+
 class App(tk.Tk):
     def __init__(self, manager: Manager):
         ios.enable_dpi_awareness()
@@ -181,10 +199,10 @@ class App(tk.Tk):
         self._build_templates()
         self._build_history()
         self._build_units()
-        self._build_compendium()
-        self._tab_discord = 6
+        self._tab_discord = 5
         self._build_discord()
         self._build_log()
+        self._build_companion()
         self.status.configure(text="F12 stops everything  ·  F11 pauses or resumes all")
 
         self.tray = Tray(lambda action: self.events.put({"type": "_tray", "action": action}))
@@ -1251,48 +1269,61 @@ class App(tk.Tk):
             self.m.history.clear()
             self.refresh_history()
 
-    # ================================================================ units
+    # ================================================================ units (roster + compendium)
     def _build_units(self):
+        """One Units tab: the unit roster from your scans and the Compendium (quest clear
+        targets, progress, change since the last scan)."""
+        from .compendium import FILTERS
         _, page, hdr = self._page("Units", "Units", "people")
         ios.Button(hdr, "Export CSV", self.units_export, kind="tinted",
                    icon="download").pack(side="right")
-        ios.Button(hdr, "Correct Name", self.units_correct, kind="plain", icon="edit",
-                   small=True).pack(side="right", padx=(0, px(14)))
-        ios.Button(hdr, "Remove", self.units_remove, kind="plain", color="red", icon="delete",
-                   small=True).pack(side="right", padx=(0, px(14)))
-        ios.Button(hdr, "GSCompanion", self.units_gsc, kind="plain", icon="link",
-                   small=True).pack(side="right", padx=(0, px(14)))
+        for text, cmd, icon, color in (("Global Target", self.comp_global, "edit", None),
+                                       ("Set Target", self.comp_target, "edit", None),
+                                       ("Correct Name", self.units_correct, "edit", None),
+                                       ("Remove", self.units_remove, "delete", "red"),
+                                       ("GS Companion", self.units_gsc, "link", None)):
+            kw = {"color": color} if color else {}
+            ios.Button(hdr, text, cmd, kind="plain", icon=icon, small=True,
+                       **kw).pack(side="right", padx=(0, px(14)))
         bar = tk.Frame(page, bg=C["bg"])
         bar.pack(fill="x", padx=px(20), pady=(0, px(10)))
         self.units_q = tk.StringVar()
-        ios.Field(bar, self.units_q, width=22).pack(side="left")
+        ios.Field(bar, self.units_q, width=20).pack(side="left")
         self.units_q.trace_add("write", lambda *a: self.refresh_units())
         self.units_el = ios.Select(bar, values=["All elements", "Fire", "Water", "Earth", "Light", "Dark"],
                                    accent=True, command=self.refresh_units)
         self.units_el.set("All elements")
-        self.units_el.pack(side="left", padx=px(16))
-        self.units_incomplete = tk.BooleanVar(value=False)
-        ios.Switch(bar, self.units_incomplete, command=self.refresh_units).pack(side="left")
-        self._label(bar, "Unread fields only").pack(side="left", padx=(px(6), 0))
-        self.units_summary = self._label(bar, "")
-        self.units_summary.pack(side="right")
+        self.units_el.pack(side="left", padx=(px(16), 0))
+        self.comp_show = ios.Select(bar, values=list(FILTERS), accent=True, command=self.refresh_units)
+        self.comp_show.set(FILTERS[0])
+        self.comp_show.pack(side="left", padx=px(16))
+        self._label(bar, "Near target from").pack(side="left")
+        self.comp_near = ios.Select(bar, values=["75%", "80%", "90%", "95%"], accent=True,
+                                    command=self._comp_near_changed)
+        self.comp_near.set(f"{self.m.compendium.targets.get('near_pct') or 90}%")
+        self.comp_near.pack(side="left", padx=(px(6), 0))
+        self.units_summary = self._label(page, "", anchor="w", justify="left")
+        self.units_summary.pack(fill="x", padx=px(24), pady=(0, px(6)))
 
         lc = ios.Card(page, pad=6, stretch=True)
         lc.pack(fill="both", expand=True, padx=px(20), pady=(0, px(14)))
-        cols = ("name", "element", "race", "quest_clears", "first_seen", "last_seen")
-        heads = ("Name", "Element", "Race", "Quest clears", "First seen", "Last seen")
+        cols = ("name", "element", "race", "clears", "target", "pct", "remaining", "delta")
+        heads = ("Unit", "Element", "Race", "Clears", "Target", "Progress", "Remaining", "Change")
         sb = ttk.Scrollbar(lc.body, orient="vertical", style="IOS.Vertical.TScrollbar")
         self.units_tree = ttk.Treeview(lc.body, columns=cols, show="headings", style="IOS.Treeview",
                                        selectmode="browse", yscrollcommand=sb.set)
         sb.configure(command=self.units_tree.yview)
         self._units_sort = ("name", False)
-        for c, h, w in zip(cols, heads, (260, 90, 110, 110, 110, 110)):
+        for c, h, w in zip(cols, heads, (240, 76, 84, 84, 100, 160, 90, 130)):
             self.units_tree.heading(c, text=h, command=lambda c=c: self._units_sort_by(c))
             self.units_tree.column(c, width=px(w), stretch=(c == "name"),
-                                   anchor="w" if c in ("name", "race") else "center")
+                                   anchor="w" if c in ("name", "race", "pct") else "center")
         self.units_tree.tag_configure("uncertain", foreground=C["orange"])
+        self.units_tree.tag_configure("done", foreground=C["green"])
+        self.units_tree.tag_configure("near", foreground=C["blue"])
         sb.pack(side="right", fill="y", pady=px(4))
         self.units_tree.pack(side="left", fill="both", expand=True)
+        self.units_tree.bind("<Double-1>", lambda e: self.comp_target())
         self.units_empty = tk.Label(lc.body, bg=C["card"], fg=C["secondary"], font=F["footnote"],
                                     justify="center",
                                     text="No units yet\nOpen Units in-game and run the Compendium Counter "
@@ -1301,34 +1332,46 @@ class App(tk.Tk):
 
     def _units_sort_by(self, col: str):
         cur, desc = self._units_sort
-        self._units_sort = (col, not desc if cur == col else col in ("quest_clears", "last_seen"))
+        self._units_sort = (col, not desc if cur == col else col in ("clears", "pct", "delta", "last_seen"))
         self.refresh_units()
 
+    def _comp_near_changed(self):
+        try:
+            self.m.compendium.set_near(int(self.comp_near.get().rstrip("%")))
+        except ValueError:
+            return
+        self.refresh_units()
+        self._refresh_compendium_tiles(force=True)
+
     def refresh_units(self):
-        r = self.m.units
+        from .compendium import bar
+        c = self.m.compendium
         el = self.units_el.get()
-        rows = r.rows(search=self.units_q.get(), sort=self._units_sort[0], desc=self._units_sort[1],
-                      element=None if el in ("", "All elements") else el,
-                      only_incomplete=self.units_incomplete.get())
+        rows = c.rows(search=self.units_q.get(), sort=self._units_sort[0], desc=self._units_sort[1],
+                      show=self.comp_show.get() or "All units",
+                      element=None if el in ("", "All elements") else el)
         self.units_tree.delete(*self.units_tree.get_children())
-        for u in rows:
-            def val(f):
-                v = r.value(u, f)
-                if v is None:
-                    return "–"
-                st = u["fields"][f].get("status")
-                return f"{v:,}" if isinstance(v, int) else (f"{v}?" if st == "uncertain" else str(v))
-            unsure = u.get("name_status") == "uncertain"
-            self.units_tree.insert("", "end", iid=u["name"], tags=("uncertain",) if unsure else (),
-                                   values=(u["name"] + (" ?" if unsure else ""), val("element"),
-                                           val("race"), val("quest_clears"),
-                                           datetime.fromtimestamp(u["first_seen"]).strftime("%d %b %Y"),
-                                           datetime.fromtimestamp(u["last_seen"]).strftime("%d %b %Y")))
+        for r in rows:
+            tgt = "" if not r["target"] else (f"{r['target']:,}" + (" (all)" if r["target_kind"] == "global" else ""))
+            clears = "–" if r["clears"] is None else f"{r['clears']:,}" + ("?" if r["status"] == "uncertain" else "")
+            el_txt = "–" if not r["element"] else r["element"] + ("?" if r["element_unsure"] else "")
+            tags = ("uncertain",) if r["uncertain"] else ((r["state"],) if r["state"] in ("done", "near") else ())
+            self.units_tree.insert("", "end", iid=r["name"], tags=tags,
+                                   values=(r["name"] + (" ?" if r["uncertain"] else ""), el_txt,
+                                           r["race"] or "–", clears, tgt, bar(r["pct"]),
+                                           "" if r["remaining"] is None else f"{r['remaining']:,}",
+                                           c.change_text(r)))
         if rows:
             self.units_empty.place_forget()
         else:
             self.units_empty.place(relx=0.5, rely=0.45, anchor="center")
-        self.units_summary.configure(text=r.summary_text().replace("**", ""))
+        text = self.m.units.summary_text().replace("**", "") + "   ·   " + \
+            c.summary_text().replace("**", "").replace("\n", "   ·   ")
+        if self.units_summary.cget("text") != text:
+            self.units_summary.configure(text=text)
+
+    # kept for callers of the former Compendium tab
+    refresh_compendium = refresh_units
 
     def _units_selected(self) -> str | None:
         sel = self.units_tree.selection()
@@ -1346,15 +1389,19 @@ class App(tk.Tk):
         name = self._units_selected()
         if not name:
             return ios.alert(self, "Select a unit first.", "Correct Name")
-        right = ios.ask_string(self, "Correct Name",
-                               f"Rerun read this name as '{name}'. Type the correct name - future "
-                               "scans will remember it.", name)
+        # GS Companion's spelling, when it knows a close match, is offered (never applied
+        # without you pressing OK).
+        suggest = self._gsc_suggest(name)
+        msg = f"Rerun read this name as '{name}'. Type the correct name - future scans will remember it."
+        if suggest and suggest != name:
+            msg += f"\n\nGS Companion suggests: {suggest}"
+        right = ios.ask_string(self, "Correct Name", msg, suggest or name)
         if right and right.strip() and right.strip() != name:
             self.m.units.correct_name(name, right.strip())
             self.m.compendium.rename(name, right.strip())
             self.flash(f"Saved: '{name}' is {right.strip()}", "ok")
             self.refresh_units()
-            self.refresh_compendium()
+            self._companion_refresh()
 
     def units_remove(self):
         name = self._units_selected()
@@ -1367,106 +1414,42 @@ class App(tk.Tk):
             self.m.units.remove(name)
             self.flash(f"Removed '{name}'", "ok")
             self.refresh_units()
-            self.refresh_compendium()
+            self._companion_refresh()
 
     def units_gsc(self):
-        """GSCompanion as a reference you open yourself: Rerun copies the unit's name and
-        opens GSCompanion's Units page (nothing is downloaded from the site)."""
+        """Open the selected unit in the GS Companion tab (or its website when the tab or
+        its data is not available)."""
+        name = self._units_selected()
+        page = getattr(self, "companion", None)
+        if page is not None:
+            if not name:
+                self.nb.select(self._tab_companion)
+                return
+            if page.show_rerun_unit(name, self._unit_element(name)):
+                self.nb.select(self._tab_companion)
+                return
+            return self.flash(f"GS Companion has no unit matching '{name}' - correct the name "
+                              "first if it was misread", "info")
         import webbrowser
         from .units import GSC_UNITS_URL
-        name = self._units_selected()
         if name:
             self.clipboard_clear()
             self.clipboard_append(name)
             self.flash(f"Copied '{name}' - paste it into GSCompanion's search", "info")
         webbrowser.open(GSC_UNITS_URL)
 
-    # ================================================================ compendium
-    def _build_compendium(self):
-        from .compendium import FILTERS
-        _, page, hdr = self._page("Compendium", "Compendium", "check")
-        ios.Button(hdr, "Global Target", self.comp_global, kind="tinted",
-                   icon="edit").pack(side="right")
-        ios.Button(hdr, "Set Target", self.comp_target, kind="plain", icon="edit",
-                   small=True).pack(side="right", padx=(0, px(14)))
-        bar = tk.Frame(page, bg=C["bg"])
-        bar.pack(fill="x", padx=px(20), pady=(0, px(10)))
-        self.comp_q = tk.StringVar()
-        ios.Field(bar, self.comp_q, width=22).pack(side="left")
-        self.comp_q.trace_add("write", lambda *a: self.refresh_compendium())
-        self.comp_show = ios.Select(bar, values=list(FILTERS), accent=True,
-                                    command=self.refresh_compendium)
-        self.comp_show.set(FILTERS[0])
-        self.comp_show.pack(side="left", padx=px(16))
-        self._label(bar, "Near target from").pack(side="left")
-        self.comp_near = ios.Select(bar, values=["75%", "80%", "90%", "95%"], accent=True,
-                                    command=self._comp_near_changed)
-        self.comp_near.set(f"{self.m.compendium.targets.get('near_pct') or 90}%")
-        self.comp_near.pack(side="left", padx=(px(6), 0))
-        self.comp_summary = self._label(bar, "", justify="right")
-        self.comp_summary.pack(side="right")
+    def _unit_element(self, name: str) -> str | None:
+        u = self.m.units.units.get(name)
+        return self.m.units.value(u, "element") if u else None
 
-        lc = ios.Card(page, pad=6, stretch=True)
-        lc.pack(fill="both", expand=True, padx=px(20), pady=(0, px(14)))
-        cols = ("name", "clears", "target", "pct", "remaining", "delta")
-        heads = ("Unit", "Clears", "Target", "Progress", "Remaining", "Change")
-        sb = ttk.Scrollbar(lc.body, orient="vertical", style="IOS.Vertical.TScrollbar")
-        self.comp_tree = ttk.Treeview(lc.body, columns=cols, show="headings", style="IOS.Treeview",
-                                      selectmode="browse", yscrollcommand=sb.set)
-        sb.configure(command=self.comp_tree.yview)
-        self._comp_sort = ("name", False)
-        for c, h, w in zip(cols, heads, (260, 90, 110, 170, 100, 150)):
-            self.comp_tree.heading(c, text=h, command=lambda c=c: self._comp_sort_by(c))
-            self.comp_tree.column(c, width=px(w), stretch=(c == "name"),
-                                  anchor="w" if c in ("name", "pct") else "center")
-        self.comp_tree.tag_configure("uncertain", foreground=C["orange"])
-        self.comp_tree.tag_configure("done", foreground=C["green"])
-        self.comp_tree.tag_configure("near", foreground=C["blue"])
-        sb.pack(side="right", fill="y", pady=px(4))
-        self.comp_tree.pack(side="left", fill="both", expand=True)
-        self.comp_tree.bind("<Double-1>", lambda e: self.comp_target())
-        self.comp_empty = tk.Label(lc.body, bg=C["card"], fg=C["secondary"], font=F["footnote"],
-                                   justify="center",
-                                   text="Nothing to show\nRun the Compendium Counter on the in-game "
-                                        "Units list to read every unit's quest clears.")
-        self.after(140, self.refresh_compendium)
-
-    def _comp_sort_by(self, col: str):
-        cur, desc = self._comp_sort
-        self._comp_sort = (col, not desc if cur == col else col in ("clears", "pct", "delta"))
-        self.refresh_compendium()
-
-    def _comp_near_changed(self):
+    def _gsc_suggest(self, name: str) -> str | None:
+        page = getattr(self, "companion", None)
+        if page is None:
+            return None
         try:
-            self.m.compendium.set_near(int(self.comp_near.get().rstrip("%")))
-        except ValueError:
-            return
-        self.refresh_compendium()
-        self._refresh_compendium_tiles(force=True)
-
-    def refresh_compendium(self):
-        c = self.m.compendium
-        rows = c.rows(search=self.comp_q.get(), sort=self._comp_sort[0], desc=self._comp_sort[1],
-                      show=self.comp_show.get() or "All units")
-        from .compendium import bar
-        self.comp_tree.delete(*self.comp_tree.get_children())
-        for r in rows:
-            tgt = "" if not r["target"] else (f"{r['target']:,}" + (" (all)" if r["target_kind"] == "global" else ""))
-            clears = "–" if r["clears"] is None else f"{r['clears']:,}" + ("?" if r["status"] == "uncertain" else "")
-            tags = ("uncertain",) if r["uncertain"] else ((r["state"],) if r["state"] in ("done", "near") else ())
-            self.comp_tree.insert("", "end", iid=r["name"], tags=tags,
-                                  values=(r["name"] + (" ?" if r["uncertain"] else ""), clears, tgt,
-                                          bar(r["pct"]), "" if r["remaining"] is None else f"{r['remaining']:,}",
-                                          c.change_text(r)))
-        if rows:
-            self.comp_empty.place_forget()
-        else:
-            self.comp_empty.place(relx=0.5, rely=0.45, anchor="center")
-        self.comp_summary.configure(text=c.summary_text().replace("**", "").replace("\n", "   ·   "))
-
-    def _comp_selected(self) -> str | None:
-        sel = self.comp_tree.selection()
-        return sel[0] if sel else None
+            return page.match_name(name, self._unit_element(name))
+        except Exception:  # noqa: BLE001 - a suggestion must never break correcting
+            return None
 
     @staticmethod
     def _parse_count(text: str | None) -> int | None | bool:
@@ -1477,7 +1460,7 @@ class App(tk.Tk):
         return int(t) if t.isdigit() else False
 
     def comp_target(self):
-        name = self._comp_selected()
+        name = self._units_selected()
         if not name:
             return ios.alert(self, "Select a unit first.", "Set Target")
         c = self.m.compendium
@@ -1492,8 +1475,9 @@ class App(tk.Tk):
             return ios.alert(self, "Type a whole number, e.g. 500.", "Set Target")
         c.set_target(name, n)
         self.flash(f"{name}: target {n:,}" if n else f"{name}: uses the global target", "ok")
-        self.refresh_compendium()
+        self.refresh_units()
         self._refresh_compendium_tiles(force=True)
+        self._companion_refresh()
 
     def comp_global(self):
         c = self.m.compendium
@@ -1507,8 +1491,47 @@ class App(tk.Tk):
             return ios.alert(self, "Type a whole number, e.g. 100.", "Global Target")
         c.set_global(n)
         self.flash(f"Global target {n:,}" if n else "Global target removed", "ok")
-        self.refresh_compendium()
+        self.refresh_units()
         self._refresh_compendium_tiles(force=True)
+        self._companion_refresh()
+
+    # ================================================================ GS Companion
+    def _build_companion(self):
+        """GS Companion (gsc_app/): Crest Palace guides, crests, units, team checker and farm
+        planner, linked to your roster both ways. Last tab, so the others keep their index.
+        Left out when gsc_app/ is missing."""
+        self.companion = None
+        try:
+            from gsc_app.page import GSCompanionPage
+        except ImportError:
+            return
+        page = GSCompanionPage(self.nb.content, self.m.root, flash=self.flash,
+                               rerun=RerunLink(self))
+        self.nb.add(page, "Companion", "search")
+        self.companion = page
+        self._tab_companion = len(self.nb._pages) - 1
+
+    def _companion_refresh(self):
+        page = getattr(self, "companion", None)
+        if page is not None:
+            try:
+                page.rerun_changed()
+            except Exception as e:  # noqa: BLE001 - never let the companion break Rerun
+                self.m.log("app", f"GS Companion refresh failed: {e}", level="error")
+
+    def show_in_units(self, name: str) -> bool:
+        """Select a roster unit in the Units tab (from GS Companion)."""
+        if name not in self.m.units.units:
+            return False
+        self.units_q.set("")
+        self.units_el.set("All elements")
+        self.comp_show.set("All units")
+        self.refresh_units()
+        self.nb.select(4)
+        if self.units_tree.exists(name):
+            self.units_tree.selection_set(name)
+            self.units_tree.see(name)
+        return True
 
     # ================================================================ discord
     def _build_discord(self):
@@ -1731,8 +1754,8 @@ class App(tk.Tk):
                     history_changed = True
                     if ev.get("entry", {}).get("kind") == "compendium":
                         self.after(50, self.refresh_units)  # a unit scan just finished
-                        self.after(80, self.refresh_compendium)
                         self.after(90, lambda: self._refresh_compendium_tiles(force=True))
+                        self.after(120, self._companion_refresh)
                 elif t == "_preview":
                     self._preview_img = ev["img"]
                     self._draw_preview()

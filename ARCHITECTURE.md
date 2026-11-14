@@ -76,6 +76,8 @@ listeners (`_poll_events`). There is no typed event bus yet (planned: Milestone 
 | crest_log.jsonl (Phase 1) | JSONL | append-only crest ledger, never compacted — see below |
 | templates/_meta.json | JSON | per-template threshold, source (ReStart/user), generation, resolution |
 | units/roster.json, scans.jsonl, aliases.json (Phase 3) | JSON/JSONL | `rerun/units.py` UnitRoster: units with per-field provenance; every scan appended (with `complete`); learned name corrections |
+| units/renames.jsonl | JSONL | names replaced by GS Companion's (from, to, time); undo = Correct Name |
+| data/gscompanion/ | JSON + images | GS Companion reference data, local only (git-ignored); `rerun/gsc_data.py` GSCData, `gsc_app/` Companion tab |
 | units/targets.json (Phase 4) | JSON | `rerun/compendium.py` Compendium: global / per-unit quest clear targets, near-target %; progress and "+N since" computed from scans.jsonl |
 
 ## Crest ledger (Phase 1)

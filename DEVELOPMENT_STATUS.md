@@ -23,6 +23,13 @@ rerun/compendium.py + Compendium tab + dashboard line + /compendium. Targets in
 units/targets.json. Checked against a temp copy of the live data (191 units). Not live-verified in
 the installed app yet. Weekly automatic scans not done (no navigation to the Units list).
 
+## Units + Companion (2026-11-14, user request)
+Units and Compendium are one tab; the GS Companion app is the last tab (Companion), linked both
+ways. GS Companion unit names take priority over OCR names on a clear match (user decision,
+overrides the brief's "never overwrite" for names read by OCR; manual names/fields are never
+touched). Data stays local: data/gscompanion (git-ignored), copied next to the exe by build.py.
+The installed app needs that folder next to Rerun.exe for the tab and the names.
+
 ## Completed
 - Phase 0: recovery, git baseline f4df578, backups, docs.
 - Phase 1 (BETA): crest ledger, reconstruction, dashboard tiles, /crests; live-verified 13:57.

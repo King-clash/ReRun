@@ -63,10 +63,16 @@ class MyUnits:
         self._scan: set[str] = set()
         self._scan_key = None
         self.unmatched: list[str] = []  # scan names with no GS Companion unit
+        self.roster_of: dict[str, str] = {}  # GS Companion name -> Rerun roster name
+        self.gsc_of: dict[str, str] = {}     # Rerun roster name -> GS Companion name
 
     # --- Rerun scan ---------------------------------------------------------------
+    fixed_dir: Path | None = None  # set inside Rerun: always its own folder
+
     @property
     def rerun_dir(self) -> Path | None:
+        if self.fixed_dir:
+            return self.fixed_dir
         d = self.s["rerun_dir"]
         return Path(d) if d else self.default_dir
 
@@ -83,6 +89,7 @@ class MyUnits:
             key = None
         if key != self._scan_key:
             self._scan_key, self._scan, self.unmatched = key, set(), []
+            self.roster_of, self.gsc_of = {}, {}
             if key:
                 try:
                     roster = json.loads(p.read_text(encoding="utf-8"))
@@ -94,9 +101,16 @@ class MyUnits:
                         or self.gsc.match_unit(name)
                     if u:
                         self._scan.add(u["name"])
+                        self.gsc_of[name] = u["name"]
+                        self.roster_of.setdefault(u["name"], name)
                     else:
                         self.unmatched.append(name)
         return self._scan
+
+    def rescan(self) -> None:
+        """Re-read Rerun's roster now (e.g. a name was corrected within the same second)."""
+        self._scan_key = None
+        self.scanned()
 
     def scan_status(self) -> str:
         p = self.roster_path

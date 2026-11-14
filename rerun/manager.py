@@ -115,6 +115,31 @@ class Manager:
         self.routines: dict[str, dict] = {}
         self.instances: dict[str, Instance] = {}
         self.reload()
+        self._setup_reference_names()
+
+    # ------------------------------------------------------------ GS Companion names
+    def _setup_reference_names(self) -> None:
+        """GS Companion unit names take priority over names read from the game when one
+        unit clearly matches (rerun/gsc_data.py reference_name). Needs the local data in
+        <root>/data/gscompanion/; without it scanned names stay as read."""
+        self.units.rename_listeners.append(self.compendium.rename)
+        self.gsc = None
+        self.reference_renames: list[tuple[str, str]] = []
+        try:
+            from .gsc_data import GSCData
+            g = GSCData(self.root)
+            if not g.available or not g.units:
+                return
+            self.gsc = g
+            self.units.reference = g.reference_name
+            self.units.reference_facts = g.unit_facts
+            self.reference_renames = self.units.adopt_reference_names(g.reference_name)
+        except Exception as e:  # noqa: BLE001 - never block startup on reference data
+            self.log("app", f"GS Companion names not applied: {e}", level="error")
+            return
+        if self.reference_renames:
+            self.log("app", f"Units: {len(self.reference_renames)} name(s) replaced with GS Companion's "
+                            "(old spellings kept as aliases; see units/renames.jsonl)")
 
     # ------------------------------------------------------------ config
     def reload(self) -> list[str]:

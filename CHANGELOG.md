@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-11-14 — Units + Compendium merged; GS Companion inside Rerun; GS Companion names win
+- One **Units** tab (roster + Compendium): element, race, clears, target, progress,
+  remaining, change; filters All / Unread or uncertain / With a target / Near / At target;
+  Set Target, Global Target, Correct Name, Remove, GS Companion, Export CSV. Tabs are now
+  Dashboard, Settings, Templates, History, Units, Discord, Log, **Companion**.
+- **Companion** tab (gsc_app, by the GS Companion session) built into rerun/gui.py
+  (`_build_companion`, replaces rerun_tab.patch), linked both ways via `RerunLink`
+  (read-only): Units → open the unit in the Companion; the Companion's unit panel shows your
+  clears / target / progress / change and links back; scans, targets and corrections refresh it;
+  Correct Name suggests GS Companion's spelling.
+- **GS Companion names take priority** (user decision): rerun/gsc_data.py `best_unit` /
+  `reference_name` match a name read from the game against the site's units of the same
+  element (title + name, "Name, the …", run-together OCR, race bonus); taken only when one
+  unit clearly wins (≥ 0.78 and 0.05 ahead, or the more specific of two). The Manager applies
+  it at start-up and to every scan (`UnitRoster.reference`); race / element come from the
+  site when misread or uncertain (status "reference"). Never changed: names and fields you
+  typed (manual), verified values, close calls ("Rimuru"), clashes, units the site doesn't
+  list. Old spellings become aliases; renames are logged in units/renames.jsonl; Compendium
+  targets follow the rename.
+- On a copy of the live roster: 89 of 191 names replaced (all checked by eye), uncertain names
+  27 → 11, unread/uncertain rows 88 → 36; 64 story/fodder units stay as read.
+- build.py: gsc_app modules in the exe; local data/gscompanion (not raw/) copied next to it.
+- Tests: tests/test_reference_names.py (5); gsc_app hookup test now drives the real App
+  both ways. 118/118 + gsc_app 16/16.
+
 ## 2026-11-14 — Phase 4: Compendium (BETA)
 - `rerun/compendium.py`: quest clear targets per unit and a global target (units/targets.json),
   progress, remaining clears, near-target (75/80/90/95 %, default 90) and at-target states, change

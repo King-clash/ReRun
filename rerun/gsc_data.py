@@ -32,6 +32,13 @@ def _norm(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", (s or "").lower()).strip()
 
 
+def _key(s: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", (s or "").lower())
+
+
+_BASE_RE = re.compile(r"\s*\(.*?\)\s*$")  # "Kane (Earth)" -> "Kane"
+
+
 class GSCData:
     def __init__(self, root: str | Path):
         self.dir = Path(root) / "data" / "gscompanion"
@@ -125,6 +132,87 @@ class GSCData:
         c = self.crest(crest_name)
         name = c["name"] if c else crest_name
         return [u for u, cs in self.recommendations.items() if name in cs]
+
+    # --- units: reference names for scanned units -------------------------------------
+    @cached_property
+    def _details(self) -> dict:
+        return self._load("unit_details.json").get("units", {})
+
+    def best_unit(self, text: str, element: str | None = None,
+                  race: str | None = None) -> dict | None:
+        """Score every GS Companion unit (of the same element when known) against a name
+        read from the game. The game shows titles ("Clyde, the Crimson Sword God",
+        "Awoken Priscilla") where the site uses the short name, and OCR runs words
+        together, so a unit's name found as the last words, the words before a comma,
+        or inside the reading scores high. Returns {"name", "score", "second",
+        "second_name"} or None when there is nothing to compare."""
+        k = _key(text)
+        if not k:
+            return None
+        words = _norm(text).split()
+        comma = text.split(",", 1)[0] if "," in text else None
+        pool = [u for u in self.units if not element or u.get("element") == element] or self.units
+        scored: dict[str, float] = {}
+        for u in pool:
+            d = self._details.get(u["name"]) or {}
+            names = {u["name"], _BASE_RE.sub("", u["name"])} | set(d.get("aka") or [])
+            best = 0.0
+            for n in names:
+                ck = _key(n)
+                if not ck:
+                    continue
+                cw = _norm(n).split()
+                if ck == k:
+                    s = 1.0
+                elif comma is not None and _key(comma) == ck:
+                    s = 0.95                         # "Clyde, the Crimson Sword God"
+                elif comma is None and len(cw) <= len(words) and words[-len(cw):] == cw:
+                    s = 0.95                         # "Awoken Priscilla", "Holy Knight Goddess Feena"
+                elif any(words[i:i + len(cw)] == cw for i in range(len(words))):
+                    s = 0.85                         # whole words somewhere in the title
+                elif len(ck) >= 4 and ck in k:
+                    s = min(0.9, 0.75 + 0.25 * len(ck) / len(k))   # inside run-together OCR
+                else:
+                    s = difflib.SequenceMatcher(None, k, ck).ratio()
+                best = max(best, s)
+            if race and d.get("race") and race.lower() == str(d["race"]).lower():
+                best += 0.03
+            scored[u["name"]] = best
+        if not scored:
+            return None
+        ranked = sorted(scored.items(), key=lambda x: -x[1])
+        (n1, s1), (n2, s2) = ranked[0], (ranked[1] if len(ranked) > 1 else ("", 0.0))
+        return {"name": n1, "score": round(s1, 3), "second": round(s2, 3), "second_name": n2}
+
+    def unit_facts(self, name: str) -> dict:
+        """Element and race GS Companion lists for a unit (by its exact name)."""
+        u = next((x for x in self.units if x["name"] == name), None)
+        if not u:
+            return {}
+        out = {"element": u.get("element")}
+        race = (self._details.get(name) or {}).get("race")
+        if race:
+            out["race"] = race
+        return {k: v for k, v in out.items() if v}
+
+    REF_MIN = 0.78      # best score needed to take GS Companion's name
+    REF_MARGIN = 0.05   # ...and how far ahead of the next unit it must be
+
+    def reference_name(self, text: str, element: str | None = None,
+                       race: str | None = None) -> str | None:
+        """GS Companion's name for a scanned unit, only when one unit clearly matches
+        (e.g. "Rimuru" matches two units equally: no answer)."""
+        b = self.best_unit(text, element, race)
+        if not b or b["score"] < self.REF_MIN:
+            return None
+        if b["score"] - b["second"] >= self.REF_MARGIN:
+            return b["name"]
+        # Close call between a full name and a shorter one inside it ("Godspeed Crusader
+        # Platina" vs "Platina"): the more specific name wins when it reads well.
+        k1, k2 = _key(_BASE_RE.sub("", b["name"])), _key(_BASE_RE.sub("", b["second_name"]))
+        if b["score"] >= 0.9 and b["score"] > b["second"] and k2 and k2 in k1 and k1 != k2:
+            return b["name"]
+        return None
 
     # --- units --------------------------------------------------------------------
     def match_unit(self, text: str, cutoff: float = 0.86) -> dict | None:

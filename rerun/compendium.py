@@ -21,7 +21,8 @@ from pathlib import Path
 from .units import UnitRoster
 
 NEAR_PCT = 90
-FILTERS = ("All units", "With a target", "Near target", "At target")
+UNREAD = "Unread or uncertain"
+FILTERS = ("All units", UNREAD, "With a target", "Near target", "At target")
 
 
 def bar(pct: float | None, width: int = 10) -> str:
@@ -134,15 +135,13 @@ class Compendium:
 
     # ------------------------------------------------------------ rows
     def rows(self, search: str = "", sort: str = "name", desc: bool = False,
-             show: str = "All units") -> list[dict]:
+             show: str = "All units", element: str | None = None) -> list[dict]:
+        """One row per roster unit: its roster fields plus target progress."""
         hist = self.readings()
         near = self.targets.get("near_pct") or NEAR_PCT
-        q = search.lower().strip()
         out = []
-        for u in self.r.units.values():
+        for u in self.r.rows(search=search, element=element, only_incomplete=(show == UNREAD)):
             name = u["name"]
-            if q and q not in name.lower():
-                continue
             clears = self.r.value(u, "quest_clears")
             target, kind = self.target_of(name)
             pct = remaining = None
@@ -161,7 +160,10 @@ class Compendium:
                 continue
             if show == "At target" and state != "done":
                 continue
-            out.append({"name": name, "clears": clears, "target": target, "target_kind": kind,
+            out.append({"name": name, "element": self.r.value(u, "element"),
+                        "element_unsure": (u["fields"].get("element") or {}).get("status") == "uncertain",
+                        "race": self.r.value(u, "race"), "last_seen": u.get("last_seen"),
+                        "clears": clears, "target": target, "target_kind": kind,
                         "pct": pct, "remaining": remaining, "delta": delta, "since": since,
                         "state": state, "uncertain": u.get("name_status") == "uncertain",
                         "status": (u["fields"].get("quest_clears") or {}).get("status")})
@@ -170,6 +172,23 @@ class Compendium:
             return r["name"].lower() if sort == "name" else r.get(sort)
         have = sorted((r for r in out if v(r) is not None), key=v, reverse=desc)
         return have + sorted((r for r in out if v(r) is None), key=lambda r: r["name"].lower())
+
+    def unit_line(self, name: str) -> str | None:
+        """One line about a roster unit for other views (GS Companion): clears, target,
+        progress, change. None when the unit is not in the roster."""
+        rows = [r for r in self.rows() if r["name"] == name]
+        if not rows:
+            return None
+        r = rows[0]
+        parts = ["clears not read" if r["clears"] is None else f"{r['clears']:,} quest clears"]
+        if r["target"]:
+            parts.append(f"target {r['target']:,}" + (" (global)" if r["target_kind"] == "global" else ""))
+            if r["pct"] is not None:
+                parts.append("reached" if r["state"] == "done" else f"{r['remaining']:,} to go ({r['pct']:.0f}%)")
+        ch = self.change_text(r)
+        if ch:
+            parts.append(ch)
+        return "  ·  ".join(parts)
 
     @staticmethod
     def change_text(row: dict) -> str:
@@ -209,4 +228,4 @@ class Compendium:
         return text
 
 
-__all__ = ["Compendium", "FILTERS", "bar", "day"]
+__all__ = ["Compendium", "FILTERS", "UNREAD", "bar", "day"]

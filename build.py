@@ -31,6 +31,9 @@ def main() -> int:
         "--hidden-import", "pystray._win32",
         "--hidden-import", "pynput.keyboard._win32",
         "--hidden-import", "pynput.mouse._win32",
+        # GS Companion tab (imported inside a try block in rerun/gui.py)
+        "--hidden-import", "gsc_app.page", "--hidden-import", "gsc_app.update_data",
+        "--hidden-import", "gsc_app.scrape",
         "--exclude-module", "matplotlib", "--exclude-module", "pytest",
         str(ROOT / "main.py"),
     ]
@@ -44,6 +47,12 @@ def main() -> int:
         src = ROOT / folder
         if src.is_dir():
             shutil.copytree(src, DIST / folder, dirs_exist_ok=True)
+    # GS Companion's data is local only (git-ignored, never inside the exe): when you have
+    # it, it is copied next to the exe for the Companion tab and unit names.
+    gsc = ROOT / "data" / "gscompanion"
+    if (gsc / "units.json").exists():
+        shutil.copytree(gsc, DIST / "data" / "gscompanion", dirs_exist_ok=True,
+                        ignore=shutil.ignore_patterns("raw", "companion_settings.json"))
     for f in ("README.md", "config.yaml"):
         if (ROOT / f).exists():
             shutil.copy2(ROOT / f, DIST / f)

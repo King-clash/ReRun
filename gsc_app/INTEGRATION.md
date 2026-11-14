@@ -92,27 +92,25 @@ Tests: `py gsc_app/test_page.py`. The last test applies the patch below to a
 **temporary copy** of Rerun and starts the real Rerun window there. Your own files
 are never changed.
 
-## Add it to Rerun (NOT done yet)
+## Inside Rerun (done 2026-11-14)
 
-Nothing in Rerun has been changed. When you want the tab, `rerun_tab.patch` makes the
-only change needed: two small edits to `rerun/gui.py` that add a **Companion** tab
-as the last tab (the Discord tab keeps its position).
+Rerun has a **Companion** tab (the last tab; `rerun/gui.py` `_build_companion`). If
+`gsc_app/` is missing, Rerun simply leaves the tab out. Inside Rerun the companion always
+reads Rerun's own `units/roster.json` (no "Rerun folder…" button) and is linked both ways
+through `RerunLink` (read-only):
 
-```
-git apply gsc_app/rerun_tab.patch
-```
+- Rerun **Units** tab → **GS Companion** button: opens the selected unit here.
+- A unit's panel here → **YOUR ACCOUNT (RERUN)**: quest clears, target, progress and the
+  change since the last scan, and **Show in Rerun's Units tab**.
+- A scan, a target or a name correction in Rerun refreshes this tab (`rerun_changed`).
+- **Correct Name** in Rerun suggests GS Companion's spelling.
 
-To take it out again: `git apply -R gsc_app/rerun_tab.patch`.
+**GS Companion's unit names take priority** (rerun/gsc_data.py `reference_name`, applied
+by the Manager at start-up and to every scan): when one GS Companion unit clearly matches a
+name read from the game ("Clyde, the Crimson Sword God", "IDivine ConquronGediNies SF"),
+the unit takes the site's name; its race / element come from the site too when misread.
+Names you typed (Correct Name) are never changed, a close call or a clash is left as read,
+the old spelling is kept as an alias and every rename is logged in `units/renames.jsonl`.
 
-If `gsc_app/` is ever missing, Rerun simply leaves the tab out.
-
-### Rerun.exe (packaged build)
-
-`build.py` doesn't bundle `gsc_app` or `data/gscompanion/` yet. For the exe to have the tab,
-these changes are also needed in `build.py` (not made):
-
-- add `"--hidden-import", "gsc_app.page"` to the PyInstaller command (to be safe: the
-  import sits inside a try block)
-- copy `data/gscompanion/*.json` to `dist/Rerun/data/gscompanion/`
-
-Running from source (`Run Rerun.bat` / `python main.py`) needs neither.
+`build.py` adds the `gsc_app` modules to Rerun.exe and copies your local
+`data/gscompanion/` (not `raw/`) next to it; the data is never inside the exe or in git.

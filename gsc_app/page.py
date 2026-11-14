@@ -160,12 +160,16 @@ class GSCompanionPage(tk.Frame):
     root:          the folder holding data/gscompanion/ (Rerun's folder).
     flash:         optional (text, kind) -> None, e.g. Rerun's toast.
     settings_path: where to remember things (default data/gscompanion/companion_settings.json).
-    rerun_dir:     Rerun folder whose units/roster.json lists your scanned units (default root)."""
+    rerun_dir:     Rerun folder whose units/roster.json lists your scanned units (default root).
+    rerun:         inside Rerun, its link (rerun/gui.py RerunLink): unit_line(roster name) for
+                   clears / target / progress, show_unit(roster name) to open the Units tab.
+                   Read-only: the companion never writes Rerun's data."""
 
     def __init__(self, parent, root: str | Path, flash=None, open_url=webbrowser.open,
                  settings_path: Path | None = None, rerun_dir: Path | None = None,
-                 data_out: Path | None = None):
+                 data_out: Path | None = None, rerun=None):
         super().__init__(parent, bg=C["bg"])
+        self.rerun = rerun
         self._load_data(Path(root))
         # "Update data" writes here (the exe: a data folder next to it).
         self.data_out = Path(data_out) if data_out else self.gsc.dir
@@ -174,6 +178,8 @@ class GSCompanionPage(tk.Frame):
         self._show_kit = True    # unit panel: the kit section
         self.s = Settings(settings_path or self.gsc.dir / "companion_settings.json")
         self.my = MyUnits(self.s, self.gsc, Path(rerun_dir or root))
+        if rerun is not None:
+            self.my.fixed_dir = Path(rerun.root)
         self._game_day = today_name()
         self._flash_cb = flash
         self._open_url = open_url
@@ -644,8 +650,9 @@ class GSCompanionPage(tk.Frame):
             search()
             select([ALL_ELEMENTS] + ELEMENTS, self.element)
             select(UNIT_FILTERS, self.unit_filter, padx=(px(16), 0))
-            ios.Button(f, "Rerun folder…", self.choose_rerun_dir, kind="plain",
-                       small=True).pack(side="left", padx=(px(16), 0))
+            if self.rerun is None:  # inside Rerun the folder is Rerun's own
+                ios.Button(f, "Rerun folder…", self.choose_rerun_dir, kind="plain",
+                           small=True).pack(side="left", padx=(px(16), 0))
             self._note(f"★ starred · ✓ in your Rerun scan · click the ★ column to star  ·  "
                        f"{self.my.scan_status()}")
         elif view == "Planner":
@@ -1488,6 +1495,7 @@ class GSCompanionPage(tk.Frame):
         if name in self.my.scanned():
             self._put("  ·  in your Rerun scan", "good")
         self._put("\n")
+        self._rerun_section(name)
         if self.my.is_starred(name):
             self._action("★ Starred – unstar", lambda: self.toggle_star(u))
         else:
@@ -1562,6 +1570,62 @@ class GSCompanionPage(tk.Frame):
                 self._put(f"None of the crests it still needs drop on {today}.\n", "dim")
         self._kit_section(name)
         self._end()
+
+    # ================================================================== Rerun link
+    def _rerun_section(self, gsc_name: str):
+        """Inside Rerun: the unit's quest clears / target from your roster, and a link to
+        it in Rerun's Units tab."""
+        if self.rerun is None:
+            return
+        roster_name = self.my.roster_of.get(gsc_name)
+        if not roster_name:
+            return
+        try:
+            line = self.rerun.unit_line(roster_name)
+        except Exception:  # noqa: BLE001 - Rerun data is optional here
+            line = None
+        self._put("YOUR ACCOUNT (RERUN)\n", "h")
+        if roster_name != gsc_name:
+            self._put(f"Scanned as '{roster_name}'\n", "dim")
+        if line:
+            self._put(line + "\n")
+        self._action("→ Show in Rerun's Units tab", lambda: self.rerun.show_unit(roster_name))
+        self._put("\n")
+
+    def _gsc_unit(self, name: str) -> dict | None:
+        return next((u for u in self.gsc.units if u["name"] == name), None)
+
+    def match_name(self, text: str, element: str | None = None, loose: float = 0.6) -> str | None:
+        """GS Companion's name for a scanned (maybe misread) unit name: the scan's own match
+        first, then a close match among units of the same element. A suggestion only."""
+        self.my.scanned()
+        if text in self.my.gsc_of:
+            return self.my.gsc_of[text]
+        b = self.gsc.best_unit(text, element)
+        return b["name"] if b and b["score"] >= loose else None
+
+    def show_rerun_unit(self, roster_name: str, element: str | None = None) -> bool:
+        """From Rerun's Units tab: open that unit here. False when nothing matches."""
+        self.my.scanned()
+        name = self.my.gsc_of.get(roster_name)
+        u = self._gsc_unit(name) if name else None
+        if u is None:
+            m = (self.gsc.match_unit(f"{roster_name} ({element})") if element else None) \
+                or self.gsc.match_unit(roster_name)
+            u = m
+        if u is None:
+            return False
+        self.go("Units", u)
+        return True
+
+    def rerun_changed(self):
+        """Rerun's roster or targets changed: re-read the scan, redraw the list and panel."""
+        self.my.rescan()
+        self.refresh()
+        if self._shown:
+            kind, rec = self._shown
+            if kind == "unit":
+                self._show_unit(rec)
 
     def _show_plan_panel(self):
         self._shown = None

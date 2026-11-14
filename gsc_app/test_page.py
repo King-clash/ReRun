@@ -542,7 +542,8 @@ def test_pictures():
 
 
 def test_rerun_hookup_on_a_copy():
-    """Apply rerun_tab.patch to a throwaway copy of Rerun and start the real App."""
+    """Start the real Rerun App on a throwaway copy (code, data, a small unit scan) and use
+    the Companion tab and the links between it and Rerun's Units tab."""
     tmp = Path(tempfile.mkdtemp(prefix="gsc_hook_"))
     try:
         shutil.copytree(ROOT / "rerun", tmp / "rerun", ignore=shutil.ignore_patterns("__pycache__"))
@@ -550,28 +551,47 @@ def test_rerun_hookup_on_a_copy():
         shutil.copytree(ROOT / "routines", tmp / "routines")
         shutil.copytree(ROOT / "data" / "gscompanion", tmp / "data" / "gscompanion",
                         ignore=shutil.ignore_patterns("companion_settings.json"))
-        r = subprocess.run(["git", "apply", str(HERE / "rerun_tab.patch")], cwd=tmp,
-                           capture_output=True, text=True)
-        assert r.returncode == 0, r.stderr
+        # a scan as Rerun saves it: one name as the game shows it, one fodder unit
+        sys.path.insert(0, str(tmp))
+        ob = lambda n, el, c: {"name": n, "name_conf": 90, "fields": {  # noqa: E731
+            "element": {"value": el, "confidence": 90}, "quest_clears": {"value": c, "confidence": 90}}}
+        from rerun.units import UnitRoster as _R  # noqa: E402 - the copy is identical
+        _R(tmp).apply_scan([ob("Clyde, the Crimson Sword God", "Fire", 12), ob("Troll", "Earth", 3)],
+                           "units_list", complete=True)
         script = textwrap.dedent("""
             import sys; sys.path.insert(0, r'%s')
             from rerun.gui import App
             from rerun.manager import Manager
             from gsc_app.page import GSCompanionPage
-            app = App(Manager(r'%s'))
+            m = Manager(r'%s')
+            # GS Companion's name took priority over the game's title
+            assert 'Clyde' in m.units.units and 'Troll' in m.units.units, list(m.units.units)
+            app = App(m)
             errors = []
             app.report_callback_exception = lambda *a: errors.append(a)
             pages = app.nb._pages
-            assert isinstance(pages[-1], GSCompanionPage)
+            assert isinstance(pages[-1], GSCompanionPage) and app._tab_companion == len(pages) - 1
             assert sum(isinstance(p, GSCompanionPage) for p in pages) == 1
-            assert pages[app._tab_discord] is not pages[-1]  # Discord keeps its tab
+            assert pages[app._tab_discord] is not pages[-1]
             def step():
-                app.nb.select(len(pages) - 1); app.update()
                 p = pages[-1]
+                app.nb.select(len(pages) - 1); app.update()
                 for v in ('Today', 'Week', 'Units', 'Team', 'Planner', 'Compare'):
                     p.show_view(v); app.update()
                 p.show_view('Units'); app.update()
                 assert len(p._rows) > 400
+                # Rerun Units -> Companion
+                app.nb.select(4); app.refresh_units(); app.update()
+                app.units_tree.selection_set('Clyde'); app.units_gsc(); app.update()
+                assert app.nb.index() == app._tab_companion and p._shown[1]['name'] == 'Clyde'
+                assert 'Clyde' in p.my.scanned() and p.my.roster_of['Clyde'] == 'Clyde'
+                assert '12 quest clears' in p.rerun.unit_line('Clyde')
+                # Companion -> Rerun Units
+                assert p.rerun.show_unit('Clyde'); app.update()
+                assert app.nb.index() == 4 and app.units_tree.selection() == ('Clyde',)
+                # a target set in Rerun shows in the Companion panel
+                m.compendium.set_target('Clyde', 20); app._companion_refresh(); app.update()
+                assert 'target 20' in p.rerun.unit_line('Clyde')
                 app.after(300, app.destroy)
             app.after(300, step)
             app.after(30000, app.destroy)
