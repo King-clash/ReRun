@@ -125,6 +125,40 @@ def test_switch_off_keeps_the_old_start_behaviour():
     assert "exploring_button" not in dev.tapped
 
 
+def test_unrecognised_quest_row_stops_with_a_message_instead_of_sitting_silent():
+    """Seen live: each palace's quest looks different; a row picture from another palace never
+    matched and Crest just sat on the quest list."""
+    fast()
+    scr = {"quest_list": Screen([], extra=[("quest_list", 280, 32)])}
+    dev = Sim(scr, "quest_list", {})
+    ctx = make_ctx(Path(tempfile.mkdtemp()), dev, CrestScript)
+    s = CrestScript(ctx, {"start_home": False})
+    result = run(s)
+    assert result == "finished: quest row not recognised", result
+    assert dev.tapped == []
+    assert any("quest_list_entry" in n and "Stopped" in n for n in ctx.notes), ctx.notes
+    assert any("none of my quest row pictures" in l for l in ctx.logs)
+
+
+def test_second_palaces_row_picture_is_used():
+    fast()
+    scr = {"quest_list": Screen([("quest_list_entry2", 100, 600)], extra=[("quest_list", 280, 32)]),
+           "mode": Screen([("solo_quest_button", 300, 600)])}
+    dev = Sim(scr, "quest_list", {("quest_list", "quest_list_entry2"): "mode"})
+    holder = {}
+    orig = Sim.tap
+
+    def tap(self, x, y):
+        orig(self, x, y)
+        if self.tapped[-1] == "solo_quest_button":
+            holder["ctx"].stop_event.set()
+    dev.tap = tap.__get__(dev)
+    ctx = make_ctx(Path(tempfile.mkdtemp()), dev, CrestScript)
+    holder["ctx"] = ctx
+    run(CrestScript(ctx, {"start_home": False}))
+    assert dev.tapped[0] == "quest_list_entry2" and dev.tapped[-1] == "solo_quest_button", dev.tapped
+
+
 def test_dimmed_home_is_not_the_home_screen():
     """A popup over Home dims the Exploring button: Crest must not count that as Home."""
     import cv2

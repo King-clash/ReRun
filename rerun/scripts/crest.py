@@ -114,6 +114,10 @@ CREST HANDLING
         T("crest_fragment_ok", "OK on the Crest Fragment popup."),
         T("quest_list", "Header of a Crest Palace's quest list.", optional=True),
         T("quest_list_entry", "A quest row in that list to tap (e.g. the one you farm).", optional=True),
+        T("quest_list_entry2", "Same, for a second palace whose quest looks different (optional).",
+          optional=True),
+        T("quest_list_entry3", "Same, for a third palace (optional).", optional=True),
+        T("quest_list_entry4", "Same, for a fourth palace (optional).", optional=True),
         T("exploring_button", "'Exploring' button on the Home screen (24/7 mode).", optional=True),
         T("crest_palace_icon", "Crest Palace entry on the Exploring screen (24/7 mode).", optional=True),
         T("crest_palace_icon2", "Same entry while a 'Campaign!' badge covers it.", optional=True),
@@ -167,7 +171,7 @@ CREST HANDLING
     # ------------------------------------------------------------ start from Home
     HOME_TIMEOUT_S = 120
     HOME_MAX_BACKS = 30
-    HOME_NEEDS = ("exploring_button", "quest_list", "quest_list_entry")
+    HOME_NEEDS = ("exploring_button", "quest_list")
     # Screens where an undecided crest is on offer: never leave them with Back.
     PENDING_CREST = {"crest_burst", "equip_crest_screen"}
 
@@ -182,6 +186,8 @@ CREST HANDLING
         missing = [n for n in self.HOME_NEEDS if not self.has_template(n)]
         if not (self.has_template("crest_palace_icon") or self.has_template("crest_palace_icon2")):
             missing.append("crest_palace_icon")
+        if not any(self.has_template(n) for n in self.QUEST_ROW_NAMES):
+            missing.append("quest_list_entry")
         if not any(self.has_template(n) for n in self.palace_tile_names()):
             missing.append("crest_palace_target (or " + self.palace_tile_names()[0] + ")")
         if missing:
@@ -494,12 +500,29 @@ CREST HANDLING
         self.log("Crest Fragment popup - OK")
         self.tap_template("crest_fragment_ok", screen, settle=1.0)
 
+    QUEST_ROW_NAMES = ("quest_list_entry", "quest_list_entry2", "quest_list_entry3", "quest_list_entry4")
+    QUEST_ROW_MISS_LIMIT = 5
+
     def handle_quest_list(self, screen):
         if self.target_reached():
             self.finish()
-        if self.tap_template("quest_list_entry", screen, settle=2):
-            self.log("Quest list - opening the quest")
-            self.reset_party("new quest entry")
+        for name in self.QUEST_ROW_NAMES:
+            if self.has_template(name) and self.tap_template(name, screen, settle=2):
+                self.quest_row_misses = 0
+                self.log(f"Quest list - opening the quest ({name})")
+                self.reset_party("new quest entry")
+                return
+        self.quest_row_misses = getattr(self, "quest_row_misses", 0) + 1
+        self.log("Quest list - none of my quest row pictures match this list "
+                 f"({self.quest_row_misses}/{self.QUEST_ROW_MISS_LIMIT})")
+        if self.quest_row_misses >= self.QUEST_ROW_MISS_LIMIT:
+            saved = self.save_frame("quest_row_missing", screen)
+            self.notify(f"{self.NAME}: reached the quest list but the quest to farm isn't recognised "
+                        "(its row doesn't match quest_list_entry - each palace's quest looks different). "
+                        "Capture the quest's title row in the Templates tab as quest_list_entry "
+                        "(or quest_list_entry2/3/4 for other palaces). Stopped."
+                        + (f" Frame saved to {saved}." if saved else ""))
+            raise Finished("quest row not recognised")
 
     def handle_home_screen(self, screen):
         if not self.navigating():
