@@ -1,25 +1,35 @@
-﻿# Changelog
+# Changelog
 
-## 2026-11-14 â€” GS Companion reference data (local only)
+## 2026-11-14 — Units scan: grey Achievements button (second live scan)
+- Live 15:14: the scan read Clyde (and renamed the earlier garbled entry to "Clyde, the Crimson Sword
+  God" as designed), then stopped on Rekyuon: units without achievements show a GREY Achievements
+  button (colour match 0.71 < 0.80), so the page went unrecognised for 15 s and the scan stopped safely.
+- Fix: CompendiumCounter.detect_state falls back to a greyscale shape match of
+  compendium_detail_marker around the button (grey 0.85, yellow 1.00, other screens <= 0.38).
+- Fixture unit_profile_rekyuon.png (reads "Rekyuon", Fire, Spirit, 0 clears). Tests: 15 in
+  test_units; 96/96 pass.
+- Repaired CHANGELOG.md text encoding (commit 7a4b774 had re-saved it as double-encoded UTF-8).
+
+## 2026-11-14 — GS Companion reference data (local only)
 - Decision change (user): gscompanion.com was scraped once (via Firecrawl) for personal use. Its
   robots.txt still disallows Anthropic's crawlers and signals `ai-train=no, use=reference`, so the
   data is **local only**: `data/` stays gitignored and `build.py` does not bundle it.
-- `data/gscompanion/raw/*.md` (scraped pages) â†’ `tools/gscompanion_build.py` â†’ `crest_palace.json`
+- `data/gscompanion/raw/*.md` (scraped pages) → `tools/gscompanion_build.py` → `crest_palace.json`
   (18 stages: days, boss, hazards, crest drops), `crests.json` (138 crests, per-level values),
   `crest_recommendations.json` (427 units, from the Advisor Team's CrestRec doc), `units.json` (428).
 - `rerun/gsc_data.py`: GSCData lookups (palace_today on the 06:00 UTC-6 game day, stages_dropping,
   match_crest for OCR titles, recommended, units_wanting, match_unit). Not wired into scripts yet.
 - tests/test_gsc_data.py (6); skips when the local data is absent.
 
-## 2026-11-14 â€” Phase 3: Unit Roster (BETA)
+## 2026-11-14 — Phase 3: Unit Roster (BETA)
 - Source decision from real captures: the Units list grid has no readable text (portrait, element
   icon, star badge, 'Lv' badge without a number). Tapping a card opens the unit's page (the same
   page ReStart's compendium templates target): name, element icon, race, "Quest cleared: N". No
   level/rarity text is shown there, so those stay empty (never invented).
 - `rerun/unit_screens.py`: grid card finder by fixed 5-column geometry (template matching alone
   missed ~25% of cards: 21/30 and 23/28 on the fixtures; now 30/30 and 28/28); unit page reader
-  (white-text mask with a 3-threshold vote for the name over artwork, element by icon hue â€”
-  Fire/Light/Dark seen, Water/Earth marked uncertain until seen â€” race, quest clears).
+  (white-text mask with a 3-threshold vote for the name over artwork, element by icon hue —
+  Fire/Light/Dark seen, Water/Earth marked uncertain until seen — race, quest clears).
 - `rerun/units.py`: UnitRoster (units/roster.json, scans.jsonl, aliases.json). Provenance per
   field; status order manual > verified > ocr > estimated > uncertain; incomplete scans keep
   values; fuzzy match onto known names; manual corrections learned as aliases; scan comparison;
@@ -35,27 +45,27 @@
 - Fixtures: units_grid_fire/dark/dark_2.png, unit_profile_ira.png. Tests: tests/test_units.py (11).
   92/92 pass.
 
-## 2026-11-14 â€” Phase 2: Always re-select Past Party (BETA)
+## 2026-11-14 — Phase 2: Always re-select Past Party (BETA)
 - Setting renamed: the "Party" choice (Last Party / Current Party) is now the switch
   **Always re-select Past Party** (`past_party`). Default ON for Crest (and every Auto-Loop farm),
   OFF for Any Quest / Secret Equip.
-- Config migration (read-time, non-destructive): `party: Last Party` â†’ on, `Current Party` â†’ off,
+- Config migration (read-time, non-destructive): `party: Last Party` → on, `Current Party` → off,
   except Crest, which is on (per the Phase 2 brief). An explicit `past_party` always wins. config.yaml
   is rewritten in the new form only when the user saves Settings. Scripts without the switch
   (Multiplayer Farm) are unaffected.
-- Verified flow (rerun/scripts/loop_farm.py): Past Party (must be visible and lit) â†’ Include AI
-  ticked (unticked box tapped, max 3, else stop) â†’ re-check on a fresh frame â†’ Apply â†’ confirm the
+- Verified flow (rerun/scripts/loop_farm.py): Past Party (must be visible and lit) → Include AI
+  ticked (unticked box tapped, max 3, else stop) → re-check on a fresh frame → Apply → confirm the
   dialog closed and the party screen is back (max 3 Applies, else stop).
-- Fallbacks: no / greyed Past Party button, or its dialog never opens â†’ continue with the current
+- Fallbacks: no / greyed Past Party button, or its dialog never opens → continue with the current
   party, notify once per session, History entry.
 - Re-applied on: Start, new quest entry (Solo/Challenge, crest quest list, restart after wipe),
   Resume from Pause (new BaseScript.on_resume hook), crash relaunch and daily-reset relogin
   (on_relaunch). Not on Redeploy.
 - New BaseScript hooks: `migrate_settings` (also applied in Manager.script_settings), `on_resume`.
 - Tests: tests/test_past_party.py (12, incl. a real-screenshot check); test_app updated for the
-  rename and made deterministic (its fixed timers raced on a busy PC â€” flaky TclError). 81/81 pass.
+  rename and made deterministic (its fixed timers raced on a busy PC — flaky TclError). 81/81 pass.
 
-## 2026-11-14 â€” Fix: History rebuild re-imported live crests on restart (Phase 1 bug)
+## 2026-11-14 — Fix: History rebuild re-imported live crests on restart (Phase 1 bug)
 - Installed the double-count fix (exe only, user files unchanged; backup
   `backups/preinstall_20261114_141002/`). On that restart the History rebuild imported 11 crests the
   script had already logged live (the live crest is also written to History), so the stats would
@@ -65,18 +75,18 @@
 - Checked on a copy of the installed data: 76 crests counted = 76 in History; rebuilding again adds 0.
 - Tests: 2 new (15 in test_crest_stats). 69/69 pass.
 
-## 2026-11-14 â€” Phase 1 live check + fix: crest counted twice after a popup
-- Live check (installed build, 13:57â€“14:01): 3 runs and 4 crest records, all with OCR titles
+## 2026-11-14 — Phase 1 live check + fix: crest counted twice after a popup
+- Live check (installed build, 13:57–14:01): 3 runs and 4 crest records, all with OCR titles
   ("Break Power Lv3", "CRI rate UP Lv3", ...); the ledger matched History one-for-one.
-- Bug found live (pre-existing, also in History and stats.json): Redeploy â†’ out of energy â†’ L Potion
-  â†’ the same Equip Crest screen came back and "Freeze Resistance Lv3" was judged and counted twice.
+- Bug found live (pre-existing, also in History and stats.json): Redeploy → out of energy → L Potion
+  → the same Equip Crest screen came back and "Freeze Resistance Lv3" was judged and counted twice.
 - Fix (rerun/scripts/crest.py): a crest of the same rarity (and same title when both were read)
   seen again with no completed run in between is not counted again; it is still scrapped/redeployed.
 - Tests: 2 new (13 in test_crest_stats); the regression test fails on the old code. 67/67 pass.
 - The one duplicate already recorded (14:00:27) is left in History/ledger/stats as recorded (not
   edited silently): it inflates all-time Lv3 by 1.
 
-## 2026-11-14 â€” Build and install (Phase 1)
+## 2026-11-14 — Build and install (Phase 1)
 - Rebuilt with `build.py` (one-file PyInstaller, 77.9 MB). Smoke-tested from a temp copy (starts,
   no crash.log, crest log rebuilt).
 - Installed to `C:\Users\dandr\Downloads\Rerun\Rerun` after the user quit Rerun themselves: only
@@ -85,7 +95,7 @@
 - On first start the installed app rebuilt its crest log: 65 crests (62 Lv3, 2 Lv3+, 1 uncertain)
   and 42 earlier undated runs.
 
-## 2026-11-14 â€” Phase 1: Crest 4+ and Burst tracking (BETA)
+## 2026-11-14 — Phase 1: Crest 4+ and Burst tracking (BETA)
 - New `rerun/crest_stats.py`: append-only crest ledger `crest_log.jsonl` (runs, drops, pre-ledger
   run baseline), never compacted, tolerant of a torn last line. Rarity classes lv3 / lv3+ / lv4 /
   4+ / burst / ?; Lv4 is never counted as 4+. Records carry session, source (live/history),
@@ -96,14 +106,14 @@
   weekday breakdowns.
 - Reconstruction from History + stats.json on startup; keyed, so it is repeatable and never double-counts.
 - Crest script (and Multiplayer Farm / Queue, which inherit it) writes runs and every crest outcome.
-- Dashboard: new "Crests" tiles (4+, Burst, Lv4 as today Â· session Â· all, runs since last 4+,
+- Dashboard: new "Crests" tiles (4+, Burst, Lv4 as today · session · all, runs since last 4+,
   observed rate) with a plain-language note.
 - Discord: `/crests [instance]` (gold embed, last 4+/Burst screenshot attached).
 - Files: rerun/crest_stats.py (new), rerun/engine.py (Context.crests), rerun/manager.py,
   rerun/scripts/crest.py, rerun/gui.py, rerun/discord_bot.py, tests/test_crest_stats.py (new),
   .gitignore. No changes to existing data formats; no migration needed.
 
-## 2026-11-14 â€” Phase 0: recovery and baseline
+## 2026-11-14 — Phase 0: recovery and baseline
 - Recovered the project from the previous session's scratch folder to `C:\Users\dandr\Documents\Rerun`
   (457 files, byte totals verified identical).
 - Installed Git for Windows (winget, with the user's approval); initialised a local repo (never pushed).
@@ -116,13 +126,13 @@
 - Commits: f4df578 (baseline).
 
 
-## 2026-11-14 â€” Phase 3 live fixes (first live scan)
-- Live: the scan read the first unit, then reopened it forever â€” the Units screen animates, so the
+## 2026-11-14 — Phase 3 live fixes (first live scan)
+- Live: the scan read the first unit, then reopened it forever — the Units screen animates, so the
   exact pixel signature used to recognise "same view" never matched. Now a thumbnail compared with
   a tolerance (same view ~0.03, threshold 6), done-cards reset only after Rerun scrolls, plus a
   backstop (6 already-read units in a row -> scroll on). Regression test fails fast on the old code.
 - Live: "Clyde, the Crimson Sword God" ran into the race and the flames behind it broke the reading
-  ("Clyde thÃ©.Crimson sword G"). Name and race are now read from one line (race = last word by
+  ("Clyde thé.Crimson sword G"). Name and race are now read from one line (race = last word by
   position/gap), with 7 masks voting (3 white-text + 4 "outlined text" masks that drop un-outlined
   bright art), compared ignoring case/punctuation/I-l-1, cleanest spelling chosen. Both fixture
   units read exactly; ~2.4 s per unit page.

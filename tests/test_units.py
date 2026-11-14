@@ -239,6 +239,31 @@ def test_long_name_over_flames_and_race_split():
     assert (f["element"]["value"], f["race"]["value"], f["quest_clears"]["value"]) == ("Fire", "Human", 0), f
 
 
+def test_unit_page_with_grey_achievements_is_recognised_and_read():
+    """Seen live 15:14: Rekyuon's page has a grey Achievements button; it went
+    unrecognised and the scan stopped after one unit."""
+    import cv2
+    from rerun.adb import FakeDevice
+    from rerun.engine import Context
+    from rerun.scripts.compendium_counter import CompendiumCounterScript
+    from rerun.stats import Stats
+    v, ocr = _vision(), _ocr()
+    if v is None or ocr is None:
+        print("  (skipped: templates or Tesseract missing)")
+        return
+    ctx = Context(instance="t", device=FakeDevice([]), vision=v, stats=Stats(), routines={},
+                  base_resolution=(720, 1280), log=lambda i, m: None,
+                  notify=lambda i, m, image=None, ping=False: None)
+    s = CompendiumCounterScript(ctx, {})
+    for fx, want in (("unit_profile_rekyuon.png", "detail"), ("unit_profile_ira.png", "detail"),
+                     ("units_grid_fire.png", "grid"), ("home.png", "unknown"),
+                     ("party_reigrad.png", "unknown")):
+        assert s.detect_state(cv2.imread(str(FIX / fx))) == want, fx
+    from rerun.unit_screens import read_profile
+    ob = read_profile(ocr, cv2.imread(str(FIX / "unit_profile_rekyuon.png")))
+    assert ob["name"] == "Rekyuon" and ob["fields"]["race"]["value"] == "Spirit", ob
+
+
 def test_animated_grid_does_not_reopen_the_same_card():
     """Seen live 2026-11-14 15:00: the Units screen animates, an exact pixel signature
     never matched, and the first card was reopened forever."""

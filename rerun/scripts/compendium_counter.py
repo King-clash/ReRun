@@ -101,6 +101,26 @@ debug/); fix them in the Units tab and Rerun remembers the correction.
         self.notify(msg, screenshot=False, ping=False)
         raise Done(msg)
 
+    # Seen live: units without achievements (Rekyuon) show the Achievements button
+    # GREY. The colour match drops to 0.71, so the page went unrecognised and the
+    # scan stopped. Its shape still matches in greyscale (0.85; other screens <= 0.38).
+    DETAIL_GREY_MIN = 0.78
+    DETAIL_REGION = (230, 1140, 720, 1280)  # x0, y0, x1, y1 around the button
+
+    def detect_state(self, screen):
+        state = super().detect_state(screen)
+        if state == "unknown" and self.has_template("compendium_detail_marker"):
+            x0, y0, x1, y1 = self.DETAIL_REGION
+            h, w = screen.shape[:2]
+            if (w, h) == (720, 1280):
+                region = cv2.cvtColor(screen[y0:y1, x0:x1], cv2.COLOR_BGR2GRAY)
+                t = cv2.cvtColor(self.ctx.vision.store.get("compendium_detail_marker"), cv2.COLOR_BGR2GRAY)
+                if region.shape[0] >= t.shape[0] and region.shape[1] >= t.shape[1]:
+                    best = cv2.minMaxLoc(cv2.matchTemplate(region, t, cv2.TM_CCOEFF_NORMED))[1]
+                    if best >= self.DETAIL_GREY_MIN:
+                        return "detail"
+        return state
+
     # ---------------------------------------------------------------- grid
     def cards(self, screen) -> list[tuple[int, int]]:
         # Fixed 5-column grid, every cell checked (badge matching alone missed
