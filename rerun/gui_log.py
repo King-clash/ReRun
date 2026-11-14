@@ -34,6 +34,12 @@ class LogMixin:
         self._log_after = None
         self._log_hidden_before = 0  # entries removed by Clear
 
+    def _backfill_log(self):
+        """Show lines logged before the window existed (start-up warnings, config problems...).
+        Later lines arrive as events, so only the first `_log_backfill` entries are added here."""
+        for e in self.m.log_entries[:getattr(self, "_log_backfill", 0)]:
+            self._append_log(e)
+
     def _log_match(self, e: dict) -> bool:
         levels = LOG_LEVELS.get(self.log_level.get())
         inst = self.log_inst.get()

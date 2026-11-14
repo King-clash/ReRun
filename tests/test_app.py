@@ -5,6 +5,7 @@ import shutil
 import sys
 import tempfile
 import threading
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -106,6 +107,30 @@ def test_discord_bot_requires_token():
     bot = DiscordBot(m)
     client = bot._build_client()  # builds slash-command tree without connecting
     assert client is not None
+
+
+def test_log_tab_shows_lines_logged_before_the_window_opened():
+    """Start-up lines (config warnings, import notes) are logged before the App exists; the Log tab
+    used to start empty and never show them. Lines logged afterwards must appear exactly once."""
+    from rerun.gui import App
+    root = temp_root()
+    (root / "config.yaml").write_text("close_to_tray: maybe\n", encoding="utf-8")
+    m = Manager(root)
+    m.config["live_view_fps"] = 0
+    m.config["setup_seen"] = True
+    m.log("app", "logged before the window")
+    app = App(m)
+    try:
+        m.log("app", "logged after the window")
+        for _ in range(8):
+            app.update()
+            time.sleep(0.05)
+        text = app.log_box.get("1.0", "end")
+        assert text.count("logged before the window") == 1, text
+        assert text.count("logged after the window") == 1, text
+        assert "'close_to_tray' should be true/false" in text, text      # the config warning
+    finally:
+        app.destroy()
 
 
 def test_gui_starts_and_closes():

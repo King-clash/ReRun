@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — Fix: the Log tab now shows lines logged before the window opened
+- Found in the final walkthrough: the Log tab started empty and only showed lines logged after the window
+  existed, so start-up lines (including the new config warnings) never appeared. It now shows them once
+  (`_backfill_log`); later lines still arrive as events. tests/test_app.py: `test_log_tab_shows_lines_logged_before_the_window_opened`.
+
 ## Unreleased — Phase H: backlog triage
 - `tools/beta_report.py` -> `BETA_CHECKLISTS.md`: for the 13 scripts that never ran on the real game, which pictures
   are captured/missing (only `raid_ticket_target` of Raid Tickets lacks a required one) and one live-check procedure.

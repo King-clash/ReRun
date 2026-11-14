@@ -27,6 +27,7 @@ class App(UpdatesKeysMixin, DashboardMixin, SettingsMixin, TemplatesMixin, Histo
         self._icon = ImageTk.PhotoImage(make_icon(64))
         self.iconphoto(True, self._icon)
         self.events: queue.Queue = queue.Queue()
+        self._log_backfill = len(self.m.log_entries)   # lines logged before the window existed
         self.m.listeners.append(self.events.put)
         self.bot = None
         self._hotkeys = None
@@ -49,6 +50,7 @@ class App(UpdatesKeysMixin, DashboardMixin, SettingsMixin, TemplatesMixin, Histo
         self._tab_discord = 5
         self._build_discord()
         self._build_log()
+        self._backfill_log()
         self._build_companion()
         self.status.configure(text="F12 stops everything  ·  F11 pauses or resumes all")
         if self.license is not None:
