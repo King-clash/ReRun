@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — Quality-of-life settings (15 of 16 ideas; BETA, simulator + real fixtures)
+## 1.1.0 — Quality-of-life settings (15 of 16 ideas; BETA, simulator + real fixtures)
 **Crest / loop farms** (Settings tab, per script)
 - **Palaces to farm, in order of preference** - a comma list ("Cursed Claw, Whirlwind"); the first one that is open
   is used. **Palaces per weekday** - "Mon: Cursed Claw; Sat/Sun: Heavenly Light" overrides the list on those days.
@@ -23,17 +23,17 @@
 - Tests: test_qol (5), test_limits (11), test_discord_settings (6), test_ui_options (10), test_capture_helper (5),
   +6 in test_crest_home, +3 in test_crest_names. Not live-verified.
 
-## Unreleased — Fix: the Log tab now shows lines logged before the window opened
+## 1.1.0 — Fix: the Log tab now shows lines logged before the window opened
 - Found in the final walkthrough: the Log tab started empty and only showed lines logged after the window
   existed, so start-up lines (including the new config warnings) never appeared. It now shows them once
   (`_backfill_log`); later lines still arrive as events. tests/test_app.py: `test_log_tab_shows_lines_logged_before_the_window_opened`.
 
-## Unreleased — Phase H: backlog triage
+## 1.1.0 — Phase H: backlog triage
 - `tools/beta_report.py` -> `BETA_CHECKLISTS.md`: for the 13 scripts that never ran on the real game, which pictures
   are captured/missing (only `raid_ticket_target` of Raid Tickets lacks a required one) and one live-check procedure.
 - IMPROVEMENT_PLAN.md has an Outcome table; live verification and new features stay with you.
 
-## Unreleased — Phase G: release tooling
+## 1.1.0 — Phase G: release tooling
 - `tools/publish.py`: fixed a defect (it wrote `__init__.py` through Python's text mode, turning its line endings
   into CRLF on Windows); now needs a `## X.Y.Z` CHANGELOG heading and real notes (thin / "see changelog" / no
   testing section are refused); refuses to push unless HEAD contains origin/main; **warns about other branches'
@@ -43,7 +43,7 @@
 - `license.json` added to the private files publish.py refuses to find tracked in git.
 - Not done: hosting the signed in-app updates (needs a host + you), code signing, marking v1.0.1/1.0.2 superseded.
 
-## Unreleased — Phase F: structure (no behaviour change)
+## 1.1.0 — Phase F: structure (no behaviour change)
 - `rerun/gui.py` (2,419 lines) is split by tab into mixins: `gui_updates` (updates + key), `gui_dashboard`
   (+ Live View), `gui_settings` (+ setup check), `gui_templates`, `gui_history`, `gui_units`
   (+ Companion), `gui_discord`, `gui_log`; shared imports/constants/widgets in `gui_common`;
@@ -58,7 +58,7 @@
 - Not done on purpose: splitting `gsc_app/page.py` (a separate app, another session's work) and removing
   the old `party` setting migration (users upgrading from old configs still need it).
 
-## Unreleased — Phase D: tests and CI
+## 1.1.0 — Phase D: tests and CI
 - `run_tests.py` runs suites in parallel (`--jobs`, default 4) with a timing table: 63 s instead of ~225 s
   (3 runs in a row, all 20 suites pass). `--ci` skips suites needing a real Tesseract.
 - `pyproject.toml`: ruff on real-bug classes only (syntax, undefined names, unused imports/variables).
@@ -67,7 +67,7 @@
 - The real-screen cases found live (palace list, quest list, Home button, dimmed Home) are fixtures + tests
   from Phase B/C; "every state is detected and handled" already covers all scripts including the BETA ones.
 
-## Unreleased — Phase C: reliability (BETA, simulator + real fixtures)
+## 1.1.0 — Phase C: reliability (BETA, simulator + real fixtures)
 - **Home button first:** Crest's "start from Home" taps the bottom bar's Home button (new template
   `home_nav_button`, threshold 0.9, matches the real Crest Palace and quest list screens) when it is
   visible and lit, and presses Back only otherwise (or after 4 taps that change nothing). Back from
@@ -84,7 +84,7 @@
   matching now go to `error.log`.
 - Tests: tests/test_runlog.py (4), 3 more in tests/test_crest_home.py.
 
-## Unreleased — Crest finds the palace and quest by name (BETA)
+## 1.1.0 — Crest finds the palace and quest by name (BETA)
 - Palaces rotate and every quest looks different, so hand-captured tile/row pictures break.
   New Crest settings **Palace to farm** and **Quest to farm** (names, optional). Pictures are still
   tried first; when none matches, Crest reads the screen with the text reader (`rerun/textnav.py`)
