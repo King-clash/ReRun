@@ -39,7 +39,13 @@ Phase 2 Past Party · 3 Units · 4 Compendium · 5 Compendium Farm · 6 Discord.
 ## Last commit
 See `git log` (Phase 1 commit follows e795766).
 
+## Installed build
+2026-11-14 13:54: Phase 1 build installed (exe only). Rollback: copy
+`backups/preinstall_20261114_135429/Rerun.exe` back. Phase 1 live check pending: after the next
+Crest farming session, confirm crest_log.jsonl gains "run" and live "drop" records and the
+dashboard tiles move.
+
 ## Next actions
-1. Phase 2 Past Party verification flow (see Active task).
-2. Ask the user about rebuilding/installing the exe (Rerun.exe is running; never close it unasked).
+1. Verify Phase 1 live from the installed app's crest_log.jsonl after the user farms.
+2. Phase 2 Past Party verification flow (see Active task).
 3. Phase 3 needs real Units-list / Compendium screenshots — ask the user to open those screens.

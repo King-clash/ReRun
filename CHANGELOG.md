@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-11-14 — Build and install (Phase 1)
+- Rebuilt with `build.py` (one-file PyInstaller, 77.9 MB). Smoke-tested from a temp copy (starts,
+  no crash.log, crest log rebuilt).
+- Installed to `C:\Users\dandr\Downloads\Rerun\Rerun` after the user quit Rerun themselves: only
+  Rerun.exe and README.md replaced; config, stats, history and templates verified unchanged (hash
+  comparison). Previous exe + data backed up to `backups/preinstall_20261114_135429/`.
+- On first start the installed app rebuilt its crest log: 65 crests (62 Lv3, 2 Lv3+, 1 uncertain)
+  and 42 earlier undated runs.
+
 ## 2026-11-14 — Phase 1: Crest 4+ and Burst tracking (BETA)
 - New `rerun/crest_stats.py`: append-only crest ledger `crest_log.jsonl` (runs, drops, pre-ledger
   run baseline), never compacted, tolerant of a torn last line. Rarity classes lv3 / lv3+ / lv4 /
