@@ -1,5 +1,6 @@
 """Publish a Rerun release:  py tools/publish.py 1.1.0 [--push]
 
+Needs release_notes/vX.Y.Z.md (plain-language notes, committed) - it becomes the release page.
 Steps: check the tree is clean and no secrets are tracked -> run all tests -> bump
 rerun/__init__.py -> build.py --release (clean zip) -> commit "Release vX" and tag vX.
 With --push (asks to confirm): push HEAD to origin/main and the tag, then create the GitHub release
@@ -54,6 +55,12 @@ def main() -> int:
             version not in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8"):
         print(f"note: CHANGELOG.md has no entry mentioning {version}")
 
+    notes = ROOT / "release_notes" / f"v{version}.md"
+    if not notes.exists() or len(notes.read_text(encoding="utf-8").strip()) < 400:
+        die(f"write the plain-language release notes first: {notes} (see the github-publish-notes "
+            "skill: what changed, what to do, what is and isn't tested - a high schooler should "
+            "understand it) and commit it")
+
     print("Running tests...")
     if run(sys.executable, "run_tests.py", check=False).returncode != 0:
         die("tests failed")
@@ -92,7 +99,7 @@ def main() -> int:
         print(f"Pushed. 'gh' is not installed, so create the release by hand and attach {zip_path}")
         return 0
     run("gh", "release", "create", tag, str(zip_path), "--title", f"Rerun {version}",
-        "--notes", f"Rerun {version}. See CHANGELOG.md.")
+        "--notes-file", str(notes))
     print("Release created.")
     return 0
 
