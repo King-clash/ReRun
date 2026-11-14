@@ -50,7 +50,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "schedules": {},
     "summary": {"enabled": True, "time": "21:00"},  # daily Discord summary
     "setup_seen": False,
-    "update_repo": "",          # GitHub "owner/name" (public) to check for new releases; empty = off
+    "update_repo": "King-clash/ReRun",  # GitHub "owner/name" (public) checked for new releases; "" = off
 }
 
 LOG_KEEP = 3000
