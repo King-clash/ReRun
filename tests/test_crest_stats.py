@@ -114,6 +114,35 @@ def test_reconstruction_is_repeatable_and_maps_rarities():
     assert "not a prediction" in text and "no dates" in text
 
 
+def test_restart_does_not_reimport_crests_already_logged_live():
+    """Seen on the installed app 2026-11-14 14:10: after a restart the History
+    rebuild imported 11 crests the script had already logged live."""
+    with tempfile.TemporaryDirectory() as d:
+        led = CrestLedger(d)
+        led.add_drop("A", "s", "lv3", "scrapped", t=NOW)          # live
+        hist = [{"t": NOW + 0.004, "instance": "A", "script": "crest", "kind": "crest",
+                 "rarity": "lv3", "action": "scrapped", "detail": "x"},   # same crest in History
+                {"t": NOW - 600, "instance": "A", "script": "crest", "kind": "crest",
+                 "rarity": "lv3", "action": "scrapped", "detail": "x"}]   # older, not live
+        added = CrestLedger(d).reconstruct(hist, {})
+        assert added["drops"] == 1, added
+        assert CrestLedger(d).summary("A", now=NOW)["all"]["drops"]["lv3"] == 2
+
+
+def test_duplicates_written_by_the_early_build_are_ignored_not_deleted():
+    with tempfile.TemporaryDirectory() as d:
+        led = CrestLedger(d)
+        led.add_drop("A", "s", "lv3", "scrapped", t=NOW)
+        # what the early Phase 1 build appended on restart
+        led._append({"type": "drop", "t": NOW + 0.004, "instance": "A", "session": "history",
+                     "script": "crest", "rarity": "lv3", "action": "scrapped",
+                     "source": "history", "confidence": "verified", "key": f"h:A:{NOW + 0.004}"})
+        again = CrestLedger(d)
+        assert len(again.records) == 2                         # file untouched
+        s = again.summary("A", now=NOW)
+        assert s["all"]["drops"]["lv3"] == 1 and s["reconstructed"] == 0, s["all"]
+
+
 def test_reconstruction_on_real_installed_history_copy():
     """The user's real History (backed up in Phase 0) rebuilds without errors."""
     backups = sorted((ROOT / "backups").glob("installed_*/history/history.jsonl"))

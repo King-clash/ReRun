@@ -45,11 +45,13 @@ See `git log` (Phase 1 commit follows e795766).
 Crest farming session, confirm crest_log.jsonl gains "run" and live "drop" records and the
 dashboard tiles move.
 
-Phase 1 recording verified live 13:57–14:01 (runs + crests + titles). Double-count fix built at
-14:04 (dist/) — install pending the user's OK to close Rerun.
+Phase 1 recording verified live 13:57–14:01 (runs + crests + titles). Double-count fix installed
+14:10. History re-import fix built 14:14 (dist/) — install pending the user's OK to close Rerun.
+The installed crest_log.jsonl contains 11 duplicate "history" records from the 14:10 restart; the
+new build ignores them at read time (do not delete them).
 
 ## Next actions
-1. Install the double-count fix build (exe only) when the user agrees; then verify after a potion
-   refill that the crest is logged once.
+1. Install the re-import fix build (exe only) when the user agrees; verify the dashboard all-time
+   crest total equals History's crest count, and that a crest after a potion refill is logged once.
 2. Phase 2 Past Party verification flow (see Active task).
 3. Phase 3 needs real Units-list / Compendium screenshots — ask the user to open those screens.

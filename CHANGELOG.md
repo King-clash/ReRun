@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-14 — Fix: History rebuild re-imported live crests on restart (Phase 1 bug)
+- Installed the double-count fix (exe only, user files unchanged; backup
+  `backups/preinstall_20261114_141002/`). On that restart the History rebuild imported 11 crests the
+  script had already logged live (the live crest is also written to History), so the stats would
+  have shown them twice.
+- Fix (rerun/crest_stats.py): the rebuild skips History crests logged live within 3 s; the summary
+  ignores rebuilt copies that match a live drop. The ledger file is not edited (append-only).
+- Checked on a copy of the installed data: 76 crests counted = 76 in History; rebuilding again adds 0.
+- Tests: 2 new (15 in test_crest_stats). 69/69 pass.
+
 ## 2026-11-14 — Phase 1 live check + fix: crest counted twice after a popup
 - Live check (installed build, 13:57–14:01): 3 runs and 4 crest records, all with OCR titles
   ("Break Power Lv3", "CRI rate UP Lv3", ...); the ledger matched History one-for-one.

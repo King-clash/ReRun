@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import shutil
+from bisect import bisect_left
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -37,6 +38,26 @@ NOTABLE = ("4+", "burst")
 WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 # History's rarity names -> ledger classes
 _HISTORY_RARITY = {"lv3": "lv3", "lv3+": "lv3+", "lv4": "lv4", "4+": "4+", "5+": "burst", "?": "?"}
+
+
+SAME_EVENT_S = 3.0  # a script writes History and the ledger within milliseconds of each other
+
+
+def _live_times(records: list[dict]) -> dict[str, list[float]]:
+    out: dict[str, list[float]] = {}
+    for r in records:
+        if r.get("type") == "drop" and r.get("source", "live") == "live":
+            out.setdefault(r.get("instance"), []).append(float(r["t"]))
+    for v in out.values():
+        v.sort()
+    return out
+
+
+def _seen_live(index: dict[str, list[float]], instance: str, t: float) -> bool:
+    """True when a live drop was logged for this instance at (almost) the same moment."""
+    times = index.get(instance) or []
+    i = bisect_left(times, t - SAME_EVENT_S)
+    return i < len(times) and times[i] <= t + SAME_EVENT_S
 
 
 def game_day(t: float) -> datetime.date:
@@ -137,12 +158,16 @@ class CrestLedger:
         counts from stats.json. Repeatable: every record has a stable key, so a
         second call adds nothing. Returns {"drops": n, "baselines": n}."""
         added = {"drops": 0, "baselines": 0}
+        live = _live_times(self.records)
         for e in history_entries:
             if e.get("kind") != "crest":
                 continue
             key = f"h:{e.get('instance')}:{e.get('t')}"
             if key in self._keys:
                 continue
+            if _seen_live(live, e.get("instance"), float(e.get("t", 0))):
+                continue  # the script already logged this crest live
+
             raw = e.get("rarity")
             rarity = _HISTORY_RARITY.get(raw or "", "?")
             rec = {"type": "drop", "t": float(e.get("t", 0)), "instance": e.get("instance", "?"),
@@ -185,7 +210,12 @@ def crest_summary(records: list[dict], instance: str | None = None, now: float |
     today = game_day(now)
     recs = [r for r in records if instance is None or r.get("instance") == instance]
     runs = [r for r in recs if r["type"] == "run"]
-    drops = sorted((r for r in recs if r["type"] == "drop"), key=lambda r: r["t"])
+    live = _live_times(recs)
+    # Rebuilt-from-History copies of crests that were also logged live (written by
+    # an early Phase 1 build on restart) are ignored, not deleted: the file stays append-only.
+    drops = sorted((r for r in recs if r["type"] == "drop" and not (
+        r.get("source") == "history" and _seen_live(live, r.get("instance"), float(r["t"])))),
+        key=lambda r: r["t"])
     baseline = sum(int(r.get("runs", 0)) for r in recs if r["type"] == "baseline")
     if session is None:  # latest live session
         live = [r for r in recs if r["type"] in ("run", "drop") and r.get("source", "live") == "live"]
