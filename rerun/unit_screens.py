@@ -68,9 +68,7 @@ def grid_cards(screen: np.ndarray, vision) -> list[tuple[int, int]]:
 
 
 # --------------------------------------------------------------------------- unit page
-NAME_BOX = (100, 698, 370, 46)      # x, y, w, h  (element icon sits just left of it)
-ICON_BOX = (64, 703, 32, 32)
-RACE_BOX = (500, 700, 125, 40)
+ICON_BOX = (64, 703, 32, 32)        # element icon, left of the name
 CLEARED_BOX = (420, 1100, 280, 46)
 # OpenCV hue (0-180) of the element icon. Seen on real captures: fire 8, light 21,
 # dark 131-133. Water / earth are expected ranges not yet seen on this account.
@@ -87,26 +85,106 @@ def white_text(img: np.ndarray, smax: int, vmin: int, scale: float = 3.0) -> np.
     return cv2.copyMakeBorder(255 - m, BORDER, BORDER, BORDER, BORDER, cv2.BORDER_CONSTANT, value=255)
 
 
-def read_name(ocr, screen: np.ndarray) -> tuple[str, float, int]:
-    """(name, mean confidence of the winning reading, votes out of 3).
-    Three white-text thresholds vote; the name only counts as read when they agree."""
-    x, y, w, h = NAME_BOX
-    crop = screen[y:y + h, x:x + w]
-    reads = []
-    for vmin in (170, 200, 225):
-        words = ocr._words(white_text(crop, 40, vmin), 7, None)
-        words = [wd for wd in words if re.search(r"[A-Za-z]", wd.text)]
-        if words:
-            text = re.sub(r"[^\w' .&:()-]", "", " ".join(wd.text for wd in words)).strip()
-            reads.append((text, sum(wd.conf for wd in words) / len(words)))
+LINE_BOX = (100, 700, 515, 42)     # name ... race, one line (x 100-615)
+RACE_MIN_X = 515                    # race word starts right of here (Human: 536-540)
+RACE_GAP = 18                       # px gap between the name's end and the race word
+SCALE = 3.0
+
+
+def outlined_text(img: np.ndarray, vmin: int, smax: int, dark_v: int, reach: int) -> np.ndarray:
+    """White strokes that touch the game's black text outline. Bright artwork (flames,
+    sparkles) has no outline, so it drops out - seen live on Clyde's fiery page."""
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    white = cv2.inRange(hsv, (0, 0, vmin), (180, smax, 255))
+    dark = cv2.inRange(hsv, (0, 0, 0), (180, 255, dark_v))
+    m = cv2.bitwise_and(white, cv2.dilate(dark, np.ones((reach, reach), np.uint8)))
+    for _ in range(3):  # grow back to the full stroke, staying inside the white
+        m = cv2.bitwise_and(cv2.dilate(m, np.ones((3, 3), np.uint8)), white)
+    m = cv2.resize(m, None, fx=SCALE, fy=SCALE, interpolation=cv2.INTER_CUBIC)
+    return cv2.copyMakeBorder(255 - m, BORDER, BORDER, BORDER, BORDER, cv2.BORDER_CONSTANT, value=255)
+
+
+# (kind, args) - seven independent readings of the name line
+_LINE_MASKS = [("white", (40, 170)), ("white", (40, 200)), ("white", (55, 170)),
+               ("outline", (190, 50, 70, 5)), ("outline", (200, 45, 60, 5)),
+               ("outline", (180, 60, 80, 7)), ("outline", (170, 55, 70, 5))]
+
+
+def _clean(text: str) -> str:
+    text = re.sub(r"[^A-Za-z0-9' ,.&:()!?-]", "", text)
+    text = re.sub(r"\s+", " ", text).strip(" ,.:-'")
+    return text
+
+
+def _tidy(text: str) -> str:
+    """Stray marks OCR puts between letters: 'the:Crimson' / 'Sword,God' -> spaces."""
+    text = re.sub(r"(?<=[A-Za-z])[:;](?=[A-Za-z])", " ", text)
+    text = re.sub(r",(?=[A-Za-z])", " ", text)   # a real comma is followed by a space
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _spelling_score(text: str) -> tuple:
+    words = text.split()
+    whole = sum(1 for w in words if len(w.strip(",.!?'")) >= 2 or w.lower() in ("a", "i"))
+    fragments = len(words) - whole
+    odd = len(re.findall(r"[^A-Za-z0-9 ,'&()-]", text))
+    caps = sum(w[:1].isupper() for w in words)
+    mid_caps = len(re.findall(r"[a-z][A-Z]", text))   # 'GaMagoori', 'SWord' are OCR noise
+    return (-fragments, -odd, -mid_caps, caps, -len(words))
+
+
+def _vote_key(text: str) -> str:
+    """Compare readings ignoring case, punctuation and the I/l/1 confusion."""
+    k = re.sub(r"[^a-z0-9]", "", text.lower())
+    return k.translate(str.maketrans({"l": "i", "1": "i", "0": "o"}))
+
+
+def read_line(ocr, screen: np.ndarray) -> tuple[list[tuple[str, float]], list[tuple[str, float]]]:
+    """All readings of the name line, split into (names, races) by word position."""
+    x, y, w, h = LINE_BOX
+    line = screen[y:y + h, x:x + w]
+    names, races = [], []
+    for kind, args in _LINE_MASKS:
+        prep = white_text(line, *args) if kind == "white" else outlined_text(line, *args)
+        words = [wd for wd in ocr._words(prep, 7, None) if re.search(r"[A-Za-z]", wd.text)]
+        if not words:
+            continue
+        lefts = [x + (wd.x - BORDER) / SCALE for wd in words]
+        rights = [x + (wd.x - BORDER + wd.w) / SCALE for wd in words]
+        race_i = None
+        if len(words) >= 2 and (lefts[-1] >= RACE_MIN_X or lefts[-1] - rights[-2] >= RACE_GAP):
+            race_i = len(words) - 1
+        name_words = words[:race_i] if race_i is not None else words
+        if name_words:
+            names.append((_clean(" ".join(wd.text for wd in name_words)),
+                          sum(wd.conf for wd in name_words) / len(name_words)))
+        if race_i is not None:
+            races.append((_clean(words[race_i].text), words[race_i].conf))
+    return [n for n in names if n[0]], [r for r in races if r[0]]
+
+
+def _pick(reads: list[tuple[str, float]]) -> tuple[str, float, int]:
+    """Most-agreed reading (by vote key); its best-confidence spelling."""
     if not reads:
         return "", 0.0, 0
-    text, votes = Counter(t for t, _ in reads).most_common(1)[0]
-    conf = max(c for t, c in reads if t == text)
-    if votes == 1:
-        text, conf = max(reads, key=lambda r: r[1])
-        conf = min(conf, 55.0)  # no agreement: keep it, but as uncertain
+    groups: dict[str, list[tuple[str, float]]] = {}
+    for t, c in reads:
+        groups.setdefault(_vote_key(t), []).append((t, c))
+    best = max(groups.values(), key=lambda g: (len(g), max(c for _, c in g)))
+    # The readings agree on the letters; pick the cleanest spelling of them:
+    # whole words (not 'Clyd e ... Swo rd'), capitals ('Ira' not 'lra'), no stray marks.
+    text = max((_tidy(t) for t, _ in best), key=_spelling_score)
+    conf = max(c for _, c in best)
+    votes = len(best)
+    if votes < 2:
+        conf = min(conf, 55.0)  # no two readings agree: keep it, but as uncertain
     return text, round(conf, 1), votes
+
+
+def read_name(ocr, screen: np.ndarray) -> tuple[str, float, int]:
+    """(name, confidence, number of agreeing readings out of 7)."""
+    names, _ = read_line(ocr, screen)
+    return _pick(names)
 
 
 def read_element(screen: np.ndarray) -> tuple[str | None, float]:
@@ -124,10 +202,11 @@ def read_element(screen: np.ndarray) -> tuple[str | None, float]:
 
 def read_profile(ocr, screen: np.ndarray) -> dict:
     """One observation for UnitRoster.apply_scan."""
-    name, name_conf, votes = read_name(ocr, screen)
+    names, races = read_line(ocr, screen)
+    name, name_conf, votes = _pick(names)
     element, el_conf = read_element(screen)
-    race = ocr.read_region(screen, *RACE_BOX)
-    race_text = re.sub(r"[^A-Za-z -]", "", race.text).strip()
+    race_text, race_conf, race_votes = _pick(races)
+    race = type("R", (), {"confidence": race_conf if race_votes >= 2 else min(race_conf, 55.0)})
     cl = ocr.read_region(screen, *CLEARED_BOX)
     m = _CLEARED.search(cl.text or "")
     clears = int(m.group(1).replace(",", "")) if m else None

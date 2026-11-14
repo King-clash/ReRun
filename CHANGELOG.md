@@ -115,3 +115,17 @@
 - Docs: ARCHITECTURE, PROJECT_ROADMAP, TESTING, DEVELOPMENT_STATUS, CHANGELOG.
 - Commits: f4df578 (baseline).
 
+
+## 2026-11-14 — Phase 3 live fixes (first live scan)
+- Live: the scan read the first unit, then reopened it forever — the Units screen animates, so the
+  exact pixel signature used to recognise "same view" never matched. Now a thumbnail compared with
+  a tolerance (same view ~0.03, threshold 6), done-cards reset only after Rerun scrolls, plus a
+  backstop (6 already-read units in a row -> scroll on). Regression test fails fast on the old code.
+- Live: "Clyde, the Crimson Sword God" ran into the race and the flames behind it broke the reading
+  ("Clyde thé.Crimson sword G"). Name and race are now read from one line (race = last word by
+  position/gap), with 7 masks voting (3 white-text + 4 "outlined text" masks that drop un-outlined
+  bright art), compared ignoring case/punctuation/I-l-1, cleanest spelling chosen. Both fixture
+  units read exactly; ~2.4 s per unit page.
+- A confident reading that fuzzy-matches a unit stored under an uncertain spelling renames it (old
+  spelling kept as alias); manual names are never replaced.
+- Fixtures: unit_profile_clyde.png, units_grid_fire_top.png. Tests: 14 in test_units. 97/97 pass.

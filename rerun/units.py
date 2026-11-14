@@ -136,6 +136,16 @@ class UnitRoster:
                 summary["seen"] += 1
                 if how == "uncertain":
                     summary["uncertain"].append(name)
+                read = norm_name(ob.get("name", ""))
+                cur = self.units.get(name)
+                if (how == "fuzzy" and cur is not None and cur.get("name_status") == "uncertain"
+                        and ob.get("name_conf", 0) >= MIN_NAME_CONF and read and read != name):
+                    # A confident reading replaces an earlier uncertain spelling (never a
+                    # manual one); the old spelling is kept as an alias.
+                    self.units[read] = {**self.units.pop(name), "name": read, "name_status": "ocr"}
+                    self.aliases[name] = read
+                    summary.setdefault("renamed", []).append((name, read))
+                    name = read
                 u = self.units.get(name)
                 if u is None:
                     u = self.units[name] = {"name": name, "first_seen": t, "last_seen": t,

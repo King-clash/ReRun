@@ -59,6 +59,22 @@ def test_manual_correction_is_learned_and_merges():
         assert s["new"] == []
 
 
+def test_confident_reading_replaces_earlier_uncertain_spelling():
+    """Live: the first scan stored 'Clyde the.Crimson sword G' (uncertain)."""
+    with tempfile.TemporaryDirectory() as d:
+        r = UnitRoster(d)
+        r.apply_scan([ob("Clyde the.Crimson sword G", conf=55, quest_clears=0)], "units_list")
+        assert r.units["Clyde the.Crimson sword G"]["name_status"] == "uncertain"
+        s = r.apply_scan([ob("Clyde, the Crimson Sword God", conf=61, quest_clears=0)], "units_list")
+        assert list(r.units) == ["Clyde, the Crimson Sword God"], list(r.units)
+        assert s["new"] == [] and s["renamed"]
+        assert UnitRoster(d).resolve_name("Clyde the.Crimson sword G")[0] == "Clyde, the Crimson Sword God"
+        # a manual name is never replaced
+        r.correct_name("Clyde, the Crimson Sword God", "Clyde")
+        r.apply_scan([ob("Clyde, the Crimson Sword God", conf=90)], "units_list")
+        assert "Clyde" in r.units
+
+
 def test_ocr_never_overwrites_manual_or_verified():
     with tempfile.TemporaryDirectory() as d:
         r = UnitRoster(d)
@@ -206,6 +222,72 @@ def test_scan_script_fills_roster_from_real_screens():
         assert ctx.device.backs == 1
         assert len(r.scans()) == 1 and (Path(d) / "compendium_report.csv").exists()
         assert any("1 new" in n for n in notes), notes
+
+
+def test_long_name_over_flames_and_race_split():
+    """Seen live: 'Clyde, the Crimson Sword God' ran into the race box and the flames
+    behind it broke the reading."""
+    import cv2
+    from rerun.unit_screens import read_profile
+    ocr = _ocr()
+    if ocr is None:
+        print("  (skipped: no Tesseract)")
+        return
+    ob = read_profile(ocr, cv2.imread(str(FIX / "unit_profile_clyde.png")))
+    assert ob["name"] == "Clyde, the Crimson Sword God" and ob["name_votes"] >= 2, ob
+    f = ob["fields"]
+    assert (f["element"]["value"], f["race"]["value"], f["quest_clears"]["value"]) == ("Fire", "Human", 0), f
+
+
+def test_animated_grid_does_not_reopen_the_same_card():
+    """Seen live 2026-11-14 15:00: the Units screen animates, an exact pixel signature
+    never matched, and the first card was reopened forever."""
+    import cv2
+    from rerun.adb import FakeDevice
+    from rerun.engine import Context
+    from rerun.scripts.compendium_counter import CompendiumCounterScript
+    from rerun.stats import Stats
+    import tests.test_scripts as ts
+    v, ocr = _vision(), _ocr()
+    if v is None or ocr is None:
+        print("  (skipped: templates or Tesseract missing)")
+        return
+    ts.fast()
+    frames = [cv2.imread(str(FIX / "units_grid_fire.png")), cv2.imread(str(FIX / "units_grid_fire_top.png"))]
+    pages = [cv2.imread(str(FIX / "unit_profile_clyde.png")), cv2.imread(str(FIX / "unit_profile_ira.png"))]
+
+    class Dev(FakeDevice):
+        def __init__(self):
+            super().__init__(frames)
+            self.n, self.page, self.taps, self.hits = 0, None, [], {}
+
+        def screencap(self):
+            if self.page is not None:
+                return self.page
+            self.n += 1
+            return frames[self.n % 2]          # same view, animated
+
+        def tap(self, x, y):
+            if (x, y) not in self.taps:
+                self.taps.append((x, y))
+            self.hits[(x, y)] = self.hits.get((x, y), 0) + 1
+            if self.hits[(x, y)] > 3:  # the live bug: fail fast instead of looping
+                raise AssertionError(f"card {(x, y)} reopened {self.hits[(x, y)]} times")
+            self.page = pages[min(self.taps.index((x, y)), 1)]
+
+        def back(self):
+            self.page = None
+
+    with tempfile.TemporaryDirectory() as d:
+        ctx = Context(instance="t", device=Dev(), vision=v, stats=Stats(), routines={},
+                      base_resolution=(720, 1280), log=lambda i, m: None,
+                      notify=lambda i, m, image=None, ping=False: None, data_dir=d, units=UnitRoster(d))
+        ctx.params["tesseract_path"] = "auto"
+        result = ts.run(CompendiumCounterScript(ctx, {"max_units": 2}))
+        r = UnitRoster(d)
+    assert result.startswith("finished: Compendium Counter"), result
+    assert len(ctx.device.taps) == 2, ctx.device.taps        # two different cards, once each
+    assert set(r.units) == {"Clyde, the Crimson Sword God", "Ira Gamagoori"}, list(r.units)
 
 
 if __name__ == "__main__":

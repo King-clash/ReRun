@@ -11,6 +11,7 @@ import csv
 import time
 from pathlib import Path
 
+import cv2
 import numpy as np
 
 from ..engine import StopRoutine
@@ -47,6 +48,8 @@ debug/); fix them in the Units tab and Rerun remembers the correction.
         ("grid", ["compendium_grid_header"]),
     ]
     MAX_SCROLLS = 80
+    VIEW_CHANGED = 6.0   # mean grey difference (0-255) of the grid thumbnail = a different view
+    MAX_DUPES = 6        # already-read units in a row before forcing a scroll
 
     def on_start(self) -> None:
         if self.ocr is None:
@@ -59,8 +62,10 @@ debug/); fix them in the Units tab and Rerun remembers the correction.
         self.opened: tuple[int, int] | None = None
         self.scrolls = 0
         self.limit = int(self.cfg.get("max_units") or 0)
-        self.view_sig: bytes | None = None
+        self.view_sig = None
         self._saved = False
+        self.force_scroll = False
+        self.dupe_streak = 0
 
     def run(self) -> None:
         try:
@@ -106,10 +111,16 @@ debug/); fix them in the Units tab and Rerun remembers the correction.
     def handle_grid(self, screen):
         if self.limit and len(self.rows) >= self.limit:
             self.report("Unit limit reached.")
-        sig = np.asarray(screen[300:1100:40, ::40]).tobytes()
-        if sig != self.view_sig:
-            self.view_sig, self.done_cards = sig, set()
-        todo = [c for c in self.cards(screen) if c not in self.done_cards]
+        # Same view or a new one? Seen live: the Units screen is animated, so an
+        # exact pixel signature never matched and card 1 was reopened forever.
+        # Compare small thumbnails with a tolerance instead (same view: ~0.03,
+        # one scroll: far above VIEW_CHANGED).
+        thumb = cv2.resize(cv2.cvtColor(screen[300:1100], cv2.COLOR_BGR2GRAY), (72, 80),
+                           interpolation=cv2.INTER_AREA).astype(np.int16)
+        if self.view_sig is None or np.abs(thumb - self.view_sig).mean() > self.VIEW_CHANGED:
+            self.view_sig, self.done_cards = thumb, set()
+        todo = [] if self.force_scroll else \
+            [c for c in self.cards(screen) if c not in self.done_cards]
         if todo:
             self.opened = todo[0]
             self.done_cards.add(todo[0])
@@ -125,6 +136,8 @@ debug/); fix them in the Units tab and Rerun remembers the correction.
         after = self.grab()
         if np.abs(after[300:1100].astype(int) - before[300:1100].astype(int)).mean() < 2:
             self.report("Reached the end of the list.")
+        self.force_scroll = False
+        self.view_sig, self.done_cards = None, set()  # new view: every card is new
         self.log("Scrolled")
 
     # ---------------------------------------------------------------- unit page
@@ -140,7 +153,13 @@ debug/); fix them in the Units tab and Rerun remembers the correction.
             self.log("Couldn't read the unit's name - skipped.")
         elif name in self.rows or name in self.seen:
             self.log(f"{name} already read (seen again after scrolling)")
+            self.dupe_streak += 1
+            if self.dupe_streak >= self.MAX_DUPES:
+                # Backstop: units keep coming back already read - move the list on.
+                self.log(f"{self.dupe_streak} already-read units in a row - scrolling on")
+                self.force_scroll, self.dupe_streak = True, 0
         else:
+            self.dupe_streak = 0
             self.seen.add(name)
             el = ob["fields"]["element"]["value"] or "?"
             unsure = " (name uncertain)" if ob["name_votes"] < 2 else ""
