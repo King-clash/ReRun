@@ -45,6 +45,11 @@ Crest Lv3, mailbox, errors). Also `debug_crest/` holds 3 real Equip Crest captur
 |---|---|---|
 | 2026-11-14 | Phase 1 crest ledger | 65/65 (54 original + 11 new test_crest_stats); no new failures |
 
+| 2026-11-14 | Crest double-count fix | 67/67 (13 test_crest_stats) |
+
+**Live (installed exe, 2026-11-14 13:57–14:01):** Phase 1 ledger recorded 3 runs + 4 crests with
+titles, matching History exactly; exposed the double count fixed above (fix not yet live-verified).
+
 Phase 1 also checked by rendering the dashboard against a temp copy of the user's backed-up live
 History (52 crest entries + 30 pre-ledger runs rebuilt). That is a screenshot of real data, not a live
 farming test: the live Crest hooks will be verified the next time the rebuilt exe farms.

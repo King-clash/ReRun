@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-11-14 — Phase 1 live check + fix: crest counted twice after a popup
+- Live check (installed build, 13:57–14:01): 3 runs and 4 crest records, all with OCR titles
+  ("Break Power Lv3", "CRI rate UP Lv3", ...); the ledger matched History one-for-one.
+- Bug found live (pre-existing, also in History and stats.json): Redeploy → out of energy → L Potion
+  → the same Equip Crest screen came back and "Freeze Resistance Lv3" was judged and counted twice.
+- Fix (rerun/scripts/crest.py): a crest of the same rarity (and same title when both were read)
+  seen again with no completed run in between is not counted again; it is still scrapped/redeployed.
+- Tests: 2 new (13 in test_crest_stats); the regression test fails on the old code. 67/67 pass.
+- The one duplicate already recorded (14:00:27) is left in History/ledger/stats as recorded (not
+  edited silently): it inflates all-time Lv3 by 1.
+
 ## 2026-11-14 — Build and install (Phase 1)
 - Rebuilt with `build.py` (one-file PyInstaller, 77.9 MB). Smoke-tested from a temp copy (starts,
   no crash.log, crest log rebuilt).

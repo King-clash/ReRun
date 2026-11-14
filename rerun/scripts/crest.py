@@ -152,7 +152,17 @@ CREST HANDLING
         self.log(f"Keeping crests: {self.cfg['keep']}")
 
     # ------------------------------------------------------------ crest ledger
+    def same_crest_again(self, rarity: str, text: str | None) -> bool:
+        """A new crest only appears after a run finishes. Seeing a crest of the
+        same rarity (and the same title, when both were read) with no run in
+        between means the Equip Crest screen came back after an interruption."""
+        prev = getattr(self, "judged", None)
+        if not prev or prev["rarity"] != rarity:
+            return False
+        return not text or not prev["title"] or text == prev["title"]
+
     def count_run(self) -> None:
+        self.judged = None  # the next Equip Crest screen holds a new crest
         super().count_run()
         ledger = getattr(self.ctx, "crests", None)
         if ledger is not None:
@@ -329,7 +339,13 @@ CREST HANDLING
                 self.notify(f"Crest: found a crest I couldn't identify (scores {scores}). Left it on screen and stopped.")
                 raise Finished("unknown crest")
             rarity, confidence = "lv3", "assumed"
-        self.count(f"crest_{rarity}")
+        # Seen live: Redeploy -> out of energy -> potion -> back on this same
+        # Equip Crest screen, and the crest was judged and counted a second time.
+        dup = self.same_crest_again(rarity, text)
+        if dup:
+            self.log(f"Same {rarity} crest as before (no run finished since) - not counted again")
+        else:
+            self.count(f"crest_{rarity}")
         self.progress()
 
         if self.wanted(rarity):
@@ -342,15 +358,17 @@ CREST HANDLING
             self.notify(f"{rarity} crest found on {self.ctx.instance}! Left on the Equip Crest screen for you.")
             raise Finished(f"{rarity} crest")
 
-        self.record("crest", f"{rarity} crest - scrapped into fragments", row, rarity=rarity,
-                    action="scrapped")
-        self.ledger_drop(rarity, "scrapped", confidence, title=text)
+        if not dup:
+            self.record("crest", f"{rarity} crest - scrapped into fragments", row, rarity=rarity,
+                        action="scrapped")
+            self.ledger_drop(rarity, "scrapped", confidence, title=text)
+            self.count("scrapped")
+            self.judged = {"rarity": rarity, "title": text or ""}
         self.log(f"Crest identified as {rarity} - scrapping")
         # Tick the equipped crests so only the new one is converted.
         for (cx, cy) in self.find_blue_boxes(screen, box[1]):
             self.log(f"Ticking equipped crest at ({cx}, {cy})")
             self.tap(cx, cy, settle=0.4)
-        self.count("scrapped")
         self.crest_handled_at = time.monotonic()
         self.scrap(self.grab())
 

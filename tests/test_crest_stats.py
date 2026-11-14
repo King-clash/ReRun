@@ -178,6 +178,43 @@ def test_crest_script_records_burst():
     assert s["all"]["drops"]["burst"] == 1 and s["today"]["drops"]["burst"] == 1
 
 
+def test_same_crest_seen_again_after_a_popup_is_not_counted_twice():
+    """Seen live 2026-11-14 14:00: Redeploy -> out of energy -> potion -> the same
+    Equip Crest screen again; 'Freeze Resistance Lv3' was recorded twice."""
+    fast()
+    dev = Sim({"equip": crest_equip_screen("crest_icon_lv3")}, "equip", {})
+    d = tempfile.mkdtemp()
+    ctx = make_ctx(Path(d), dev, CrestScript)
+    ctx.crests = CrestLedger(d)
+    s = CrestScript(ctx, {"verify_text": False})
+    s.on_start()
+    s.handle_equip_crest_screen(dev.screencap())
+    s.crest_handled_at = 0.0          # popup handled, screen is back
+    s.handle_equip_crest_screen(dev.screencap())
+    st = ctx.stats.get("Test")
+    assert st["crest.crest_lv3"] == 1 and st["crest.scrapped"] == 1, st
+    assert ctx.crests.summary("Test")["all"]["drops"]["lv3"] == 1
+    assert dev.tapped.count("redeploy_button") == 2, dev.tapped  # still scraps / moves on
+    # After a finished run the next crest is new, even with the same rarity.
+    s.count_run()
+    s.crest_handled_at = 0.0
+    s.handle_equip_crest_screen(dev.screencap())
+    assert ctx.stats.get("Test")["crest.crest_lv3"] == 2
+    assert ctx.crests.summary("Test")["all"]["drops"]["lv3"] == 2
+
+
+def test_same_rarity_different_title_is_a_new_crest():
+    fast()
+    dev = Sim({"equip": crest_equip_screen("crest_icon_lv3")}, "equip", {})
+    ctx = make_ctx(Path(tempfile.mkdtemp()), dev, CrestScript)
+    s = CrestScript(ctx, {})
+    s.judged = {"rarity": "lv3", "title": "Freeze Resistance Lv3"}
+    assert s.same_crest_again("lv3", "Freeze Resistance Lv3")
+    assert s.same_crest_again("lv3", "")            # title unreadable: trust the run count
+    assert not s.same_crest_again("lv3", "Break Power Lv3")
+    assert not s.same_crest_again("lv3+", "Freeze Resistance Lv3")
+
+
 def test_crest_script_without_ledger_still_works():
     """Contexts built elsewhere (Queue, tests, custom tools) have no ledger."""
     fast()

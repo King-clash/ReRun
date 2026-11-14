@@ -45,7 +45,11 @@ See `git log` (Phase 1 commit follows e795766).
 Crest farming session, confirm crest_log.jsonl gains "run" and live "drop" records and the
 dashboard tiles move.
 
+Phase 1 recording verified live 13:57–14:01 (runs + crests + titles). Double-count fix built at
+14:04 (dist/) — install pending the user's OK to close Rerun.
+
 ## Next actions
-1. Verify Phase 1 live from the installed app's crest_log.jsonl after the user farms.
+1. Install the double-count fix build (exe only) when the user agrees; then verify after a potion
+   refill that the crest is logged once.
 2. Phase 2 Past Party verification flow (see Active task).
 3. Phase 3 needs real Units-list / Compendium screenshots — ask the user to open those screens.
