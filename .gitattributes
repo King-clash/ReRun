@@ -1,0 +1,10 @@
+# One line-ending rule for the whole repo: LF in git, so merges and diffs stay clean.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.zip binary
+*.exe binary
+*.traineddata binary
+# Windows batch files must keep CRLF when checked out
+*.bat text eol=crlf

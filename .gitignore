@@ -46,3 +46,7 @@ Rerun.old.exe
 # Clean release for sharing (python build.py --release)
 release/
 /tesseract/
+
+# Build log is generated on every build (tools/buildlog.py); keep it out of git so builds never dirty the tree
+BUILDS.md
+builds.jsonl

@@ -51,6 +51,14 @@ Releases: `py tools/publish.py X.Y.Z --push` (tests, `build.py --release`, tag, 
 King-clash/ReRun; only when the user asks). The signed in-app update system (rerun/updates.py) is
 separate and stays off until `UPDATE_URL` is set.
 
+## How a release is made (since 1.0.3)
+1. Work on a branch, open a PR into `main`, merge it (PR checks must pass once CI exists).
+2. Start from the merged `main` (`git switch -c publish/X.Y.Z origin/main`) with a clean tree.
+3. Write `release_notes/vX.Y.Z.md` in plain language (see the `github-publish-notes` skill) and commit it.
+4. `py tools/publish.py X.Y.Z --push` - tests, `build.py --release` (clean zip), tag, push, GitHub release.
+5. Re-read the live release page. Never release from a feature branch or with uncommitted work.
+`BUILDS.md` / `builds.jsonl` are generated locally and git-ignored; line endings are LF (`.gitattributes`).
+
 ## Completed
 - Phase 0: recovery, git baseline f4df578, backups, docs.
 - Phase 1 (BETA): crest ledger, reconstruction, dashboard tiles, /crests; live-verified 13:57.
