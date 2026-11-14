@@ -25,4 +25,4 @@ hotkeys:
   pause_all: f11
 appearance: auto
 close_to_tray: true
-update_repo: ""   # GitHub "owner/name" of a PUBLIC repo; Rerun then checks its latest release at startup
+update_repo: "King-clash/ReRun"   # GitHub "owner/name" of a PUBLIC repo; Rerun then checks its latest release at startup
