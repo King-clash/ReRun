@@ -9,7 +9,8 @@
 - Git: `C:\Program Files\Git\cmd\git.exe` (prepend to PATH in a fresh shell)
 
 ## Current phase
-Milestone A · Phase 2 done as BETA (2026-11-14); Phase 3 Unit Roster next.
+Milestone A · Phase 2 COMPLETE (Start path live-verified 2026-11-14 14:33; Resume/relaunch/relogin
+simulator-only). Phase 3 Unit Roster next — needs real Units-list and Compendium screenshots.
 Phase 2 live check: on Start, the log should show "Selecting Past Party", "Ticking Include AI"
 (or straight to Apply), "Past Party applied with Include AI - dialog closed"; capture the Past
 Party dialog as tests/fixtures/past_party_dialog.png.

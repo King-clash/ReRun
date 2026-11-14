@@ -52,7 +52,8 @@ Crest Lv3, mailbox, errors). Also `debug_crest/` holds 3 real Equip Crest captur
 **Live (installed exe, 2026-11-14 14:33–14:34):** Crest started from the party screen with Past
 Party on; the first run completed at 14:34:09 with no party fallback or failure in History.
 That outcome means the verified flow reached Apply + dialog closed (the only other paths record
-an entry), but the Log lines themselves were not seen by Claude.
+an entry). The user confirmed the Log showed "Selecting Past Party", "Ticking Include AI" and
+"Past Party applied with Include AI - dialog closed".
 
 `py tests/test_past_party.py` — Phase 2. The real party screen (party_reigrad.png) matches
 past_party_button 0.96 lit; under the error popup it is dimmed (8 vs 131). No real capture of the
