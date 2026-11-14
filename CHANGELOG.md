@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-11-14 — GS Companion reference data (local only)
+- Decision change (user): gscompanion.com was scraped once (via Firecrawl) for personal use. Its
+  robots.txt still disallows Anthropic's crawlers and signals `ai-train=no, use=reference`, so the
+  data is **local only**: `data/` stays gitignored and `build.py` does not bundle it.
+- `data/gscompanion/raw/*.md` (scraped pages) → `tools/gscompanion_build.py` → `crest_palace.json`
+  (18 stages: days, boss, hazards, crest drops), `crests.json` (138 crests, per-level values),
+  `crest_recommendations.json` (427 units, from the Advisor Team's CrestRec doc), `units.json` (428).
+- `rerun/gsc_data.py`: GSCData lookups (palace_today on the 06:00 UTC-6 game day, stages_dropping,
+  match_crest for OCR titles, recommended, units_wanting, match_unit). Not wired into scripts yet.
+- tests/test_gsc_data.py (6); skips when the local data is absent.
+
 ## 2026-11-14 — Phase 3: Unit Roster (BETA)
 - Source decision from real captures: the Units list grid has no readable text (portrait, element
   icon, star badge, 'Lv' badge without a number). Tapping a card opens the unit's page (the same
