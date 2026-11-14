@@ -41,9 +41,44 @@ class SettingsMixin:
         ios.Switch(g2.row("Keep running in the tray", "Closing the window hides Rerun next to "
                           "the clock instead of quitting. Quit from the tray icon's menu."),
                    self.close_to_tray, command=self._save_close_to_tray).pack()
+        ui = self.m.config.get("ui") or {}
+        self.ui_vars = {
+            "start_minimized": tk.BooleanVar(value=bool(ui.get("start_minimized"))),
+            "autostart": tk.BooleanVar(value=bool(ui.get("autostart"))),
+            "confirm_stop_all": tk.BooleanVar(value=bool(ui.get("confirm_stop_all"))),
+        }
+        ios.Switch(g2.row("Start minimized to the tray", "Opens hidden next to the clock. Needs the tray "
+                          "icon; ignored on a first run."),
+                   self.ui_vars["start_minimized"], command=self._save_ui_options).pack()
+        ios.Switch(g2.row("Start scripts when Rerun opens", "Starts every instance's script a few seconds "
+                          "after Rerun opens - handy after a reboot. Check the settings first."),
+                   self.ui_vars["autostart"], command=self._save_ui_options).pack()
+        ios.Switch(g2.row("Confirm before Stop All", "Asks when you press the Stop All button. The F12 "
+                          "hotkey and the tray menu never ask."),
+                   self.ui_vars["confirm_stop_all"], command=self._save_ui_options).pack()
         ios.Button(g2.row("Setup check", "Checks ADB, your instances, screen size, templates "
                           "and the text reader, with a fix for anything missing."),
                    "Run", self.open_setup_check, kind="tinted", small=True).pack()
+
+        lg = self.m.config.get("logging") or {}
+        g4 = ios.Group(wrap, header="Logging",
+                       footer="rerun.log (next to Rerun) keeps what the Log tab shows, across restarts. "
+                              "Applies right away.")
+        g4.pack(fill="x", pady=(0, px(24)))
+        self.log_file_level = ios.Select(g4.row("Write to rerun.log", "Which lines are saved to the file."),
+                                         values=list(LOG_FILE_LEVELS.values()), command=self._save_logging)
+        self.log_file_level.set(LOG_FILE_LEVELS.get(str(lg.get("file_level", "all")), "Everything"))
+        self.log_file_level.pack()
+        self.log_vars = {}
+        for key, label, sub, default in (
+                ("file_mb", "File size (MB)", "A new file starts when this is reached (0.1 - 100).", 1),
+                ("file_count", "Old files kept", "rerun.log.1, .2 ... (1 - 20).", 3),
+                ("memory_lines", "Lines in the Log tab", "Older lines drop off (500 - 20000).", 3000)):
+            self.log_vars[key] = tk.StringVar(value=str(lg.get(key, default)))
+            fld = ios.Field(g4.row(label, sub), self.log_vars[key], width=7, justify="right")
+            fld.pack()
+            fld.entry.bind("<FocusOut>", lambda e: self._save_logging(), add="+")
+            fld.entry.bind("<Return>", lambda e: self._save_logging(), add="+")
 
         us = updates.settings(self.m.config)
         g3 = ios.Group(wrap, header="Updates",
@@ -144,6 +179,27 @@ class SettingsMixin:
         self.m.config["appearance"] = key
         self.m.save_config()
         self.flash(f"Theme set to {APPEARANCE[key]} - restart Rerun to apply", "ok")
+
+    def _save_ui_options(self):
+        ui = self.m.config.setdefault("ui", {})
+        for key, var in self.ui_vars.items():
+            ui[key] = bool(var.get())
+        self.m.save_config()
+
+    def _save_logging(self):
+        lg = self.m.config.setdefault("logging", {})
+        lg["file_level"] = next((k for k, v in LOG_FILE_LEVELS.items() if v == self.log_file_level.get()), "all")
+        for key, lo, hi, cast in (("file_mb", 0.1, 100.0, float), ("file_count", 1, 20, int),
+                                  ("memory_lines", 500, 20000, int)):
+            try:
+                value = cast(self.log_vars[key].get().strip().replace(",", "."))
+            except ValueError:
+                value = (self.m.config["logging"].get(key) or lo)
+            value = max(lo, min(value, hi))
+            lg[key] = int(value) if cast is int or float(value).is_integer() else value
+            self.log_vars[key].set(str(lg[key]))          # show what was actually kept
+        self.m.save_config()
+        self.m.apply_logging()
 
     def _save_close_to_tray(self):
         self.m.config["close_to_tray"] = bool(self.close_to_tray.get())

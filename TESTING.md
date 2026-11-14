@@ -20,6 +20,11 @@ py tests/test_units.py        # Phase 3 roster + unit page readers
 py tests/test_compendium.py   # Phase 4 targets, progress, change since last scan
 py tests/test_updates.py      # signed updates against a local web server (throwaway key)
 py tests/test_crest_home.py   # Crest starts from the Home screen
+py tests/test_limits.py        # time limit, energy floor, restart cap
+py tests/test_discord_settings.py  # quiet hours, ping kinds, summary contents
+py tests/test_ui_options.py   # window memory, start options, Stop All confirm, logging
+py tests/test_capture_helper.py  # Suggest Crop on the Templates tab
+py tests/test_qol.py          # pure helpers (times, name lists, window position)
 py tests/test_errlog.py       # quiet-failure error.log
 ```
 

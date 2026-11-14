@@ -15,7 +15,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageTk
 
-from . import __version__, errlog, ios, qol, updates
+from . import __version__, errlog, ios, qol, textnav, updates
 from .adb import discover_bluestacks_instances
 from .appicon import make_icon
 from .ios import C, F, px
@@ -29,6 +29,7 @@ STATUS_TEXT = {"idle": "Idle", "starting": "Starting", "running": "Running",
                "paused": "Paused", "error": "Error"}
 STATUS_COLOR = {"idle": "gray", "starting": "blue", "running": "green",
                 "paused": "orange", "error": "red"}
+LOG_FILE_LEVELS = {"all": "Everything", "warnings": "Warnings and errors", "errors": "Errors only"}
 APPEARANCE = {"auto": "Automatic", "light": "Light", "dark": "Dark"}
 ALL_INSTANCES = "All instances"
 LOG_LEVELS = {"All": None, "Warnings": {"warn", "error"}, "Errors": {"error"}}
@@ -196,6 +197,8 @@ Only the user IDs you allowed can start, stop, reset stats or take screenshots.
 Alerts:  rare crests, Crest Bursts, hyper rare drops, failures, crashes and finished runs are posted to the alert channel, with a screenshot where useful, pinging the user ID above."""
 
 __all__ = [
+    "textnav",
+    "LOG_FILE_LEVELS",
     "qol",
     "ADB_HELP",
     "ALL_INSTANCES",

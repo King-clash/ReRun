@@ -104,3 +104,52 @@ def sample_text(words, y0: int, y1: int, limit: int = 160) -> str:
     seen = [w.text for w in sorted(words, key=lambda w: (w.y // 40, w.x))
             if y0 <= w.y <= y1 and w.conf >= 85 and len(w.text) >= 3 and w.h < 140]
     return " ".join(seen)[:limit]
+
+
+# ---- capture helper: where to draw the template box (720x1280 frame) --------------------------------
+PALACE_TILE_BOX = (95, 530, 110)             # x, w, h; y is 50 px above the name text
+QUEST_ROW_BOX = (36, 340, 34)               # x, w, h; y comes from the 'Rank Needed' anchor
+HOME_BUTTON_BOX = (4, 1156, 112, 118)       # the bottom bar's Home button never moves
+NON_TILE = ("crest_palace_icon", "crest_palace_icon2", "crest_palace_header")
+
+
+def suggest_palace_tile(words, prefs: list[str] | None = None):
+    """(x, y, w, h) around one palace banner's name (not its red 'time left' badge, which changes).
+    The first of `prefs` that is on screen, else the topmost banner. None when no banner text is read."""
+    cy = None
+    for name in prefs or []:
+        hit = find_name(words, name, (300, 1000))
+        if hit:
+            cy = hit.y
+            break
+    if cy is None:
+        tall = sorted((w for w in words if 300 <= w.y <= 1000 and w.conf >= 80 and 30 <= w.h <= 140),
+                      key=lambda w: w.y)
+        if not tall:
+            return None
+        cy = tall[0].y + tall[0].h // 2
+    return (PALACE_TILE_BOX[0], max(0, cy - 50), PALACE_TILE_BOX[1], PALACE_TILE_BOX[2])
+
+
+def suggest_quest_row(words):
+    """(x, y, w, h) around the first quest card's title row on a quest list; None if there is none."""
+    rows = quest_rows(words)
+    if not rows:
+        return None
+    return (QUEST_ROW_BOX[0], rows[0]["y"] - 15, QUEST_ROW_BOX[1], QUEST_ROW_BOX[2])
+
+
+def suggest_crop(name: str, words, prefs: list[str] | None = None):
+    """((x, y, w, h), explanation) for the template called `name`, or None when there is no rule for
+    it. Coordinates are in the 720x1280 frame; the caller scales them to the screenshot."""
+    if name == "home_nav_button":
+        return HOME_BUTTON_BOX, "the bottom bar's Home button"
+    if name.startswith("crest_palace_") and name not in NON_TILE:
+        rect = suggest_palace_tile(words, prefs)
+        if rect:
+            return rect, "a palace banner (name only, without the changing 'time left' badge)"
+    if name.startswith("quest_list_entry"):
+        rect = suggest_quest_row(words)
+        if rect:
+            return rect, "the first quest's title row"
+    return None

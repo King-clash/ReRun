@@ -12,8 +12,21 @@ from pathlib import Path
 MAX_BYTES = 1_000_000
 KEEP = 3
 
+LEVELS = {"info": 0, "warn": 1, "error": 2}
+FILE_LEVELS = {"all": 0, "warnings": 1, "errors": 2}      # config logging.file_level -> minimum level
+
 _path: Path | None = None
 _lock = threading.Lock()
+_min_level = 0
+
+
+def configure(file_mb: float = 1.0, file_count: int = 3, file_level: str = "all") -> None:
+    """Apply the Logging settings: size of each file, how many old files to keep, and the lowest
+    level written ('all' | 'warnings' | 'errors'). Out-of-range values are clamped, never rejected."""
+    global MAX_BYTES, KEEP, _min_level
+    MAX_BYTES = int(max(0.1, min(float(file_mb), 100.0)) * 1_000_000)
+    KEEP = int(max(1, min(int(file_count), 20)))
+    _min_level = FILE_LEVELS.get(str(file_level).lower(), 0)
 
 
 def init(root: str | Path) -> None:
@@ -32,7 +45,7 @@ def _rotate(path: Path) -> None:
 
 def write(instance: str, msg: str, level: str = "info") -> None:
     try:
-        if _path is None:
+        if _path is None or LEVELS.get(level, 0) < _min_level:
             return
         line = f"{time.strftime('%Y-%m-%d %H:%M:%S')} {level.upper():5s} [{instance}] " \
                + msg.replace("\r", "").replace("\n", "\n    ")

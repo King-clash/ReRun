@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased — Quality-of-life settings (15 of 16 ideas; BETA, simulator + real fixtures)
+**Crest / loop farms** (Settings tab, per script)
+- **Palaces to farm, in order of preference** - a comma list ("Cursed Claw, Whirlwind"); the first one that is open
+  is used. **Palaces per weekday** - "Mon: Cursed Claw; Sat/Sun: Heavenly Light" overrides the list on those days.
+  Weekdays follow the GAME day (resets 6 AM UTC-6), now also for the `crest_palace_<day>` pictures.
+- **Stop after N minutes / Stop at HH:MM** - the batch that is running finishes, then the farm ends ("Time limit reached.").
+- **Keep at least N energy** - stops instead of using a potion when the next run would leave less (reads the energy
+  bar with the text reader; unreadable = no stop; checked between batches).
+- **Max game restarts per day** - crash/no-progress restarts count; the daily relogin, maintenance and farm switches do not.
+- **If it can't reach the Home screen**: stop (default) / restart the game and try again (2x) / keep trying.
+  **Allow the Back key**: off = only pop-ups and the on-screen Home button are used.
+**Discord tab**: **Quiet hours** (alerts still posted, without the @mention; may cross midnight), **Ping me for**
+  (rare crests / stops and problems / finished / everything else), and what the **daily summary** lists.
+**Settings tab**: **Start minimized to the tray**, **Start scripts when Rerun opens**, **Confirm before Stop All**
+  (the F12 hotkey and tray menu never ask), and a **Logging** group (what rerun.log records, file size, files kept,
+  lines in the Log tab). The window position and open tab are remembered (a position that is no longer on screen is ignored).
+**Templates tab**: **Suggest Crop** draws the box for the selected palace tile, quest row or Home button; press Save.
+- Defaults keep today's behaviour (all new limits are 0/off, all pings on).
+- NOT done: "keep farming after a rare crest" - the script keeps a crest by leaving the Equip Crest screen untouched and
+  stopping; how the game lets you keep one AND continue is unknown, so it could scrap a crest you wanted.
+- Tests: test_qol (5), test_limits (11), test_discord_settings (6), test_ui_options (10), test_capture_helper (5),
+  +6 in test_crest_home, +3 in test_crest_names. Not live-verified.
+
 ## Unreleased — Fix: the Log tab now shows lines logged before the window opened
 - Found in the final walkthrough: the Log tab started empty and only showed lines logged after the window
   existed, so start-up lines (including the new config warnings) never appeared. It now shows them once

@@ -12,7 +12,7 @@ class DashboardMixin:
     # ================================================================ dashboard
     def _build_dashboard(self):
         _, page, hdr = self._page("Dashboard", "Dashboard", "home")
-        ios.Button(hdr, "Stop All", self.stop_all, kind="tinted", color="red",
+        ios.Button(hdr, "Stop All", self.stop_all_clicked, kind="tinted", color="red",
                    icon="stop").pack(side="right", padx=(px(8), 0))
         ios.Button(hdr, "Start All", self.start_all, kind="tinted", icon="play").pack(side="right")
         # Countdown of the signed-in key's time left (empty when Rerun runs without a key check)
@@ -305,6 +305,15 @@ class DashboardMixin:
 
     def start_all(self):
         self.flash(" | ".join(self.m.start_all()))
+
+    def stop_all_clicked(self):
+        """The on-screen button: asks first when 'Confirm before Stop All' is on. The F12 hotkey and
+        the tray menu call stop_all() directly - an emergency stop never asks."""
+        running = [n for n, i in self.m.instances.items() if i.status in ("running", "paused", "starting")]
+        if running and (self.m.config.get("ui") or {}).get("confirm_stop_all") and not ios.confirm(
+                self, f"Stop {len(running)} running script(s)?", "Stop All", ok="Stop All", destructive=True):
+            return
+        self.stop_all()
 
     def stop_all(self):
         self.flash(" | ".join(self.m.stop_all()) or "Nothing running")

@@ -72,6 +72,8 @@ SETUP
    'Palace to farm' (a distinctive part of its name, read with the text reader). The quest is
    opened by its row picture (quest_list_entry, _2/_3/_4), else by 'Quest to farm', else - when
    the palace has exactly one quest - that quest. Settings > Setup check shows what is missing.
+   Useful extras: 'Palaces per weekday', 'Stop after N minutes / at HH:MM', 'Keep at least N energy',
+   'Max game restarts per day', and what to do if Home can't be reached (Settings tab).
    Turn off "Always start from the Home screen" to start from wherever the game is.
 
 CREST HANDLING

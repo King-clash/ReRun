@@ -60,6 +60,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "summary": {"enabled": True, "time": "21:00",   # daily Discord summary and what it lists
                 "include": {"runs": True, "crests": True, "refills": True, "problems": True}},
     "setup_seen": False,
+    # window and start-up behaviour (Settings > App)
+    "ui": {"geometry": "", "tab": 0, "start_minimized": False, "autostart": False,
+           "confirm_stop_all": False},
+    # rerun.log and the Log tab (Settings > Logging): file_level all | warnings | errors
+    "logging": {"file_level": "all", "file_mb": 1, "file_count": 3, "memory_lines": 3000},
     # Live View: frames per second of the emulator's video stream (rerun/live_stream.py);
     # 0 = the old screenshot preview (one frame every few seconds when idle)
     "live_view_fps": 30,
@@ -169,6 +174,7 @@ class Manager:
         for warning in check_config(raw, DEFAULT_CONFIG):
             self.log("app", warning, "warn")
         self.config = deep_merge(DEFAULT_CONFIG, raw)
+        self.apply_logging()
         if "instances" in raw:  # lists replace, not merge
             self.config["instances"] = raw["instances"]
         try:
@@ -252,9 +258,10 @@ class Manager:
         with self._lock:
             self.log_lines.append(line)
             self.log_entries.append(entry)
-            if len(self.log_lines) > LOG_KEEP + 500:  # trim in batches, not on every line
-                del self.log_lines[:-LOG_KEEP]
-                del self.log_entries[:-LOG_KEEP]
+            keep = self.log_keep()
+            if len(self.log_lines) > keep + 500:  # trim in batches, not on every line
+                del self.log_lines[:-keep]
+                del self.log_entries[:-keep]
         self.emit({"type": "log", **entry})
         runlog.write(instance, msg, level)
 
@@ -283,6 +290,21 @@ class Manager:
             elif key == "failures":
                 out["failures"] += v
         return out
+
+    def log_keep(self) -> int:
+        """Lines the Log tab keeps in memory (Settings > Logging), clamped to a sane range."""
+        try:
+            return max(500, min(int((self.config.get("logging") or {}).get("memory_lines", LOG_KEEP)), 20000))
+        except (TypeError, ValueError):
+            return LOG_KEEP
+
+    def apply_logging(self) -> None:
+        lg = self.config.get("logging") or {}
+        try:
+            runlog.configure(lg.get("file_mb", 1), lg.get("file_count", 3), lg.get("file_level", "all"))
+        except (TypeError, ValueError) as e:
+            errlog.note("manager.apply_logging", e)
+            runlog.configure()
 
     def _now(self) -> datetime:
         return datetime.now()          # a seam for tests (quiet hours)

@@ -866,6 +866,9 @@ class TabView(tk.Frame):
     def index(self) -> int | None:
         return self._index
 
+    def count(self) -> int:
+        return len(self._pages)
+
     def _paint(self):
         for j, (ic, lb) in enumerate(self._tabs):
             c = C["blue"] if j == self._index else C["tab_off"]

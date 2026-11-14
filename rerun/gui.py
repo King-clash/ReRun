@@ -23,6 +23,10 @@ class App(UpdatesKeysMixin, DashboardMixin, SettingsMixin, TemplatesMixin, Histo
         ios.init(self, str(self.m.config.get("appearance", "auto")))
         self.title("Rerun")
         self.geometry(f"{px(1220)}x{px(840)}")
+        saved = qol.clamp_geometry(str((self.m.config.get("ui") or {}).get("geometry") or ""),
+                                   self.winfo_screenwidth(), self.winfo_screenheight())
+        if saved:                      # where the window was last time (only if still on screen)
+            self.geometry(saved)
         self.minsize(px(1060), px(720))
         self._icon = ImageTk.PhotoImage(make_icon(64))
         self.iconphoto(True, self._icon)
@@ -76,6 +80,8 @@ class App(UpdatesKeysMixin, DashboardMixin, SettingsMixin, TemplatesMixin, Histo
         if self.m.config["discord"].get("enabled"):
             self.after(500, self.connect_discord)
         self.protocol("WM_DELETE_WINDOW", self.on_close)
+        self._restore_tab()
+        self._apply_start_options()
         self.after(4000, self._schedule_update_check)
 
     # small helpers --------------------------------------------------------
@@ -211,8 +217,51 @@ class App(UpdatesKeysMixin, DashboardMixin, SettingsMixin, TemplatesMixin, Histo
             self.show_window()
             self.quit_app()
 
+    # window memory and start-up options ------------------------------------------
+    def _restore_tab(self):
+        try:
+            tab = int((self.m.config.get("ui") or {}).get("tab") or 0)
+            if 0 < tab < self.nb.count():
+                self.nb.select(tab)
+        except (tk.TclError, TypeError, ValueError) as e:
+            errlog.note("gui.restore_tab", e)
+
+    def _save_ui_state(self):
+        """Remember the window position/size and the open tab for next time (normal windows only:
+        a minimised or hidden window reports a meaningless position)."""
+        try:
+            ui = self.m.config.setdefault("ui", {})
+            if self.state() == "normal":
+                ui["geometry"] = self.winfo_geometry()
+            ui["tab"] = int(self.nb.index() or 0)
+            self.m.save_config()
+        except (tk.TclError, OSError) as e:
+            errlog.note("gui.save_ui_state", e)
+
+    def _apply_start_options(self):
+        """'Start minimized to the tray' and 'Start scripts when Rerun opens' (both off by default).
+        Neither runs on a brand-new setup (before the first Setup check)."""
+        ui = self.m.config.get("ui") or {}
+        done = []
+        if not self.m.config.get("setup_seen"):
+            return done
+        if ui.get("start_minimized") and self._tray_on:
+            self.after(60, self.withdraw)
+            done.append("minimized")
+        if ui.get("autostart"):
+            self.after(6000, self._autostart)
+            done.append("autostart")
+        return done
+
+    def _autostart(self):
+        if not (self.m.config.get("ui") or {}).get("autostart"):
+            return
+        msgs = self.m.start_all()
+        self.m.log("app", "Start scripts when Rerun opens: " + (" | ".join(msgs) or "nothing to start"))
+
     def on_close(self):
         """The window's X: hide to the tray if that's on, otherwise quit."""
+        self._save_ui_state()
         if self._tray_on and self.close_to_tray.get():
             self.withdraw()
             if not self._tray_hinted:
@@ -226,6 +275,7 @@ class App(UpdatesKeysMixin, DashboardMixin, SettingsMixin, TemplatesMixin, Histo
         if running and not ios.confirm(self, "Scripts are still running. Stop them and quit?",
                                        "Quit Rerun?", ok="Stop & Quit", destructive=True):
             return
+        self._save_ui_state()
         if self._app_ready:   # a downloaded update: swap it in as Rerun closes
             return self._install_app(restart=False)
         self.m.stop_all()

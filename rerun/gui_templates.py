@@ -70,6 +70,7 @@ class TemplatesMixin:
         bot = tk.Frame(right, bg=C["bg"])
         bot.pack(fill="x", pady=(px(10), 0))
         ios.Button(bot, "Save Selection", self.tpl_save, icon="save").pack(side="left")
+        ios.Button(bot, "Suggest Crop", self.tpl_suggest, kind="tinted", icon="search").pack(side="left", padx=px(8))
         ios.Button(bot, "Test", self.tpl_test, kind="tinted", icon="search").pack(side="left", padx=px(8))
         ios.Button(bot, "Delete", self.tpl_delete, kind="tinted", color="red",
                    icon="delete").pack(side="left")
@@ -177,6 +178,45 @@ class TemplatesMixin:
         self.sel_rect = (min(x0, e.x), min(y0, e.y), max(x0, e.x), max(y0, e.y))
         self.tpl_canvas.delete("sel")
         self.tpl_canvas.create_rectangle(*self.sel_rect, outline=C["blue"], width=2, tags="sel")
+
+    def tpl_suggest(self):
+        """Draw the box for the selected template where it belongs (palace tile, quest row, Home
+        button) so only Save Selection is left to press. Uses the text reader for the first two."""
+        sel = self.tpl_tree.selection()
+        if self.tpl_img is None:
+            ios.alert(self, "Take a screenshot (or open an image) of the right screen first.")
+            return
+        if not sel:
+            ios.alert(self, "Pick a template on the left first, e.g. crest_palace_target or quest_list_entry.")
+            return
+        name = sel[0]
+        words = []
+        if name != "home_nav_button":
+            self.flash("Reading the screen…")
+            self.update_idletasks()
+            try:
+                from .ocr import get_ocr
+                words = get_ocr(self.m.config.get("tesseract_path", "auto")).screen_words(self.tpl_img, min_conf=40)
+            except Exception as e:  # noqa: BLE001 - no text reader: say so
+                errlog.note("gui.tpl_suggest", e)
+                ios.alert(self, f"This suggestion needs the text reader, which isn't available: {e}")
+                return
+        prefs = []
+        try:
+            cfg = self.m.script_settings(self.tpl_inst.get() or next(iter(self.m.instances), ""), "crest")
+            prefs = qol.split_names(str(cfg.get("palace_name") or ""))
+        except Exception as e:  # noqa: BLE001 - settings are optional here
+            errlog.note("gui.tpl_suggest.prefs", e)
+        found = textnav.suggest_crop(name, words, prefs)
+        if not found:
+            self.flash(f"No suggestion for '{name}' on this screen - drag the box yourself.", "warn")
+            return
+        (x, y, w, h), why = found
+        ih, iw = self.tpl_img.shape[:2]
+        fx, fy, s = iw / 720, ih / 1280, self.tpl_scale
+        self.sel_rect = (x * fx * s, y * fy * s, (x + w) * fx * s, (y + h) * fy * s)
+        self._draw_tpl_image()
+        self.flash(f"Suggested: {why}. Adjust the box if needed, then Save Selection.", "ok")
 
     def tpl_save(self):
         sel = self.tpl_tree.selection()
