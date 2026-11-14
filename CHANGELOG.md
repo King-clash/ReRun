@@ -6,6 +6,8 @@
   name after a clear match; otherwise a close match of the same element). Units the site doesn't
   list show no picture. Rows are taller (44 px); pictures are cached per name.
 - Checked on a copy of the live roster. Tests: test_app 5/5, test_units 18/18, gsc_app 16/16.
+- Installed 17:19 (exe only; 96 user files unchanged; no crash.log). Backup
+  `backups/preinstall_20261114_171901/`.
 
 ## 2026-11-14 — Units + Compendium merged; GS Companion inside Rerun; GS Companion names win
 - One **Units** tab (roster + Compendium): element, race, clears, target, progress,
