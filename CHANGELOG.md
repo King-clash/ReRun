@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-11-14 — Phase 6: Discord bot upgrade (BETA, not yet live-verified)
+- Alerts are embeds coloured by what happened (`alert_kind`): gold = Crest 4+ / Burst / hyper
+  rare, red = stopped / stuck / failed / out of energy / game message, green = finished /
+  counted / claimed, blue = other. Title, message, screenshot, instance and time; the daily
+  summary is a blue embed.
+- Buttons under every alert and status message: Stop, Resume (starts the instance's script
+  when it isn't paused), Screenshot, Start Crest. Handled in on_interaction by custom id
+  `rerun:<action>:<instance>`, so they keep working after a restart. Every press is checked
+  against discord.allowed_user_ids (refusals are answered privately and logged).
+- Live status board: one message per instance (pinned when the bot may pin), edited only when
+  something changed, at most once a minute: status, script, quest, mode, runs, energy, up time,
+  targets, last action, errors in 24 h. Message ids in discord_board.json (carried over by
+  updates). `discord.status_board: false` turns it off.
+- `/energy [instance]`: from the running script, else read from a screenshot
+  (`Manager.energy`).
+- Tests: tests/test_discord.py (5; fake interactions). 144/144 + gsc_app 16/16.
+- Not verified against the real Discord yet. allowed_user_ids is still empty in the user's
+  config, so every button is refused until an ID is added (Discord tab).
+
 ## 2026-11-14 — Updates keep your data
 - Replacing Rerun.exe in its folder always kept everything (data lives next to the exe; new
   settings are merged into config.yaml). A new copy started from another folder started empty.

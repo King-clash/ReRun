@@ -41,6 +41,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "channel_id": 0,
         "ping_user_id": 0,
         "allowed_user_ids": [],
+        "status_board": True,   # one pinned live-status message per instance
     },
     "hotkeys": {"stop_all": "f12", "pause_all": "f11"},
     "appearance": "auto",       # auto | light | dark
@@ -274,7 +275,31 @@ class Manager:
             if image is not None:
                 ok, buf = cv2.imencode(".png", image)
                 png = buf.tobytes() if ok else None
-            self.discord.send(f"[{instance}] {message}", png, ping)
+            if hasattr(self.discord, "alert"):
+                self.discord.alert(instance, message, png, ping)   # colour-coded embed + buttons
+            else:
+                self.discord.send(f"[{instance}] {message}", png, ping)
+
+    def energy(self, name: str, fresh: bool = False) -> tuple[int, int, float] | None:
+        """(current, max, when read) for an instance: what its running script last read,
+        else a cached reading; fresh=True reads it now from a screenshot (worker thread)."""
+        inst = self.instances.get(name)
+        if inst is None:
+            return None
+        cache = self.__dict__.setdefault("_energy", {})
+        e = inst.ctx.params.get("energy") if inst.ctx is not None else None
+        if e:
+            cache[name] = e
+            return e
+        if fresh:
+            try:
+                from .ocr import get_ocr, read_energy
+                r = read_energy(get_ocr(self.config.get("tesseract_path", "auto")), self.screenshot(name))
+            except Exception:  # noqa: BLE001 - no device / no OCR: unknown
+                r = None
+            if r:
+                cache[name] = (r[0], r[1], time.time())
+        return cache.get(name)
 
     def _set_status(self, inst: Instance, status: str, detail: str = "") -> None:
         inst.status = status

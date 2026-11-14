@@ -14,12 +14,22 @@ Slash commands (only users in discord.allowed_user_ids may use control commands)
   /crests  [instance]          4+ / Burst / Lv4 today, session, all-time, observed rates
   /units   [search]            unit roster from your scans (newest first)
   /compendium [search] [show]  quest clear targets, progress, change since the last scan
+  /energy  [instance]          energy of each instance
   /scripts                     list scripts
+
+Alerts are embeds: gold = Crest 4+ / Burst / rare drop, green = finished, red = needs you,
+with the screenshot and Stop / Resume / Screenshot / Start Crest buttons. A live status board
+(one pinned message per instance, edited about once a minute when something changed) shows
+status, script, quest, mode, runs, energy, targets, last action and errors
+(discord.status_board: false turns it off). Every button press and control command is
+checked against discord.allowed_user_ids.
 """
 from __future__ import annotations
 
 import asyncio
 import io
+import json
+import re
 import threading
 import time
 from typing import TYPE_CHECKING
@@ -39,6 +49,61 @@ except ImportError:  # pragma: no cover
 
 
 STATUS_ICON = {"idle": "⚪", "starting": "🟡", "running": "🟢", "paused": "🟠", "error": "🔴"}
+
+# Alert colours (Phase 6): gold = Crest 4+ / Burst (and other rare drops), green = finished,
+# red = a problem, blue = anything else.
+COLORS = {"gold": 0xF1C40F, "green": 0x2ECC71, "red": 0xE74C3C, "info": 0x3498DB}
+TITLES = {"gold": "Rare drop!", "green": "Finished", "red": "Needs attention", "info": "Rerun"}
+_GOLD = re.compile(r"burst|\b4\+|lv\s*4\+|hyper rare", re.I)
+_RED = re.compile(r"stopped|stuck|fail|couldn't|could not|crash|error|maintenance|no progress|"
+                  r"needs you|out of (energy|stamina|orbs)|wiped|not find|unexpected", re.I)
+_GREEN = re.compile(r"finished|complete|done|counted|reached|saved|claimed|summary|all clear", re.I)
+BOARD_EVERY_S = 60          # status board edit interval (well inside Discord's rate limits)
+ACTIONS = {"stop": "Stop", "resume": "Resume", "shot": "Screenshot", "crest": "Start Crest"}
+
+
+def alert_kind(message: str) -> str:
+    """gold | green | red | info for an alert text (rare drops win over 'stopped')."""
+    if _GOLD.search(message):
+        return "gold"
+    if _RED.search(message):
+        return "red"
+    if _GREEN.search(message):
+        return "green"
+    return "info"
+
+
+def board_fields(m: "Manager", name: str) -> list[tuple[str, str]]:
+    """What the live status board shows for one instance (plain text, testable)."""
+    inst = m.instances[name]
+    scripts = m.scripts_available()
+    stats = m.stats.get(name)
+    runs = stats.get(f"{inst.script}.runs", 0)
+    up = fmt_duration(m.stats.uptime(name)) if inst.status in ("running", "paused") else "-"
+    e = m.energy(name)
+    quest = ""
+    if inst.ctx is not None:
+        quest = str(inst.ctx.params.get("quest") or inst.ctx.params.get("palace") or "")
+    errors = sum(1 for x in m.history.recent(200, name) if x.get("kind") in ("failure", "error")
+                 and time.time() - x.get("t", 0) < 86400)
+    try:
+        mode = "24/7" if m.script_settings(name, inst.script).get("mode_247") else "normal"
+    except Exception:  # noqa: BLE001 - custom routines have no settings
+        mode = "normal"
+    out = [("Status", f"{STATUS_ICON.get(inst.status, '❔')} {inst.status}"),
+           ("Script", scripts.get(inst.script, inst.script)),
+           ("Quest", quest or "-"),
+           ("Mode", mode),
+           ("Runs", f"{runs:,}"),
+           ("Energy", f"{e[0]}/{e[1]}" if e else "-"),
+           ("Up", up)]
+    comp = getattr(m, "compendium", None)
+    if comp is not None and comp.r.units:
+        s = comp.summary()
+        out.append(("Targets", f"{s['done']} reached · {s['near']} near" if s["with_target"] else "none set"))
+    out.append(("Last action", (inst.detail or "-")[:200]))
+    out.append(("Errors (24 h)", str(errors)))
+    return out
 
 
 class DiscordBot:
@@ -88,15 +153,170 @@ class DiscordBot:
             return
         asyncio.run_coroutine_threadsafe(self._send(text, png, ping), self.loop)
 
+    async def _channel(self):
+        return self.client.get_channel(self.channel_id) or await self.client.fetch_channel(self.channel_id)
+
     async def _send(self, text: str, png: bytes | None, ping: bool) -> None:
+        """Plain messages (the daily summary): a blue embed."""
         try:
-            ch = self.client.get_channel(self.channel_id) or await self.client.fetch_channel(self.channel_id)
-            if ping and self.ping_user_id:
-                text = f"<@{self.ping_user_id}> {text}"
+            ch = await self._channel()
+            embed = discord.Embed(title="Daily summary" if "summary" in text.lower()[:60] else "Rerun",
+                                  description=text[:4000], color=COLORS["info"])
             file = discord.File(io.BytesIO(png), "screen.png") if png else None
-            await ch.send(text[:1900], file=file)
+            if file:
+                embed.set_image(url="attachment://screen.png")
+            await ch.send(content=f"<@{self.ping_user_id}>" if ping and self.ping_user_id else None,
+                          embed=embed, file=file)
         except Exception as e:  # noqa: BLE001
             self.m.log("discord", f"Could not send alert: {e}")
+
+    def alert(self, instance: str, message: str, png: bytes | None = None, ping: bool = False) -> None:
+        """Thread-safe: a colour-coded alert (gold / green / red) with control buttons."""
+        if not self.loop or not self.client or not self.ready.is_set():
+            return
+        asyncio.run_coroutine_threadsafe(self._alert(instance, message, png, ping), self.loop)
+
+    async def _alert(self, instance: str, message: str, png: bytes | None, ping: bool) -> None:
+        try:
+            ch = await self._channel()
+            kind = alert_kind(message)
+            embed = discord.Embed(title=TITLES[kind], description=message[:4000], color=COLORS[kind],
+                                  timestamp=discord.utils.utcnow())
+            embed.set_footer(text=instance)
+            file = discord.File(io.BytesIO(png), "screen.png") if png else None
+            if file:
+                embed.set_image(url="attachment://screen.png")
+            kw = {"embed": embed, "view": self.controls(instance)}
+            if file:
+                kw["file"] = file
+            if ping and self.ping_user_id:
+                kw["content"] = f"<@{self.ping_user_id}>"
+            await ch.send(**kw)
+        except Exception as e:  # noqa: BLE001
+            self.m.log("discord", f"Could not send alert: {e}")
+
+    # ------------------------------------------------------------ buttons
+    def controls(self, instance: str):
+        """Stop / Resume / Screenshot / Start Crest for one instance. The buttons carry
+        'rerun:<action>:<instance>' and are handled in on_interaction (so they keep working
+        after Rerun restarts). Must be built inside the bot's event loop."""
+        view = discord.ui.View(timeout=None)
+        style = {"stop": discord.ButtonStyle.danger, "resume": discord.ButtonStyle.success,
+                 "shot": discord.ButtonStyle.secondary, "crest": discord.ButtonStyle.primary}
+        for action, label in ACTIONS.items():
+            view.add_item(discord.ui.Button(label=label, style=style[action],
+                                            custom_id=f"rerun:{action}:{instance}"[:100]))
+        return view
+
+    async def on_button(self, inter) -> None:
+        """Every button press is checked against allowed_user_ids before anything happens."""
+        cid = (inter.data or {}).get("custom_id", "")
+        try:
+            _, action, instance = cid.split(":", 2)
+        except ValueError:
+            return
+        if inter.user.id not in self.allowed:
+            await inter.response.send_message(
+                "You are not allowed to control Rerun. Add your Discord user ID to "
+                "discord.allowed_user_ids (Rerun › Discord tab or config.yaml).", ephemeral=True)
+            self.m.log("discord", f"Refused button '{action}' from {inter.user} (not allowed)")
+            return
+        m = self.m
+        if instance not in m.instances:
+            await inter.response.send_message(f"No instance named '{instance}'", ephemeral=True)
+            return
+        if action == "shot":
+            await inter.response.defer(thinking=True)
+            try:
+                img = await asyncio.to_thread(m.screenshot, instance)
+                ok, buf = cv2.imencode(".png", img)
+                await inter.followup.send(f"{instance} now:",
+                                          file=discord.File(io.BytesIO(buf.tobytes()), "screen.png"))
+            except Exception as e:  # noqa: BLE001
+                await inter.followup.send(f"Screenshot failed: {e}")
+            return
+        if action == "stop":
+            msg = m.stop(instance)
+        elif action == "resume":
+            inst = m.instances[instance]
+            msg = m.resume(instance) if inst.status == "paused" else m.start(instance)
+        elif action == "crest":
+            msg = m.start(instance, "crest")
+        else:
+            return
+        m.log("discord", f"{inter.user} pressed {ACTIONS[action]} for {instance}: {msg}")
+        await inter.response.send_message(f"{ACTIONS[action]} → {msg}")
+        await self.update_board(force=True)
+
+    # ------------------------------------------------------------ live status board
+    @property
+    def _board_path(self):
+        return self.m.root / "discord_board.json"
+
+    def _board_ids(self) -> dict:
+        try:
+            d = json.loads(self._board_path.read_text(encoding="utf-8"))
+            return d.get(str(self.channel_id), {}) if isinstance(d, dict) else {}
+        except (OSError, ValueError):
+            return {}
+
+    def _save_board_ids(self, ids: dict) -> None:
+        try:
+            d = json.loads(self._board_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            d = {}
+        d[str(self.channel_id)] = ids
+        self._board_path.write_text(json.dumps(d, indent=1), encoding="utf-8")
+
+    def board_embed(self, name: str):
+        fields = board_fields(self.m, name)
+        status = self.m.instances[name].status
+        color = {"running": COLORS["green"], "paused": 0xE67E22, "error": COLORS["red"]}.get(status, 0x95A5A6)
+        e = discord.Embed(title=f"{name} - live status", color=color, timestamp=discord.utils.utcnow())
+        for k, v in fields:
+            e.add_field(name=k, value=v or "-", inline=k not in ("Last action",))
+        e.set_footer(text=f"Updated about every {BOARD_EVERY_S} s by Rerun")
+        return e
+
+    async def update_board(self, force: bool = False) -> None:
+        """One pinned message per instance, edited only when something changed."""
+        if not self.m.config["discord"].get("status_board", True):
+            return
+        ch = await self._channel()
+        ids = self._board_ids()
+        last = self.__dict__.setdefault("_board_last", {})
+        changed = False
+        for name in list(self.m.instances):
+            sig = repr(board_fields(self.m, name))
+            if not force and last.get(name) == sig and name in ids:
+                continue
+            embed = self.board_embed(name)
+            msg = None
+            if name in ids:
+                try:
+                    msg = await ch.fetch_message(int(ids[name]))
+                    await msg.edit(embed=embed, view=self.controls(name))
+                except Exception:  # noqa: BLE001 - deleted: post a new one
+                    msg = None
+            if msg is None:
+                msg = await ch.send(embed=embed, view=self.controls(name))
+                ids[name] = str(msg.id)
+                changed = True
+                try:
+                    await msg.pin()
+                except Exception:  # noqa: BLE001 - needs Manage Messages; the board works unpinned
+                    self.m.log("discord", "Status board: could not pin (give the bot Manage Messages)")
+            last[name] = sig
+        if changed:
+            self._save_board_ids(ids)
+
+    async def _board_loop(self) -> None:
+        while not self.client.is_closed():
+            try:
+                await self.update_board()
+            except Exception as e:  # noqa: BLE001 - keep the loop alive
+                self.m.log("discord", f"Status board update failed: {e}")
+            await asyncio.sleep(BOARD_EVERY_S)
 
     # ------------------------------------------------------------ commands
     def _build_client(self):
@@ -291,10 +511,40 @@ class DiscordBot:
                                   description=(head + "\n\n" + "\n".join(lines) + more)[:4000])
             await inter.response.send_message(embed=embed)
 
+        @tree.command(description="Energy of each instance (reads the screen of idle ones)")
+        @app_commands.autocomplete(instance=instance_ac)
+        async def energy(inter: discord.Interaction, instance: str | None = None):
+            await inter.response.defer()
+            names = [instance] if instance and instance != "all" else list(m.instances)
+            lines = []
+            for n in names:
+                if n not in m.instances:
+                    lines.append(f"**{n}**: no such instance")
+                    continue
+                e = await asyncio.to_thread(m.energy, n, True)
+                if e:
+                    age = int(time.time() - e[2]) if len(e) > 2 else 0
+                    when = "now" if age < 60 else f"{age // 60} min ago"
+                    lines.append(f"⚡ **{n}**: {e[0]}/{e[1]} ({when})")
+                else:
+                    lines.append(f"⚡ **{n}**: couldn't read it (is the game on a screen that shows energy?)")
+            embed = discord.Embed(title="Energy", description="\n".join(lines) or "No instances",
+                                  color=COLORS["info"])
+            await inter.followup.send(embed=embed)
+
         @tree.command(description="List available scripts")
         async def scripts(inter: discord.Interaction):
             lines = [f"`{k}` - {label}" for k, label in m.scripts_available().items()]
             await inter.response.send_message("\n".join(lines) or "No scripts")
+
+        @client.event
+        async def on_interaction(inter: discord.Interaction):
+            if inter.type == discord.InteractionType.component and \
+                    str((inter.data or {}).get("custom_id", "")).startswith("rerun:"):
+                try:
+                    await bot.on_button(inter)
+                except Exception as e:  # noqa: BLE001
+                    m.log("discord", f"Button failed: {e}")
 
         @client.event
         async def on_ready():
@@ -304,5 +554,7 @@ class DiscordBot:
                 m.log("discord", f"Could not register slash commands: {e}")
             bot.ready.set()
             m.log("discord", f"Discord bot online as {client.user}")
+            if not getattr(bot, "_board_task", None):
+                bot._board_task = asyncio.create_task(bot._board_loop())
 
         return client

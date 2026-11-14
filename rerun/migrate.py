@@ -26,7 +26,7 @@ from pathlib import Path
 
 # files / folders that are yours (never part of a download)
 USER_FILES = ["stats.json", "crest_log.jsonl", "license.json", "summary_state.json",
-              "compendium_report.csv"]
+              "compendium_report.csv", "discord_board.json"]
 USER_DIRS = ["history", "units", "crest_shots", "data"]
 # any of these means "this folder already has your data"
 MARKERS = ["stats.json", "crest_log.jsonl", "license.json", "history/history.jsonl",
