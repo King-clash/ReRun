@@ -21,7 +21,9 @@ SECRET_FILES = ("config.yaml", "stats.json", "crest_log.jsonl", "crash.log", "er
 
 
 def run(*cmd: str, check: bool = True, capture: bool = False) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, cwd=ROOT, check=check, text=True, capture_output=capture)
+    # stdin closed so tests/build can never swallow the confirmation prompt's input
+    return subprocess.run(cmd, cwd=ROOT, check=check, text=True, capture_output=capture,
+                          stdin=subprocess.DEVNULL)
 
 
 def out(*cmd: str) -> str:
