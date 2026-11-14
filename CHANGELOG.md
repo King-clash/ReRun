@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — Crest finds the palace and quest by name (BETA)
+- Palaces rotate and every quest looks different, so hand-captured tile/row pictures break.
+  New Crest settings **Palace to farm** and **Quest to farm** (names, optional). Pictures are still
+  tried first; when none matches, Crest reads the screen with the text reader (`rerun/textnav.py`)
+  and matches the distinctive words (tolerates banner text read partly: "Whirl." = Whirlwind).
+  A palace that isn't listed, or two palaces that match equally, stop with a message naming
+  what it can read (never a guess). With no quest name, a palace with exactly one quest opens it.
+- Settings > Setup check has a new line per Crest instance: "can start from the Home screen" or what is missing.
+- Real fixtures: tests/fixtures/crest_palace_list.png, quest_list_cursed_claw.png (live 2026-11-14).
+  tests/test_crest_names.py (9). Checked on the fixtures only: not live-verified with names.
+- Phase A: LF line endings (.gitattributes), BUILDS.md/builds.jsonl no longer tracked.
+
 ## 1.0.3 — Crest always starts from the Home screen (BETA, simulator-tested only)
 - Also: error.log for errors that used to be swallowed silently (rerun/errlog.py); tools/publish.py (tests, build --release, tag, GitHub release); run_tests.py; build/config/doc fixes.
 - New Crest setting **Always start from the Home screen** (`start_home`, default on). On Start the

@@ -137,7 +137,7 @@ def test_unrecognised_quest_row_stops_with_a_message_instead_of_sitting_silent()
     assert result == "finished: quest row not recognised", result
     assert dev.tapped == []
     assert any("quest_list_entry" in n and "Stopped" in n for n in ctx.notes), ctx.notes
-    assert any("none of my quest row pictures" in l for l in ctx.logs)
+    assert any("no quest row picture or name" in l for l in ctx.logs)
 
 
 def test_second_palaces_row_picture_is_used():

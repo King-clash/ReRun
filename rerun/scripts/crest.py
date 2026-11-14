@@ -21,6 +21,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from .. import textnav
 from .base import BASE_H, BASE_W, Finished, Setting, T, game_now
 from .loop_farm import LOOP_SETTINGS, LOOP_TEMPLATES, LoopFarmScript
 
@@ -66,8 +67,11 @@ SETUP
 2. In Settings choose the run count, party, and which crests to keep.
 3. Press Start. Rerun first gets the game to the Home screen (dismissing popups and
    pressing Back), then walks Exploring > Crest Palace > today's palace > quest.
-   Needs the templates exploring_button, crest_palace_icon, quest_list, quest_list_entry
-   and a palace tile (crest_palace_<day> or crest_palace_target) - see the Templates tab.
+   Needs the templates exploring_button, crest_palace_icon and quest_list, plus ONE of:
+   a palace tile picture (crest_palace_<day> or crest_palace_target) or the Crest setting
+   'Palace to farm' (a distinctive part of its name, read with the text reader). The quest is
+   opened by its row picture (quest_list_entry, _2/_3/_4), else by 'Quest to farm', else - when
+   the palace has exactly one quest - that quest. Settings > Setup check shows what is missing.
    Turn off "Always start from the Home screen" to start from wherever the game is.
 
 CREST HANDLING
@@ -97,6 +101,12 @@ CREST HANDLING
                 help="On Start: reach the Home screen first (closing popups, pressing Back), then "
                      "walk Exploring > Crest Palace > the palace tile > quest. Off: start from "
                      "whatever screen the game is on."),
+        Setting("palace_name", "Palace to farm (name, optional)", "text", "",
+                help="Fallback when no palace picture matches (palaces rotate). Type a distinctive "
+                     "part of the name, e.g. 'Cursed Claw'. Needs the text reader."),
+        Setting("quest_name", "Quest to farm (name, optional)", "text", "",
+                help="Fallback when no quest row picture matches, e.g. 'Experimental Scars'. "
+                     "Empty: if the palace has exactly one quest, that one is opened."),
         Setting("save_debug", "Save Equip Crest screenshots to debug_crest/", "bool", False),
     ]
     TEMPLATES = LOOP_TEMPLATES + [
@@ -178,18 +188,33 @@ CREST HANDLING
     def navigating(self) -> bool:
         return bool(self.cfg.get("mode_247")) or self.nav_active
 
-    def palace_tile_names(self) -> list[str]:
+    @staticmethod
+    def tile_names_today() -> list[str]:
         return [f"crest_palace_{WEEKDAYS[game_now().weekday()]}", "crest_palace_target"]
+
+    def palace_tile_names(self) -> list[str]:
+        return self.tile_names_today()
+
+    @classmethod
+    def nav_missing(cls, has, palace_name: str = "", ocr_ok: bool = True) -> list[str]:
+        """What the walk Home > Exploring > Crest Palace > palace > quest still needs.
+        `has(name)` says whether a template is captured. A palace/quest NAME (read with the text
+        reader) can stand in for the tile / row pictures."""
+        missing = [n for n in cls.HOME_NEEDS if not has(n)]
+        if not (has("crest_palace_icon") or has("crest_palace_icon2")):
+            missing.append("crest_palace_icon")
+        names = cls.tile_names_today()
+        if not any(has(n) for n in names) and not (palace_name.strip() and ocr_ok):
+            missing.append(f"crest_palace_target (or {names[0]}, or a 'Palace to farm' name"
+                           + ("" if ocr_ok else " - needs the text reader") + ")")
+        if not any(has(n) for n in cls.QUEST_ROW_NAMES) and not ocr_ok:
+            missing.append("quest_list_entry (or install the text reader)")
+        return missing
 
     def check_nav_templates(self) -> None:
         """Before touching the game: everything the walk to the quest needs is captured."""
-        missing = [n for n in self.HOME_NEEDS if not self.has_template(n)]
-        if not (self.has_template("crest_palace_icon") or self.has_template("crest_palace_icon2")):
-            missing.append("crest_palace_icon")
-        if not any(self.has_template(n) for n in self.QUEST_ROW_NAMES):
-            missing.append("quest_list_entry")
-        if not any(self.has_template(n) for n in self.palace_tile_names()):
-            missing.append("crest_palace_target (or " + self.palace_tile_names()[0] + ")")
+        missing = self.nav_missing(self.has_template, str(self.cfg.get("palace_name") or ""),
+                                   self.ocr is not None)
         if missing:
             self.notify(f"{self.NAME}: can't start from the Home screen - missing template(s): "
                         f"{', '.join(missing)}. Capture them in the Templates tab, or turn off "
@@ -512,15 +537,37 @@ CREST HANDLING
                 self.log(f"Quest list - opening the quest ({name})")
                 self.reset_party("new quest entry")
                 return
+        # No picture matched: read the list. A quest NAME wins; otherwise a list with exactly one
+        # quest is unambiguous.
+        words = self.ocr.screen_words(screen, min_conf=40) if self.ocr is not None else []
+        qn = str(self.cfg.get("quest_name") or "").strip()
+        target, why = None, ""
+        if words and qn:
+            hit = textnav.find_name(words, qn, (560, 1100))
+            if hit:
+                target, why = (300, hit.y), f"by name '{qn}'"
+        elif words:
+            rows = textnav.quest_rows(words)
+            if len(rows) == 1:
+                target, why = (300, rows[0]["y"]), f"the only quest on the list ('{rows[0]['title']}')"
+        if target:
+            self.quest_row_misses = 0
+            self.log(f"Quest list - opening the quest {why}")
+            self.tap(*target, settle=2)
+            self.reset_party("new quest entry")
+            return
         self.quest_row_misses = getattr(self, "quest_row_misses", 0) + 1
-        self.log("Quest list - none of my quest row pictures match this list "
+        self.log("Quest list - no quest row picture or name matches this list "
                  f"({self.quest_row_misses}/{self.QUEST_ROW_MISS_LIMIT})")
         if self.quest_row_misses >= self.QUEST_ROW_MISS_LIMIT:
             saved = self.save_frame("quest_row_missing", screen)
-            self.notify(f"{self.NAME}: reached the quest list but the quest to farm isn't recognised "
-                        "(its row doesn't match quest_list_entry - each palace's quest looks different). "
-                        "Capture the quest's title row in the Templates tab as quest_list_entry "
-                        "(or quest_list_entry2/3/4 for other palaces). Stopped."
+            titles = "; ".join(r["title"] for r in textnav.quest_rows(words)) if words else ""
+            self.notify(f"{self.NAME}: reached the quest list but couldn't tell which quest to farm "
+                        "(each palace's quest looks different, so a quest_list_entry picture from "
+                        "another palace never matches). "
+                        + (f"I can see: {titles}. " if titles else "")
+                        + "Set 'Quest to farm' in the Crest settings, or capture the quest's title row "
+                        "as quest_list_entry (quest_list_entry2/3/4 for other palaces). Stopped."
                         + (f" Frame saved to {saved}." if saved else ""))
             raise Finished("quest row not recognised")
 
@@ -545,5 +592,21 @@ CREST HANDLING
                 self.log(f"Opened palace ({name})")
                 self.palace = name
                 return
-        self.notify("Crest: on the Crest Palace screen but no palace tile template matched today. Stopped.")
+        name = str(self.cfg.get("palace_name") or "").strip()
+        words = self.ocr.screen_words(screen, min_conf=40) if self.ocr is not None else []
+        shown = textnav.sample_text(words, 300, 1000)
+        if name and words:
+            hit = textnav.find_name(words, name, (300, 1000))
+            if hit:
+                self.log(f"Opened palace by name '{name}' (read: {', '.join(hit.matched)})")
+                self.palace = f"name:{name}"
+                self.tap(hit.x, hit.y, settle=3)
+                return
+            self.notify(f"Crest: the palace '{name}' is not on the Crest Palace screen (palaces rotate), "
+                        "or two palaces look alike. " + (f"I can read: {shown}. " if shown else "")
+                        + "Change 'Palace to farm' or capture its tile. Stopped.")
+            raise Finished("palace not on the list")
+        self.notify("Crest: on the Crest Palace screen but no palace tile picture matched today and no "
+                    "'Palace to farm' name is set. " + (f"I can read: {shown}. " if shown else "")
+                    + "Capture crest_palace_target or set the name. Stopped.")
         raise Finished("palace not found")

@@ -74,8 +74,25 @@ def run_checks(m) -> list[Check]:
     try:
         exe, _ = find_tesseract(m.config.get("tesseract_path"))
         out.append(Check("Text reader (OCR)", True, str(exe)))
+        ocr_ok = True
     except OcrUnavailable as e:
         out.append(Check("Text reader (OCR)", False, str(e)))
+        ocr_ok = False
+    # 4b. Crest: can it start from the Home screen?
+    from .scripts.crest import CrestScript
+    for name, inst in m.instances.items():
+        if inst.script != "crest":
+            continue
+        cfg = m.script_settings(name, "crest")
+        if not cfg.get("start_home", True):
+            out.append(Check(f"{name}: Crest starts from wherever the game is", True,
+                             "'Always start from the Home screen' is off."))
+            continue
+        need = CrestScript.nav_missing(m.store.has, str(cfg.get("palace_name") or ""), ocr_ok)
+        out.append(Check(f"{name}: Crest can start from the Home screen", not need,
+                         "Ready: it walks Home > Exploring > Crest Palace > palace > quest." if not need
+                         else "Missing: " + ", ".join(need) + ". Capture it in the Templates tab, set "
+                              "'Palace to farm' in the Crest settings, or turn the setting off."))
     # 5. discord (only if turned on)
     d = m.config.get("discord", {})
     if d.get("enabled"):
