@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — Phase G: release tooling
+- `tools/publish.py`: fixed a defect (it wrote `__init__.py` through Python's text mode, turning its line endings
+  into CRLF on Windows); now needs a `## X.Y.Z` CHANGELOG heading and real notes (thin / "see changelog" / no
+  testing section are refused); refuses to push unless HEAD contains origin/main; **warns about other branches'
+  commits and other worktrees' uncommitted changes that the release would leave out** (the 1.0.2 mistake);
+  attaches SHA256SUMS.txt; `--draft` and `--dry-run`; re-reads the live release page and reports if it doesn't
+  match the notes or lacks the assets. tests/test_publish.py (7).
+- `license.json` added to the private files publish.py refuses to find tracked in git.
+- Not done: hosting the signed in-app updates (needs a host + you), code signing, marking v1.0.1/1.0.2 superseded.
+
 ## Unreleased — Phase F: structure (no behaviour change)
 - `rerun/gui.py` (2,419 lines) is split by tab into mixins: `gui_updates` (updates + key), `gui_dashboard`
   (+ Live View), `gui_settings` (+ setup check), `gui_templates`, `gui_history`, `gui_units`

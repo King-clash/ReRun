@@ -58,6 +58,16 @@ separate and stays off until `UPDATE_URL` is set.
 4. `py tools/publish.py X.Y.Z --push` - tests, `build.py --release` (clean zip), tag, push, GitHub release.
 5. Re-read the live release page. Never release from a feature branch or with uncommitted work.
 `BUILDS.md` / `builds.jsonl` are generated locally and git-ignored; line endings are LF (`.gitattributes`).
+`publish.py` now also: needs a `## X.Y.Z` heading in CHANGELOG.md and plain-language `release_notes/vX.Y.Z.md`,
+refuses to push unless HEAD contains `origin/main`, WARNS about other branches' commits and other worktrees'
+uncommitted edits that would be left out, attaches `SHA256SUMS.txt`, can create a `--draft` release, and
+re-reads the live release page afterwards. `--dry-run` runs only the checks.
+Version policy: PATCH (1.0.x) = fixes only, MINOR (1.x.0) = new features, MAJOR = breaking changes to config/data.
+`rerun/__init__.py`'s `__version__` is the only version; publish.py sets it.
+Not done yet (needs you): turn on in-app updates by hosting the signed manifest (`tools/publish_update.py` writes
+`updates_site/`; GitHub Pages for King-clash/ReRun would work) and setting `UPDATE_URL` in rerun/updates.py; Windows
+SmartScreen warns about unsigned exes (code signing costs money; the release notes should keep saying so).
+
 
 ## Completed
 - Phase 0: recovery, git baseline f4df578, backups, docs.
