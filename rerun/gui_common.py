@@ -15,7 +15,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageTk
 
-from . import __version__, errlog, ios, updates
+from . import __version__, errlog, ios, qol, updates
 from .adb import discover_bluestacks_instances
 from .appicon import make_icon
 from .ios import C, F, px
@@ -196,6 +196,7 @@ Only the user IDs you allowed can start, stop, reset stats or take screenshots.
 Alerts:  rare crests, Crest Bursts, hyper rare drops, failures, crashes and finished runs are posted to the alert channel, with a screenshot where useful, pinging the user ID above."""
 
 __all__ = [
+    "qol",
     "ADB_HELP",
     "ALL_INSTANCES",
     "APPEARANCE",

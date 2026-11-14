@@ -101,6 +101,14 @@ CREST HANDLING
                 help="On Start: reach the Home screen first (closing popups, pressing Back), then "
                      "walk Exploring > Crest Palace > the palace tile > quest. Off: start from "
                      "whatever screen the game is on."),
+        Setting("home_fail", "If it can't reach the Home screen", "choice", "Stop and tell me",
+                ["Stop and tell me", "Restart the game and try again", "Keep trying until I stop it"],
+                help="What 'start from Home' does when Home can't be reached in about two minutes. "
+                     "Restart: relaunches the game (up to 2 times, counted by 'Max game restarts per "
+                     "day') and tries again. Keep trying: never gives up; you get one message."),
+        Setting("allow_back", "Allow the Back key to get to Home", "bool", True,
+                help="Off: only closing pop-ups and the on-screen Home button are used. Pressing Back "
+                     "in the middle of a battle has not been tested on the real game."),
         Setting("palace_name", "Palaces to farm, in order of preference (optional)", "text", "",
                 help="Fallback when no palace picture matches (palaces rotate). Distinctive parts of "
                      "names separated by commas, best first: 'Cursed Claw, Whirlwind'. Crest opens the "
@@ -243,15 +251,51 @@ CREST HANDLING
         self.tap_match(m, settle=1.5)
         return True
 
+    HOME_FAIL_STOP, HOME_FAIL_RESTART, HOME_FAIL_KEEP = (
+        "Stop and tell me", "Restart the game and try again", "Keep trying until I stop it")
+    MAX_HOME_RESTARTS = 2
+    HOME_MAX_WAITS = 8      # with the Back key turned off there is nothing to press: wait briefly
+
     def go_home(self) -> None:
-        """Get the game to the Home screen from wherever it is: dismiss known popups with their
-        handlers, press Back on everything else, and stop (with a screenshot) if Home can't be
-        reached. Home must be lit - a popup over it dims the Exploring button."""
+        """Get the game to the Home screen from wherever it is (see _reach_home). If it can't, do
+        what 'If it can't reach the Home screen' says: stop (default), restart the game and try
+        again, or keep trying."""
         self.check_nav_templates()
         self.log("Getting to the Home screen first")
         if not self._game_running():
             self.recover_crash()  # relaunches in 24/7 mode, otherwise stops with a clear message
+        action = str(self.cfg.get("home_fail") or self.HOME_FAIL_STOP)
+        attempt = 0
+        while True:
+            if self._reach_home():
+                return
+            attempt += 1
+            saved = self.save_frame("no_home")
+            close = self.closest_screens(self.screen_img) if self.screen_img is not None else ""
+            what = (f"{self.NAME}: couldn't reach the Home screen from where the game is."
+                    + (f" Closest known screens: {close}." if close else "")
+                    + (f" Frame saved to {saved}." if saved else ""))
+            if action == self.HOME_FAIL_RESTART and attempt <= self.MAX_HOME_RESTARTS:
+                self.notify(f"{what} Restarting the game and trying again ({attempt}/{self.MAX_HOME_RESTARTS}).",
+                            ping=False)
+                self.restart_game()
+                self.sleep(15)          # the game needs a while to reach its title screen
+                continue
+            if action == self.HOME_FAIL_KEEP:
+                if attempt == 1:
+                    self.notify(f"{what} Still trying - stop the script when you want to give up.", ping=False)
+                self.sleep(10)
+                continue
+            self.notify(what + " Stopped.")
+            raise Finished("could not reach the Home screen")
+
+    def _reach_home(self) -> bool:
+        """One attempt (about two minutes): dismiss known popups with their handlers, tap the
+        on-screen Home button, else press Back (unless turned off). True once on the Home screen.
+        Home must be lit - a popup over it dims the Exploring button."""
         popups = {e[0] for e in self.COMMON_STATES} | {"ok_button", "crest_fragment", "select_crest_ok2"}
+        allow_back = bool(self.cfg.get("allow_back", True))
+        limit = self.HOME_MAX_BACKS if allow_back else self.HOME_MAX_WAITS
         end = time.monotonic() + self.HOME_TIMEOUT_S
         backs = home_taps = 0
         while time.monotonic() < end:
@@ -262,7 +306,7 @@ CREST HANDLING
                 self.state = state
                 self.log("On the Home screen")
                 self.progress()
-                return
+                return True
             if state in self.PENDING_CREST:
                 self.notify(f"{self.NAME}: the game is on a crest screen ({state}). Not leaving it "
                             "with Back in case that loses the crest - decide it yourself, then Start "
@@ -279,17 +323,15 @@ CREST HANDLING
                 self.log(f"Start: on '{state}' - tapped the Home button ({home_taps})")
             else:
                 backs += 1
-                if backs > self.HOME_MAX_BACKS:
+                if backs > limit:
                     break
-                self.log(f"Start: on '{state}' - pressing Back ({backs})")
-                self.ctx.device.back()
+                if allow_back:
+                    self.log(f"Start: on '{state}' - pressing Back ({backs})")
+                    self.ctx.device.back()
+                else:
+                    self.log(f"Start: on '{state}' - the Back key is turned off, waiting ({backs})")
             self.sleep(1.2)
-        saved = self.save_frame("no_home")
-        close = self.closest_screens(self.screen_img) if self.screen_img is not None else ""
-        self.notify(f"{self.NAME}: couldn't reach the Home screen from where the game is. Stopped."
-                    + (f" Closest known screens: {close}." if close else "")
-                    + (f" Frame saved to {saved}." if saved else ""))
-        raise Finished("could not reach the Home screen")
+        return False
 
     def handle_solo_quest_button(self, screen):
         self.nav_active = False  # the walk is over once a quest page is reached

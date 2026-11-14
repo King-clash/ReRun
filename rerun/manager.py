@@ -16,7 +16,7 @@ import yaml
 
 from .adb import AdbError, Device, find_adb
 from .engine import Context, RoutineError, Runner, StopRoutine, load_routines, templates_used
-from . import errlog, runlog
+from . import errlog, qol, runlog
 from .configcheck import check_config
 from .events import Event
 from .crest_stats import CrestLedger
@@ -45,6 +45,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "ping_user_id": 0,
         "allowed_user_ids": [],
         "status_board": True,   # one pinned live-status message per instance
+        # no @mentions between these times (alerts are still posted, silently)
+        "quiet": {"enabled": False, "start": "23:00", "end": "07:00"},
+        # which kinds of alert may @mention you: rare crests/Bursts (gold), stops and problems (red),
+        # finished runs (green), everything else
+        "ping": {"rare": True, "problem": True, "finished": True, "other": True},
     },
     "hotkeys": {"stop_all": "f12", "pause_all": "f11"},
     "appearance": "auto",       # auto | light | dark
@@ -52,7 +57,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "tesseract_path": "auto",   # OCR engine; auto = the copy ReStart ships, else a normal install
     # schedules[instance] = {"enabled": bool, "time": "HH:MM"} - start its script daily
     "schedules": {},
-    "summary": {"enabled": True, "time": "21:00"},  # daily Discord summary
+    "summary": {"enabled": True, "time": "21:00",   # daily Discord summary and what it lists
+                "include": {"runs": True, "crests": True, "refills": True, "problems": True}},
     "setup_seen": False,
     # Live View: frames per second of the emulator's video stream (rerun/live_stream.py);
     # 0 = the old screenshot preview (one frame every few seconds when idle)
@@ -278,9 +284,35 @@ class Manager:
                 out["failures"] += v
         return out
 
+    def _now(self) -> datetime:
+        return datetime.now()          # a seam for tests (quiet hours)
+
+    def effective_ping(self, message: str, ping: bool) -> tuple[bool, str]:
+        """(should the alert @mention you, why not): applies 'Ping me for' and quiet hours on top of
+        whatever the script asked for."""
+        if not ping:
+            return False, ""
+        d = self.config.get("discord") or {}
+        try:
+            from .discord_bot import alert_kind
+            kind = alert_kind(message)
+        except Exception as e:  # noqa: BLE001 - classification is a nicety: unknown = 'info'
+            errlog.note("manager.alert_kind", e)
+            kind = "info"
+        if not qol.ping_allowed(kind, d.get("ping")):
+            return False, "this kind of alert is switched off in 'Ping me for'"
+        q = d.get("quiet") or {}
+        if q.get("enabled") and qol.in_quiet_hours(self._now(), str(q.get("start") or ""),
+                                                   str(q.get("end") or "")):
+            return False, f"quiet hours ({q.get('start')}-{q.get('end')})"
+        return True, ""
+
     def notify(self, instance: str, message: str, image: np.ndarray | None = None,
                ping: bool = False) -> None:
         self.log(instance, f"NOTIFY: {message}")
+        ping, skipped = self.effective_ping(message, ping) if ping else (False, "")
+        if skipped:
+            self.log(instance, f"(no Discord @mention: {skipped})")
         self.emit({"type": "notify", "instance": instance, "message": message})
         if self.discord:
             png = None
@@ -549,12 +581,14 @@ class Manager:
             refills = sum(1 for e in recent if e["kind"] == "energy" and "Used" in e["detail"])
             problems = [e["detail"] for e in recent if e["kind"] in ("failure", "popup")
                         or e.get("action") == "stopped"]
-            lines.append(f"\n**{name}** - {max(0, runs)} run(s), {fmt_duration(max(0, seconds))} farming")
-            if kept or scrapped:
+            inc = (self.config.get("summary") or {}).get("include") or {}
+            lines.append(f"\n**{name}**" + (f" - {max(0, runs)} run(s), {fmt_duration(max(0, seconds))} farming"
+                                           if inc.get("runs", True) else ""))
+            if (kept or scrapped) and inc.get("crests", True):
                 lines.append(f"Crests: {kept} kept, {scrapped} scrapped")
-            if refills:
+            if refills and inc.get("refills", True):
                 lines.append(f"Energy refills: {refills}")
-            if problems:
+            if problems and inc.get("problems", True):
                 lines.append(f"Problems ({len(problems)}): " + "; ".join(problems[:3]))
         if update_baseline:
             import json

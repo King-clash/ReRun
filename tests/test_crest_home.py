@@ -229,6 +229,92 @@ def test_real_home_button_found_when_lit_and_ignored_when_dimmed():
             assert dev.taps[0] == (60, 1215), dev.taps
 
 
+def _stuck_game(settings, launch_goes_home=False, stop_after_backs=None):
+    """A game that never reaches Home by itself ('mystery' screen, Back does nothing)."""
+    fast()
+    dev = Sim(screens(), "mystery", TAPS)
+    dev.back_presses, dev.launches = 0, 0
+    holder = {}
+
+    def back(self):
+        self.back_presses += 1
+        if stop_after_backs and self.back_presses >= stop_after_backs:
+            holder["ctx"].stop_event.set()
+    dev.back = back.__get__(dev)
+
+    def launch():
+        dev.launches += 1
+        if launch_goes_home:
+            dev.go("home")
+    dev.launch_game = launch
+    dev.stop_game = lambda: None
+    orig = Sim.tap
+
+    def tap(self, x, y):
+        orig(self, x, y)
+        if self.tapped[-1] == "solo_quest_button":
+            holder["ctx"].stop_event.set()
+    dev.tap = tap.__get__(dev)
+    ctx = make_ctx(Path(tempfile.mkdtemp()), dev, CrestScript)
+    holder["ctx"] = ctx
+    s = CrestScript(ctx, settings)
+    return run(s), dev, ctx
+
+
+def test_home_fail_restart_relaunches_the_game_and_carries_on():
+    result, dev, ctx = _stuck_game({"home_fail": "Restart the game and try again"}, launch_goes_home=True)
+    assert dev.launches == 1 and "solo_quest_button" in dev.tapped, (dev.launches, dev.tapped, result)
+    assert any("Restarting the game and trying again (1/2)" in n for n in ctx.notes), ctx.notes
+
+
+def test_home_fail_restart_gives_up_after_two_restarts():
+    result, dev, ctx = _stuck_game({"home_fail": "Restart the game and try again"})
+    assert result == "finished: could not reach the Home screen", result
+    assert dev.launches == CrestScript.MAX_HOME_RESTARTS, dev.launches
+    assert ctx.notes[-1].endswith("Stopped."), ctx.notes
+
+
+def test_home_restarts_count_against_the_daily_restart_cap():
+    result, dev, ctx = _stuck_game({"home_fail": "Restart the game and try again", "max_restarts_per_day": 1})
+    assert result.startswith("finished: restart limit reached"), result
+    assert dev.launches == 1, dev.launches
+
+
+def test_home_fail_keep_trying_never_gives_up_until_stopped():
+    result, dev, ctx = _stuck_game({"home_fail": "Keep trying until I stop it"}, stop_after_backs=75)
+    assert result == "stopped: stopped by user", result
+    assert dev.back_presses >= 75 and dev.launches == 0
+    assert sum("Still trying" in n for n in ctx.notes) == 1, ctx.notes            # one message, not a flood
+
+
+def test_back_key_turned_off_never_presses_back():
+    result, dev, ctx = _stuck_game({"allow_back": False})
+    assert dev.back_presses == 0, dev.back_presses
+    assert result == "finished: could not reach the Home screen", result
+    assert any("Back key is turned off" in l for l in ctx.logs), ctx.logs
+
+
+def test_back_key_turned_off_still_uses_popups_and_the_home_button():
+    fast()
+    scr = screens()
+    scr["party"] = Screen([("battle_button", 500, 960), ("home_nav_button", 20, 1160)])
+    dev = Sim(scr, "popup", {**TAPS, ("party", "home_nav_button"): "home"})
+    dev.back_presses = 0
+    dev.back = (lambda self: setattr(self, "back_presses", self.back_presses + 1)).__get__(dev)
+    holder = {}
+    orig = Sim.tap
+
+    def tap(self, x, y):
+        orig(self, x, y)
+        if self.tapped[-1] == "solo_quest_button":
+            holder["ctx"].stop_event.set()
+    dev.tap = tap.__get__(dev)
+    ctx = make_ctx(Path(tempfile.mkdtemp()), dev, CrestScript)
+    holder["ctx"] = ctx
+    run(CrestScript(ctx, {"allow_back": False}))
+    assert dev.tapped[:2] == ["xpop_up", "home_nav_button"] and dev.back_presses == 0, (dev.tapped, dev.back_presses)
+
+
 def test_dimmed_home_is_not_the_home_screen():
     """A popup over Home dims the Exploring button: Crest must not count that as Home."""
     import cv2

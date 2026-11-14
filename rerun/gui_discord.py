@@ -59,6 +59,37 @@ class DiscordMixin:
         ios.Switch(gsum.row("Post a daily summary"), self.sum_on).pack()
         self.sum_time = tk.StringVar(value=str(summ.get("time", "21:00")))
         ios.Field(gsum.row("At (24-hour HH:MM)"), self.sum_time, width=6, justify="right").pack()
+        inc = summ.get("include") or {}
+        self.sum_inc = {}
+        for key, label in (("runs", "Runs and time farming"), ("crests", "Crests kept and scrapped"),
+                           ("refills", "Energy refills"), ("problems", "Problems")):
+            self.sum_inc[key] = tk.BooleanVar(value=bool(inc.get(key, True)))
+            ios.Switch(gsum.row(f"Include: {label}"), self.sum_inc[key]).pack()
+
+        quiet = cfg.get("quiet") or {}
+        gq = ios.Group(wrap, header="Quiet Hours",
+                       footer="Between these times alerts are still posted, but without @mentioning you. "
+                              "The window may cross midnight (23:00 to 07:00).")
+        gq.pack(fill="x", pady=(px(24), 0))
+        self.quiet_on = tk.BooleanVar(value=bool(quiet.get("enabled")))
+        ios.Switch(gq.row("No pings during quiet hours"), self.quiet_on).pack()
+        self.quiet_start = tk.StringVar(value=str(quiet.get("start", "23:00")))
+        ios.Field(gq.row("From (24-hour HH:MM)"), self.quiet_start, width=6, justify="right").pack()
+        self.quiet_end = tk.StringVar(value=str(quiet.get("end", "07:00")))
+        ios.Field(gq.row("Until (24-hour HH:MM)"), self.quiet_end, width=6, justify="right").pack()
+
+        pings = cfg.get("ping") or {}
+        gp = ios.Group(wrap, header="Ping Me For",
+                       footer="Switch off the kinds you only want to read, not be mentioned for. "
+                              "Alerts are posted either way.")
+        gp.pack(fill="x", pady=(px(24), 0))
+        self.ping_vars = {}
+        for key, label, sub in (("rare", "Rare crests", "Crest 4+, Crest Burst, hyper rare drops"),
+                                ("problem", "Stops and problems", "Stuck, failed, out of energy, game messages"),
+                                ("finished", "Finished runs", "Run counts reached, mailbox claimed"),
+                                ("other", "Everything else", None)):
+            self.ping_vars[key] = tk.BooleanVar(value=bool(pings.get(key, True)))
+            ios.Switch(gp.row(label, sub), self.ping_vars[key]).pack()
 
         ios.section_header(wrap, "Setup Guide", pady=(px(28), px(6)))
         gc = ios.Card(wrap)
@@ -96,7 +127,14 @@ class DiscordMixin:
         if not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", t):
             ios.alert(self, "Write the summary time as HH:MM, e.g. 21:00.", "Daily Summary")
             return
-        self.m.config["summary"] = {"enabled": bool(self.sum_on.get()), "time": t}
+        qs, qe = self.quiet_start.get().strip(), self.quiet_end.get().strip()
+        if self.quiet_on.get() and not (qol.parse_hhmm(qs) and qol.parse_hhmm(qe)):
+            ios.alert(self, "Write the quiet hours as HH:MM (24-hour), e.g. 23:00 and 07:00.", "Quiet Hours")
+            return
+        cfg["quiet"] = {"enabled": bool(self.quiet_on.get()), "start": qs or "23:00", "end": qe or "07:00"}
+        cfg["ping"] = {k: bool(v.get()) for k, v in self.ping_vars.items()}
+        self.m.config["summary"] = {"enabled": bool(self.sum_on.get()), "time": t,
+                                    "include": {k: bool(v.get()) for k, v in self.sum_inc.items()}}
         self.m.save_config()
         self.connect_discord()
 
