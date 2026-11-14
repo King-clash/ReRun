@@ -2,7 +2,7 @@
 
 Steps: check the tree is clean and no secrets are tracked -> run all tests -> bump
 rerun/__init__.py -> build Rerun.exe -> zip it -> commit "Release vX" and tag vX.
-With --push (asks to confirm): push the branch and tag, then create the GitHub release
+With --push (asks to confirm): push HEAD to origin/main and the tag, then create the GitHub release
 with the zip attached (needs the GitHub CLI `gh`, signed in).
 
 Nothing is pushed without --push AND a typed 'yes'. Needs a git remote named origin."""
@@ -16,6 +16,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 INIT = ROOT / "rerun" / "__init__.py"
+RELEASE_BRANCH = "main"  # what gets pushed to origin, whichever branch you run this from
 SECRET_FILES = ("config.yaml", "stats.json", "crest_log.jsonl", "crash.log", "error.log")
 
 
@@ -77,11 +78,11 @@ def main() -> int:
     remote = run("git", "remote", "get-url", "origin", check=False, capture=True)
     if remote.returncode != 0:
         die("no git remote 'origin' - add one first")
-    branch = out("git", "branch", "--show-current")
+    branch = RELEASE_BRANCH
     if input(f"Push {branch} + {tag} to {remote.stdout.strip()} and create the release? Type 'yes': ") != "yes":
         print("Cancelled; the local commit and tag remain.")
         return 0
-    run("git", "push", "origin", branch)
+    run("git", "push", "origin", f"HEAD:refs/heads/{branch}")
     run("git", "push", "origin", tag)
     if shutil.which("gh") is None:
         print(f"Pushed. 'gh' is not installed, so create the release by hand and attach {zip_path}")
