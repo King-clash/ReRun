@@ -13,7 +13,7 @@ something you can check.
 | Tests | 18 suites, all pass, about 3–4 minutes (`py run_tests.py`). **No CI** (no `.github/`), so PR #1 showed "no checks" |
 | Biggest files | `rerun/gui.py` 2,419 lines, `gsc_app/page.py` 2,204, `rerun/ios.py` 995 |
 | Broad `except Exception` | 58 across `rerun/` and `gsc_app/` (5 silent ones already routed to `error.log`) |
-| Scripts | 188 templates; 11 scripts still marked BETA (arena, chain, compendium counter, GC area, grand crusade, helper rewards, mines, multi farm, queue, raids, secret equip) |
+| Scripts | 189 templates; 13 scripts still marked BETA (arena, chain, compendium counter, GC area, grand crusade, helper rewards, mines, multi farm, queue, raid guest/host/tickets, secret equip) |
 | Release zip | 90 MB (includes bundled Tesseract); `release/Rerun` 107 MB |
 | Branches | `main`, `feat/new-app-icon`, `data/gscompanion`, `release/1.0.3`, `publish/1.0.3`, `claude/folder-optimization-review-…` — all merged into `main` except the two local commits above |
 | Live-verified | Crest from Home (Home > Exploring > Crest Palace > Cursed Claw > quest > farming), Past Party, Units scan, Live View 30 fps, Discord embeds |
@@ -152,8 +152,7 @@ Tasks
    bottom bar).
 4. **Feed scripts from the live stream** when Live View is on: one capture path instead of two.
    Gate on measurement; fall back to screencap on any stream gap.
-5. **Release size:** the 90 MB zip is mostly Tesseract (`eng.traineddata` 29 MB). Try the "fast"
-   tessdata model; keep it only if `test_ocr` accuracy on the energy and crest-title fixtures is unchanged.
+5. **Release size:** (measured later: the text-reader model is only 4 MB; the zip is dominated by OpenCV/numpy inside `Rerun.exe` - see PERFORMANCE_NOTES.md, nothing to shrink safely.)
 6. Idle CPU of the GUI (dashboard timers, Live View redraw) — profile with the window open and idle.
 
 Verify: before/after table in `BENCHMARKS.md`; every optimisation keeps all suites green and
@@ -227,6 +226,21 @@ Needs from you: confirm GitHub Pages hosting; your signing key stays untouched (
 | H Features | open-ended | all | yes |
 
 Recommended: A, then B and D side by side (they touch different files), then C, G, E, F, H.
+
+---
+
+## Outcome (work done 2026-11-14/15 on branch `improvements/phases-a-h`, local only)
+
+| Phase | Done | Not done / needs you |
+|---|---|---|
+| A Git hygiene | LF everywhere (`.gitattributes`), build log untracked, release steps documented | pushing the local commits, switching your primary folder to `main`, deleting merged branches (outward-facing: your go-ahead) |
+| B Crest by name | `textnav.py`, Palace/Quest name settings, lone-quest auto-open, Setup-check line, real fixtures + 9 tests | live run with names only; capture-helper button; a screenshot of another palace |
+| C Reliability | Home-button-first navigation, `rerun.log`, session summaries, closest-screens in stuck reports, error audit tool + 9 silent handlers routed to `error.log` | live test of the Home button and of Back from a battle |
+| D Tests/CI | parallel runner (225 s -> 63 s), ruff, GitHub Actions workflow | the workflow has never run on GitHub; branch protection (your GitHub settings) |
+| E Performance | `tools/bench.py`, measurements; no change justified | stream-fed capture and shorter TICK (need live testing) |
+| F Structure | `gui.py` split into 8 tab mixins (ast-verified identical), typed events, config check | `gsc_app/page.py` split (separate app) |
+| G Releases | safer `publish.py` (LF fix, guards, SHA256SUMS, draft, page check), version policy | hosting signed updates (UPDATE_URL), code signing, superseding v1.0.1/1.0.2 |
+| H Backlog | `tools/beta_report.py` -> `BETA_CHECKLISTS.md` (13 BETA scripts, 1 missing required picture) | every live verification and new feature in the list |
 
 ---
 

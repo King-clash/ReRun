@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — Phase H: backlog triage
+- `tools/beta_report.py` -> `BETA_CHECKLISTS.md`: for the 13 scripts that never ran on the real game, which pictures
+  are captured/missing (only `raid_ticket_target` of Raid Tickets lacks a required one) and one live-check procedure.
+- IMPROVEMENT_PLAN.md has an Outcome table; live verification and new features stay with you.
+
 ## Unreleased — Phase G: release tooling
 - `tools/publish.py`: fixed a defect (it wrote `__init__.py` through Python's text mode, turning its line endings
   into CRLF on Windows); now needs a `## X.Y.Z` CHANGELOG heading and real notes (thin / "see changelog" / no
