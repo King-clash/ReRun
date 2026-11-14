@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — Phase F: structure (no behaviour change)
+- `rerun/gui.py` (2,419 lines) is split by tab into mixins: `gui_updates` (updates + key), `gui_dashboard`
+  (+ Live View), `gui_settings` (+ setup check), `gui_templates`, `gui_history`, `gui_units`
+  (+ Companion), `gui_discord`, `gui_log`; shared imports/constants/widgets in `gui_common`;
+  `gui.py` keeps `App` (core: start-up, event loop, tray, closing) and `run_app` (275 lines).
+  A pure move: all 128 `App` members, every helper class and every constant have identical
+  syntax trees before and after (checked with `ast`), all suites pass, lint is clean.
+- `rerun/events.py`: the four events `Manager.emit` sends (log, status, notify, history) as typed
+  dicts + `problems()`; `Manager.emit` is typed; test checks every emitted event.
+- `rerun/configcheck.py`: config.yaml is checked against the defaults when it loads; unknown keys and
+  wrong value types are written to the Log tab as warnings (nothing is changed or rejected).
+  Both real configs on this PC check clean. tests/test_events_config.py (4).
+- Not done on purpose: splitting `gsc_app/page.py` (a separate app, another session's work) and removing
+  the old `party` setting migration (users upgrading from old configs still need it).
+
 ## Unreleased — Phase D: tests and CI
 - `run_tests.py` runs suites in parallel (`--jobs`, default 4) with a timing table: 63 s instead of ~225 s
   (3 runs in a row, all 20 suites pass). `--ci` skips suites needing a real Tesseract.

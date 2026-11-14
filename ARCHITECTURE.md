@@ -21,7 +21,13 @@ templates/              ReStart-compatible template PNGs + _meta.json (threshold
 routines/               user YAML routines (rerun/engine.py)
 tests/                  script-style suites (run all: py run_tests.py) + fixtures/ (real 720x1280 game screenshots)
 rerun/
-  gui.py                App(tk.Tk): pages Dashboard, Settings, Templates, History, Discord, Log
+  gui.py                App(...mixins, tk.Tk): core (start-up, event loop, tray, closing) + run_app
+  gui_<tab>.py          one mixin per tab: gui_updates (updates+key), gui_dashboard (+Live View), gui_settings
+                        (+setup check), gui_templates, gui_history, gui_units (+Companion), gui_discord, gui_log;
+                        gui_common holds the shared imports, constants and small widgets
+  events.py             typed shape of the events Manager.emit sends; configcheck.py warns about bad config keys
+  textnav.py            find palace / quest names on screen from OCR words (Crest fallback)
+  runlog.py             persistent rerun.log (rotated)
   ios.py                iOS-style widget kit (Card, switches, alerts, tab bar, toasts, light/dark)
   manager.py            Manager: config, instances, start/stop/pause/resume, worker threads,
                         events (emit/listeners), notify, scheduler, daily summary

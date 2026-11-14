@@ -17,6 +17,8 @@ import yaml
 from .adb import AdbError, Device, find_adb
 from .engine import Context, RoutineError, Runner, StopRoutine, load_routines, templates_used
 from . import errlog, runlog
+from .configcheck import check_config
+from .events import Event
 from .crest_stats import CrestLedger
 from .history import History
 from .compendium import Compendium
@@ -158,6 +160,8 @@ class Manager:
         if not self.config_path.exists():
             self.save_config(DEFAULT_CONFIG)
         raw = yaml.safe_load(self.config_path.read_text(encoding="utf-8")) or {}
+        for warning in check_config(raw, DEFAULT_CONFIG):
+            self.log("app", warning, "warn")
         self.config = deep_merge(DEFAULT_CONFIG, raw)
         if "instances" in raw:  # lists replace, not merge
             self.config["instances"] = raw["instances"]
@@ -228,7 +232,7 @@ class Manager:
         return find_adb(self.config.get("adb_path"))
 
     # ------------------------------------------------------------ events
-    def emit(self, event: dict) -> None:
+    def emit(self, event: Event) -> None:
         for fn in list(self.listeners):
             try:
                 fn(event)
