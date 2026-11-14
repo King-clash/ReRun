@@ -24,6 +24,10 @@
 - build.py: gsc_app modules in the exe; local data/gscompanion (not raw/) copied next to it.
 - Tests: tests/test_reference_names.py (5); gsc_app hookup test now drives the real App
   both ways. 118/118 + gsc_app 16/16.
+- Installed 17:11 after the user quit Rerun: exe + new data/gscompanion (577 files) next to it;
+  95 user files unchanged before launch. On start the app renamed 89 units (units/renames.jsonl),
+  11 names still uncertain; no crash.log. Backup `backups/preinstall_20261114_171145/`
+  (roster before the renames).
 
 ## 2026-11-14 — Phase 4: Compendium (BETA)
 - `rerun/compendium.py`: quest clear targets per unit and a global target (units/targets.json),

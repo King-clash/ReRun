@@ -29,6 +29,8 @@ ways. GS Companion unit names take priority over OCR names on a clear match (use
 overrides the brief's "never overwrite" for names read by OCR; manual names/fields are never
 touched). Data stays local: data/gscompanion (git-ignored), copied next to the exe by build.py.
 The installed app needs that folder next to Rerun.exe for the tab and the names.
+Installed 17:11 (83b5283): 89 units renamed on start, 11 uncertain; backup
+backups/preinstall_20261114_171145 holds the roster before the renames.
 
 ## Completed
 - Phase 0: recovery, git baseline f4df578, backups, docs.
