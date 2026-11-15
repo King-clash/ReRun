@@ -78,7 +78,7 @@ Minimum window size is now 1060x800 (the warning and account strip need the room
 ## Known gaps
 
 * Nothing in this release has been run against the real game; the screens it relies on are only the ones with fixtures.
-* No screen readers for tickets, name, inventory or task screens. Gems/gold/Rank are Beta (see above).
+* No screen readers for Alch (stored under the old key tickets), name, inventory or task screens. Gems/gold/Rank are Beta (see above).
 * Account switching inside one emulator.
 * Discord slash commands are not account-aware yet (alerts are).
 * Ambiguous history: when two accounts are linked to the same emulator, crests logged *before* sessions were recorded

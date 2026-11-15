@@ -41,7 +41,7 @@ FIELDS: dict[str, tuple[str, str, tuple | None, str]] = {
     "energy_max":    ("Max energy", "int", (1, 99999), "Energy"),
     "gems":          ("Gems", "int", (0, 10_000_000), "Currency"),
     "gold":          ("Gold", "int", (0, 10**12), "Currency"),
-    "tickets":       ("Tickets", "int", (0, 1_000_000), "Currency"),
+    "tickets":       ("Alch", "int", (0, 1_000_000), "Currency"),
     "summon_tickets": ("Summon tickets", "int", (0, 1_000_000), "Currency"),
     "raid_tickets":  ("Raid tickets", "int", (0, 1_000_000), "Currency"),
 }
@@ -56,7 +56,7 @@ SCAN_SUPPORT = {
     "player_name": ("unsupported", "No reader yet - needs a screenshot of the profile screen."),
     "gems": ("beta", "Top bar. Voting reader, never wrong on the real screens it was checked on (one account); sometimes unsure."),
     "gold": ("beta", "Top bar. Checked only against a capped 999,999,999 balance, so small amounts are untested."),
-    "tickets": ("unsupported", "No reader yet - needs a screenshot of the screen that shows tickets."),
+    "tickets": ("unsupported", "No reader yet - needs a screenshot of the screen that shows Alch."),
     "summon_tickets": ("unsupported", "No reader yet."),
     "raid_tickets": ("unsupported", "No reader yet."),
     "inventory": ("unsupported", "No inventory reader. Crests found while farming are logged; the rest is manual."),

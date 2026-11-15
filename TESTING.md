@@ -25,6 +25,7 @@ py tests/test_discord_settings.py  # quiet hours, ping kinds, summary contents
 py tests/test_ui_options.py   # window memory, start options, Stop All confirm, logging
 py tests/test_capture_helper.py  # Suggest Crop on the Templates tab
 py tests/test_accounts.py     # Account Manager data, checklist resets, goals, vault, safety, Manager glue
+py tests/test_scanning.py     # every scanning path: readers on all real screens, fake-emulator scans, locks, isolation
 py tests/test_accounts_gui.py # both workspaces: every section draws, forms, isolation, ToS warning
 py tests/test_qol.py          # pure helpers (times, name lists, window position)
 py tests/test_errlog.py       # quiet-failure error.log

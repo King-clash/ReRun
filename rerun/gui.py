@@ -146,6 +146,8 @@ class App(AccountsMixin, AccountsMoreMixin, FarmingMixin, UpdatesKeysMixin, Dash
                     ios.alert(self, ev["message"], "Something Went Wrong")
                 elif t == "_alert":
                     ios.alert(self, ev["message"], ev.get("title", "Rerun"))
+                elif t == "_scan_done":
+                    self._am_scan_done(ev["message"], ev["kind"])
                 elif t == "_setup":
                     self._show_setup_results(ev["checks"])
                 elif t == "_update":

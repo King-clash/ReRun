@@ -7,7 +7,7 @@
 - Existing data is untouched: the first account ("Main") keeps your current unit roster; everything new lives in `accounts/`.
 - Scanning reads energy, **gems, gold and Rank (player level)** from the top bar (Beta: checked on real screens from one account, never wrong, skips a dimmed bar).
 - Not built: readers for tickets/name/inventory screens, automatic account switching, account-aware Discord slash commands.
-- Tests: test_accounts (20), test_accounts_gui (7).
+- Tests: test_accounts (22), test_accounts_gui (7), test_scanning (8).
 
 ## 1.1.2 — Smaller exe, capped debug folder (not released yet)
 - `Rerun.exe` 78.7 -> 74.4 MB: Pillow's unused AVIF plugin is left out of the build. The exe starts and responds (checked by launching the built file).

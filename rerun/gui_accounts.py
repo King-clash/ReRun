@@ -230,7 +230,7 @@ class AccountsMixin:
         card(0, "Energy", "energy", en_val, (f"{STATUS_PILL[e['status']][0]} · {ago(e['t'])}\nRefill: {self.ops.energy_refill(aid)}" if e else "Not recorded"))
         card(1, "Gems", "gems")
         card(2, "Gold", "gold")
-        card(3, "Tickets", "tickets")
+        card(3, "Alch", "tickets")
         if e:
             bar = ios.ProgressBar(p, color="green" if not mx or e["value"] / max(1, mx["value"]) > 0.25 else "orange")
             bar.pack(fill="x", pady=(px(8), 0))
@@ -318,7 +318,7 @@ class AccountsMixin:
                 msg, kind = str(e), "error"
             except Exception as e:  # noqa: BLE001
                 msg, kind = f"Scan failed: {e}", "error"
-            self.after(0, lambda: self._am_scan_done(msg, kind))
+            self.events.put({"type": "_scan_done", "message": msg, "kind": kind})      # back to the GUI thread
         threading.Thread(target=work, daemon=True, name="account-scan").start()
 
     def _am_scan_done(self, msg: str, kind: str):
