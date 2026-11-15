@@ -590,14 +590,14 @@ def test_rerun_hookup_on_a_copy():
                 p.show_view('Units'); app.update()
                 assert len(p._rows) > 400
                 # Rerun Units -> Companion
-                app.nb.select(4); app.refresh_units(); app.update()
+                app.nb.select(app._tab_accounts); app._am_nav.select('units'); app.refresh_units(); app.update()
                 app.units_tree.selection_set('Clyde'); app.units_gsc(); app.update()
                 assert app.nb.index() == app._tab_companion and p._shown[1]['name'] == 'Clyde'
                 assert 'Clyde' in p.my.scanned() and p.my.roster_of['Clyde'] == 'Clyde'
                 assert '12 quest clears' in p.rerun.unit_line('Clyde')
                 # Companion -> Rerun Units
                 assert p.rerun.show_unit('Clyde'); app.update()
-                assert app.nb.index() == 4 and app.units_tree.selection() == ('Clyde',)
+                assert app.nb.index() == app._tab_accounts and app._am_nav.current == 'units' and app.units_tree.selection() == ('Clyde',)
                 # a target set in Rerun shows in the Companion panel
                 m.compendium.set_target('Clyde', 20); app._companion_refresh(); app.update()
                 assert 'target 20' in p.rerun.unit_line('Clyde')
@@ -605,7 +605,7 @@ def test_rerun_hookup_on_a_copy():
             app.after(300, step)
             app.after(30000, app.destroy)
             app.mainloop()
-            assert not errors, errors
+            assert not errors, [''.join(__import__('traceback').format_exception(*e)) for e in errors]
             print('HOOKUP OK')
         """) % (tmp, tmp)
         r = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True,

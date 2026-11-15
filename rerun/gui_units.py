@@ -302,7 +302,8 @@ class UnitsMixin:
         self.units_el.set("All elements")
         self.comp_show.set("All units")
         self.refresh_units()
-        self.nb.select(4)
+        self.nb.select(self._tab_accounts)          # Units live inside the Account Manager now
+        self._am_nav.select("units")
         if self.units_tree.exists(name):
             self.units_tree.selection_set(name)
             self.units_tree.see(name)
