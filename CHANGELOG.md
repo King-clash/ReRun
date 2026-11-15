@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.1 — GS Companion update merged
+- GS Companion: Bosses & Events page, Quests/Crests/Units areas, Team & Damage calculator, updater for boss/equipment/calc data (from the stages-layout session).
+- Fix: the Companion's "show in Units" selects the Units section inside Account Manager (it used a fixed tab number the 1.2.0 layout had changed).
+- Tests: 31 Rerun suites + 21 Companion tests pass.
+
 ## 1.2.0 — Account Manager + Macro Farming workspaces (BETA; simulator + fixtures only, see ACCOUNT_MANAGER.md)
 - **Account Manager** (first tab): several accounts, each with its own values, checklist, goals, crest vault, events, unit roster, safety and Discord settings. Values keep where they came from (manual / scanned / unverified); a scan never overwrites with an uncertain reading. Daily/weekly checklist on the game clock (6 AM UTC-6), goals with explained suggestions, Crest Vault with keep/review/duplicate/discard *advice only*, events with Discord reminders, per-account reports.
 - **Macro Farming** (second tab): the Dashboard, routine settings and History moved in here, plus a routines catalogue, **Dry Run** (lists what would be tapped, taps nothing), per-account session history, session/daily limits, an always-visible Terms-of-Service warning and **Emergency Stop**.
