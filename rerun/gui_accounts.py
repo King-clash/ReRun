@@ -311,7 +311,7 @@ class AccountsMixin:
 
         def work():
             try:
-                rep = self.ops.scan_energy(aid)
+                rep = self.ops.scan_screen(aid)
                 msg, kind = (f"Scan: {len(rep['detected'])} value(s) read, {len(rep['uncertain'])} uncertain, "
                              f"{len(rep['missing'])} not found", "ok" if rep["detected"] else "warn")
             except AccountError as e:
@@ -330,7 +330,7 @@ class AccountsMixin:
         aid = a["id"]
         right = self._am_title(p, "Scanning", "Rerun reads what it has been tested to read, keeps the last reliable value if a "
                                               "reading fails, and never replaces a value with an uncertain one.")
-        ios.Button(right, "Scan energy now", lambda: self.am_scan(aid), icon="sync", small=True).pack(side="right")
+        ios.Button(right, "Scan top bar now", lambda: self.am_scan(aid), icon="sync", small=True).pack(side="right")
         ios.Button(right, "Scan units", lambda: self.am_scan_units(a), kind="tinted", icon="people", small=True).pack(side="right", padx=(0, px(8)))
         body = self._am_card(p, "What can be scanned")
         for key, (level, note) in SCAN_SUPPORT.items():

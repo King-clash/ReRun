@@ -35,7 +35,8 @@ Any Quest and Crest share the loop-farm base. They stay separate until each has 
 | Validation (ranges, whole numbers, energy <= max, readable messages) | Done and tested |
 | Scan: energy and max energy from the emulator; uncertain readings parked, last reliable value kept, scan history, last successful scan | Done and tested (reader itself was verified earlier on real screens) |
 | Scan: unit roster | Existing Compendium Counter (BETA), started from the Scanning page |
-| Scan: player level/name, gems, gold, tickets, inventory, task screens | **Not built** - no reader exists; marked "Not supported yet"; enter by hand. Needs screenshots of those screens |
+| Scan: gems, gold, Rank (= player level) from the top bar (`ocr.read_header`, voting reader like energy; skips a dimmed bar) | Done and tested on the 26 real screens that show the bar: never wrong, reads 3/3 values on 12 of them. **One account only**; gold was only seen at the 999,999,999 cap, so small balances are untested - marked Beta |
+| Scan: player name, tickets, summon/raid tickets, inventory, task screens | **Not built** - no reader; marked "Not supported yet"; enter by hand. Needs screenshots of those screens (the name uses a symbol font Tesseract cannot be trusted with) |
 | Dashboard: energy, refill estimate (only if you set minutes per point), currencies, checklist, goals, farming, 4 charts, recent changes | Done and tested; charts use recorded data only |
 | Checklist: daily/weekly, game-clock resets, manual done/undo, priorities, custom tasks, states (completed / not yet verified / in progress / failed / available), duplicate-run prevention, history | Done and tested |
 | Checklist automation: Login reward -> Login & Mail (verified script), Raid tickets -> Raid Tickets (BETA, asks first) | Done and tested against the simulator; a script's "done" stays *Not yet verified* until you confirm |
@@ -77,7 +78,7 @@ Minimum window size is now 1060x800 (the warning and account strip need the room
 ## Known gaps
 
 * Nothing in this release has been run against the real game; the screens it relies on are only the ones with fixtures.
-* No screen readers for gems, gold, tickets, level, name, inventory or task screens.
+* No screen readers for tickets, name, inventory or task screens. Gems/gold/Rank are Beta (see above).
 * Account switching inside one emulator.
 * Discord slash commands are not account-aware yet (alerts are).
 * Ambiguous history: when two accounts are linked to the same emulator, crests logged *before* sessions were recorded

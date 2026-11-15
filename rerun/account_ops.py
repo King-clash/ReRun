@@ -181,8 +181,9 @@ class AccountOps:
         return msg
 
     # ------------------------------------------------------------------ scanning
-    def scan_energy(self, aid: str) -> dict:
-        """Read energy from the emulator linked to this account and store it with its provenance."""
+    def scan_screen(self, aid: str) -> dict:
+        """Read the top bar (energy, gold, gems, Rank) from the emulator linked to this account and store each
+        value with its provenance. Needs a normal screen with the bar at full brightness."""
         a = self.store.get(aid)
         inst = a["instance"]
         unsupported = [k for k, v in SCAN_SUPPORT.items() if v[0] == "unsupported"]
@@ -192,14 +193,18 @@ class AccountOps:
             raise AccountError("Several accounts share this emulator. Make this account the active one, "
                                "and make sure it is the account open in the game, before scanning.")
         try:
-            from .ocr import get_ocr, read_energy
+            from .ocr import get_ocr, read_energy, read_header
             shot = self.m.screenshot(inst)
-            r = read_energy(get_ocr(self.m.config.get("tesseract_path", "auto")), shot)
+            ocr = get_ocr(self.m.config.get("tesseract_path", "auto"))
+            r = read_energy(ocr, shot)
+            head = read_header(ocr, shot)
         except Exception as e:  # noqa: BLE001 - no device / no OCR: report, change nothing
             self.store.log_activity(aid, "scan", f"Energy scan failed: {e}")
             raise AccountError(f"Could not scan: {e}") from e
         readings = {"energy": (r[0], 90.0), "energy_max": (r[1], 90.0)} if r else {}
-        return self.store.record_scan(aid, readings, "energy bar (scan)", expected=["energy", "energy_max"],
+        readings.update(head)
+        return self.store.record_scan(aid, readings, "top bar (scan)",
+                                      expected=["energy", "energy_max", "gold", "gems", "player_level"],
                                       unsupported=unsupported)
 
     # ------------------------------------------------------------------ dashboard numbers

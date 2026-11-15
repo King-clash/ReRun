@@ -5,7 +5,8 @@
 - **Macro Farming** (second tab): the Dashboard, routine settings and History moved in here, plus a routines catalogue, **Dry Run** (lists what would be tapped, taps nothing), per-account session history, session/daily limits, an always-visible Terms-of-Service warning and **Emergency Stop**.
 - The old *Settings* tab now holds only app-wide settings; per-routine settings are under Macro Farming > Routine settings. Minimum window height 800.
 - Existing data is untouched: the first account ("Main") keeps your current unit roster; everything new lives in `accounts/`.
-- Not built: readers for gems/gold/tickets/level/inventory screens, automatic account switching, account-aware Discord slash commands.
+- Scanning reads energy, **gems, gold and Rank (player level)** from the top bar (Beta: checked on real screens from one account, never wrong, skips a dimmed bar).
+- Not built: readers for tickets/name/inventory screens, automatic account switching, account-aware Discord slash commands.
 - Tests: test_accounts (20), test_accounts_gui (7).
 
 ## 1.1.2 — Smaller exe, capped debug folder (not released yet)

@@ -239,3 +239,38 @@ def get_ocr(configured: str | None = None) -> Ocr:
     if key not in _shared:
         _shared[key] = Ocr(configured)
     return _shared[key]
+
+
+# Top bar numbers (every normal screen shows it): gold, gems and Rank (= player level). The font is stylised, so,
+# like energy, several settings vote and a value counts only when at least HEADER_MIN_VOTES agree and it leads.
+# Checked on the 26 real screens in tests/fixtures that show the bar; a dimmed bar (a popup is open) is not read.
+HEADER_REGIONS = {"gold": (462, 66, 140, 40), "gems": (640, 66, 75, 40), "player_level": (4, 146, 70, 34)}
+HEADER_SETTINGS = [(v, s) for v in ("otsu", "bright", "gray") for s in (2.0, 3.0)]
+HEADER_MIN_VOTES = 3
+
+
+def header_visible(screen: np.ndarray) -> bool:
+    """True when the top bar is shown at full brightness (not covered by a popup or the battle screen)."""
+    if screen is None or screen.shape[0] < 120:
+        return False
+    gray = cv2.cvtColor(screen[60:110, 440:710], cv2.COLOR_BGR2GRAY)
+    return bool(np.percentile(gray, 99) >= 215)
+
+
+def read_header(ocr: "Ocr", screen: np.ndarray) -> dict[str, tuple[int, float]]:
+    """{'gold'|'gems'|'player_level': (value, confidence)} for the numbers that were read with agreement.
+    Missing keys mean 'not sure'; nothing is ever guessed."""
+    from collections import Counter
+    out: dict[str, tuple[int, float]] = {}
+    if not header_visible(screen):
+        return out
+    for key, (x, y, w, h) in HEADER_REGIONS.items():
+        votes: Counter = Counter()
+        for variant, scale in HEADER_SETTINGS:
+            n = ocr.read_number(screen[y:y + h, x:x + w], variants=(variant,), scale=scale)
+            if n is not None:
+                votes[n] += 1
+        top = votes.most_common(2)
+        if top and top[0][1] >= HEADER_MIN_VOTES and (len(top) == 1 or top[0][1] > top[1][1]):
+            out[key] = (top[0][0], float(min(95, 70 + 5 * top[0][1])))
+    return out

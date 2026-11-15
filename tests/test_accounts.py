@@ -520,6 +520,65 @@ def test_session_limit_stops_the_run():
         shutil.rmtree(root, ignore_errors=True)
 
 
+def test_top_bar_reader_is_never_wrong_on_real_screens_and_skips_dimmed_bars():
+    import glob
+
+    import cv2
+
+    from rerun.ocr import OcrUnavailable, get_ocr, read_header
+    try:
+        o = get_ocr(None)
+    except OcrUnavailable:
+        return
+    fx = ROOT / "tests" / "fixtures"
+    allowed = {"gold": {999999999}, "gems": {184, 186, 111}, "player_level": {435}}   # read off the screens by eye
+    read_some = 0
+    for f in sorted(glob.glob(str(fx / "*.png"))):
+        img = cv2.imread(f)
+        if img is None or img.shape[:2] != (1280, 720):
+            continue
+        got = read_header(o, img)
+        for k, (v, conf) in got.items():
+            assert v in allowed[k], (Path(f).name, k, v)
+            assert conf >= 60
+        read_some += bool(got)
+    assert read_some >= 10, read_some
+    home = read_header(o, cv2.imread(str(fx / "home.png")))
+    assert {k: v[0] for k, v in home.items()} == {"gold": 999999999, "gems": 184, "player_level": 435}
+    assert read_header(o, cv2.imread(str(fx / "auto_loop_one.png"))) == {}, "a dimmed bar must not be read"
+    assert read_header(o, cv2.imread(str(fx / "unit_profile_ira.png"))) == {}, "no bar on this screen"
+    units = read_header(o, cv2.imread(str(fx / "units_grid_dark.png")))
+    assert units["gems"][0] == 186
+
+
+def test_scan_screen_stores_top_bar_values_for_the_linked_account():
+    import cv2
+    from rerun.adb import FakeDevice
+    from rerun.ocr import OcrUnavailable, get_ocr
+    try:
+        get_ocr(None)
+    except OcrUnavailable:
+        return
+    root, m = make_manager()
+    try:
+        inst = next(iter(m.instances))
+        m.instances[inst].device = FakeDevice([cv2.imread(str(ROOT / "tests" / "fixtures" / "home.png"))])
+        aid = m.ops.store.active_id
+        m.ops.store.update(aid, instance=inst)
+        rep = m.ops.scan_screen(aid)
+        st = m.ops.store
+        assert st.value(aid, "gems") == 184 and st.value(aid, "gold") == 999999999 and st.value(aid, "player_level") == 435
+        assert st.value(aid, "energy") == 383 and st.value(aid, "energy_max") == 517
+        assert st.field(aid, "gems")["status"] == "ocr" and not rep["missing"], rep
+        assert "tickets" in rep["unsupported"], "tickets still have no reader"
+        # a dimmed screen changes nothing and says what was not found
+        m.instances[inst].device = FakeDevice([cv2.imread(str(ROOT / "tests" / "fixtures" / "auto_loop_one.png"))])
+        rep = m.ops.scan_screen(aid)
+        assert st.value(aid, "gems") == 184 and "gems" in rep["missing"]
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failed = 0
