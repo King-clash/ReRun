@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — Account Manager + Macro Farming workspaces (BETA; simulator + fixtures only, see ACCOUNT_MANAGER.md)
+## 1.2.0 — Account Manager + Macro Farming workspaces (BETA; simulator + fixtures only, see ACCOUNT_MANAGER.md)
 - **Account Manager** (first tab): several accounts, each with its own values, checklist, goals, crest vault, events, unit roster, safety and Discord settings. Values keep where they came from (manual / scanned / unverified); a scan never overwrites with an uncertain reading. Daily/weekly checklist on the game clock (6 AM UTC-6), goals with explained suggestions, Crest Vault with keep/review/duplicate/discard *advice only*, events with Discord reminders, per-account reports.
 - **Macro Farming** (second tab): the Dashboard, routine settings and History moved in here, plus a routines catalogue, **Dry Run** (lists what would be tapped, taps nothing), per-account session history, session/daily limits, an always-visible Terms-of-Service warning and **Emergency Stop**.
 - The old *Settings* tab now holds only app-wide settings; per-routine settings are under Macro Farming > Routine settings. Minimum window height 800.
@@ -9,7 +9,7 @@
 - Not built: readers for tickets/name/inventory screens, automatic account switching, account-aware Discord slash commands.
 - Tests: test_accounts (22), test_accounts_gui (7), test_scanning (8).
 
-## 1.1.2 — Smaller exe, capped debug folder (not released yet)
+### Also in 1.2.0 — smaller exe, capped debug folder
 - `Rerun.exe` 78.7 -> 74.4 MB: Pillow's unused AVIF plugin is left out of the build. The exe starts and responds (checked by launching the built file).
 - `debug/` keeps only the newest 60 saved screenshots (about 1 MB each); it used to grow forever. tests/test_debug_prune.py (2).
 - Speed: not changed on purpose. A farming tick is dominated by the ADB screenshot (~200 ms) and the 0.8 s pause; see PERFORMANCE_NOTES.md.
