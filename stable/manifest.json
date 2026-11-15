@@ -1,0 +1,2124 @@
+{
+ "app": {
+  "file": "app/Rerun-1.2.1.exe",
+  "notes": "GS Companion update and a Units link fix. See the 1.2.1 release notes.",
+  "published": "2026-11-15",
+  "sha256": "a2ebbb2cbf07c2aca3ab9222838c08e405e7509e9c5ed341af34fa3533f8334c",
+  "size": 74681183,
+  "version": "1.2.1"
+ },
+ "channel": "stable",
+ "content": {
+  "files": {
+   "routines/README.md": {
+    "sha256": "9740455d090dc48fac7e157661e4f860bafcd9b9ca89e9ce6b1d28021fb057cc",
+    "size": 1876
+   },
+   "routines/example_tap_through.yaml": {
+    "sha256": "85726be2004b1cbb21ce58bb0d4ae351e6bd9febe2a4e4730aa69ec09e9477ce",
+    "size": 379
+   },
+   "templates/apply_button.png": {
+    "sha256": "1938240fdf4114bd6f190592280d4d773e704b34276e847a17c10e66362b9feb",
+    "size": 4695
+   },
+   "templates/arena_battle_button.png": {
+    "sha256": "4f8878b45304851cd387779c39e6fc0f00963f1def901cad886c07f5c918948d",
+    "size": 24485
+   },
+   "templates/arena_find_battle.png": {
+    "sha256": "3bb6710bef5cd4b4cd804d7aa9eca1adbc9279676412d9e000df229527d68cae",
+    "size": 65420
+   },
+   "templates/arena_home_button.png": {
+    "sha256": "22996b5502abd7f83b76857b41972f235a72dfd83cc614d59fb3b1922fe58f12",
+    "size": 37497
+   },
+   "templates/arena_match_results.png": {
+    "sha256": "8f7262d74baaa473d076dcf1f2997691307467a18a92bd7bb54c23aac987a330",
+    "size": 37779
+   },
+   "templates/arena_no_orbs_cancel.png": {
+    "sha256": "6a071c47959834620dcea4ca6fafa7a847a2d66b67e982c531b02bab297bac02",
+    "size": 10624
+   },
+   "templates/arena_ok_button.png": {
+    "sha256": "dc92cd96343356b8753b9e5f65400ad1f2af8352cbfd86507442844cadb34418",
+    "size": 4280
+   },
+   "templates/arena_ready.png": {
+    "sha256": "c4ebc36c41fdf70ae1edbae34991fa14b2b439d7fa5d948671568012a919b733",
+    "size": 35718
+   },
+   "templates/arena_restore_all.png": {
+    "sha256": "162614ab5433f9684933bd01fdfff01e26ce42f3aecce9088da88698d5830af8",
+    "size": 9842
+   },
+   "templates/arena_vs_screen.png": {
+    "sha256": "afd86b13eec436174c56fdb6b24d8abb8cced3aaf74ce33da85223c26b4df566",
+    "size": 93383
+   },
+   "templates/arena_win_fighter.png": {
+    "sha256": "b7809e78c28fea57472784e369e71000af7c2227c0bfc38dde51dd9ee8020b27",
+    "size": 74439
+   },
+   "templates/arena_win_master.png": {
+    "sha256": "6e4f5d25c717ad4b56bae3ea12f3b0109a7b4de5980fbf5acfba7c792de8383f",
+    "size": 75689
+   },
+   "templates/auto_button.png": {
+    "sha256": "101b63e56512e0ff9b34c445fc839ea1e8eed3a84437f12741f9236c93062e42",
+    "size": 2261
+   },
+   "templates/auto_loop_title.png": {
+    "sha256": "3bcc54c8b85e35cbca684eeb100f65ac7d5ee60b4903cf1c9d90030ab6bb810d",
+    "size": 15794
+   },
+   "templates/battle_button.png": {
+    "sha256": "558eb50a341092edb87566cccdaf66ad725fc5b40d8a050ace68186eb560bd33",
+    "size": 9722
+   },
+   "templates/cancel_btn.png": {
+    "sha256": "ef11717b874b4bcbf91526515cdacdc3083bb31c2e634e604bb190f47fc3ce56",
+    "size": 5900
+   },
+   "templates/challenge_button.png": {
+    "sha256": "8146872177cfdb781a8f6cc287cba3d93d5817b14befabb33f676beb759846b9",
+    "size": 5480
+   },
+   "templates/claim_all_button.png": {
+    "sha256": "4c54d585048d07754fdb5740f114660a027a119ac55468d393dd07f03b1a3f9f",
+    "size": 6691
+   },
+   "templates/claim_all_button_dim.png": {
+    "sha256": "91ee1f79ad8e6f00ed1e682dde39958c2f3f170b59d04ab2d894e4942ec3219b",
+    "size": 5862
+   },
+   "templates/claim_ok_button.png": {
+    "sha256": "e826349f9325fbf482b8d2e368193db5a496aec4f98b9cb82a4855590a86ac6f",
+    "size": 4163
+   },
+   "templates/compendium_card_lv.png": {
+    "sha256": "1b1d256843e6a0fd6c0a22db4f2ef5e9614ed0ebaa3a52fc37f906dcd4a379d3",
+    "size": 1121
+   },
+   "templates/compendium_card_lv_rainbow.png": {
+    "sha256": "6110877fdadb5b8df51bb8facf059e0a50f37dbe42a9d840bfa1e0da394a64df",
+    "size": 1175
+   },
+   "templates/compendium_detail_marker.png": {
+    "sha256": "80a8a102c8a17db13c3bb7fc1322daa20b7dc546e3655c22205fa9bd89f66840",
+    "size": 6083
+   },
+   "templates/compendium_grid_header.png": {
+    "sha256": "498ebf26549e8b85a88a4954d56744dabcc62cceb35e99f53fe23982b2e5de6d",
+    "size": 4717
+   },
+   "templates/continue_box.png": {
+    "sha256": "f597f120ef145eb3987678fa373c897077698c2751da2eb188c4009c88d3a171",
+    "size": 10252
+   },
+   "templates/crest_checkbox.png": {
+    "sha256": "0cf65d3dff0a39174c9deb2d5007164636cc7e9290648025f43fcb028f3c3974",
+    "size": 3153
+   },
+   "templates/crest_fragment.png": {
+    "sha256": "1c04f1cc5ba3198f4d68e2e4083bcaf2aebb9b42a77e5cd84cb3e5849434dd87",
+    "size": 9906
+   },
+   "templates/crest_fragment_ok.png": {
+    "sha256": "389fb9f56973417224441b1634aa22f53b187a4e97691e434bdf838e2035339b",
+    "size": 2611
+   },
+   "templates/crest_icon_lv3.png": {
+    "sha256": "454ad5d507076d48f4439860cb7efa03110dd53cbed7d403876a9ee1f7383499",
+    "size": 3710
+   },
+   "templates/crest_icon_lv3plus.png": {
+    "sha256": "46a32383a627f400350a8348cd081eada44e8be7a2274902862ffb3f4df0abf2",
+    "size": 4028
+   },
+   "templates/crest_icon_lv4.png": {
+    "sha256": "5102999842b3c2e3f4f6fe562af5147a2e782983b0dd14f786c53518c9ccda70",
+    "size": 5791
+   },
+   "templates/crest_icon_lv4plus.png": {
+    "sha256": "af905e57d19e31c6bed7b95fe2d1078466c134c818c964bced4ffc27ade1319c",
+    "size": 5448
+   },
+   "templates/crest_icon_lv5plus.png": {
+    "sha256": "cce2c8da23555e2c850cf10b7a437c25fd3e6ab6236ce2bae034080f85439237",
+    "size": 119037
+   },
+   "templates/crest_palace_header.png": {
+    "sha256": "239cec8ea77ad3c71c38c70f05add85c48379251ba77859d964d735f06df6e0d",
+    "size": 8056
+   },
+   "templates/crest_palace_icon.png": {
+    "sha256": "ba23921c7d3f3d55193f795206d0fa9b4cbdd232db8c20d81d6d0f61331183ad",
+    "size": 11787
+   },
+   "templates/crest_palace_icon2.png": {
+    "sha256": "e2c819cb9ff448314f51e5e65d18dd0f121c6846e542d67a262f2b43b5bfbbc9",
+    "size": 9300
+   },
+   "templates/data_download_ok.png": {
+    "sha256": "dad5fe602f9a347b9ebbce1eb2f5b16e837758dead586ff866190eed92203f42",
+    "size": 3895
+   },
+   "templates/data_download_prompt.png": {
+    "sha256": "710285ae7e32acab266e3aca0e30e35c3bd5eb5e176ab5f2ac79122e41e4feb7",
+    "size": 12786
+   },
+   "templates/drop_info.png": {
+    "sha256": "7475cf282a5fc7e82acd88df5a703267e16a16f5a480fab8c943af7885bea7f1",
+    "size": 5432
+   },
+   "templates/equip_crest_screen.png": {
+    "sha256": "69fcd292d9011c7a7df6e8ddf98529c206de61bc71e299bddedbdd726f7f4bde",
+    "size": 10167
+   },
+   "templates/exploring_button.png": {
+    "sha256": "250c3c461f466ee77fa2a46e4a18d0979ab5a5fab2c37743959c66c7dde5236f",
+    "size": 23114
+   },
+   "templates/game_start_screen.png": {
+    "sha256": "f21edd2fcdad34b408dee25f5309e72997b87e5d612cc3068a294b4a559075d0",
+    "size": 8780
+   },
+   "templates/gc_ap_standby_recover.png": {
+    "sha256": "fe2845c1ce76c45cf51c3d35623860430c3e9e85b213263b1c3bcc09e1a9974a",
+    "size": 6141
+   },
+   "templates/gc_area_list_button.png": {
+    "sha256": "42b428a2c6f586074bd9c405330da008d066bf1d0b7de08f580692d2f7846ebc",
+    "size": 18517
+   },
+   "templates/gc_area_list_end_arrow.png": {
+    "sha256": "9820741efbb610672284aa3eb7703e34b2d74d0d40228b6a92e5b8f3aed0eabd",
+    "size": 3122
+   },
+   "templates/gc_area_page_first.png": {
+    "sha256": "d5643087565c7bb154a0165cfaaf797acc7a2bb90b113f236a728a71395e2f9c",
+    "size": 6570
+   },
+   "templates/gc_area_select.png": {
+    "sha256": "acd187391b39147c281d943194ffa2d7923252809ba1b99a3495bd86514f0f60",
+    "size": 6477
+   },
+   "templates/gc_auto_advance_btn.png": {
+    "sha256": "e9eb56a2a717e1015f84233bd8b68f5c8a3d19967c702920bfbc7226a13c1db5",
+    "size": 14915
+   },
+   "templates/gc_auto_advance_btn2.png": {
+    "sha256": "40376452a3431ee35f3175df72bbdf27d6dc6eeba33f3a115447e707084ea5eb",
+    "size": 17782
+   },
+   "templates/gc_close_btn.png": {
+    "sha256": "d0f041d8589c8874e2e4af4d7e5193593058de1963d8890f458b4a0db41505c0",
+    "size": 4979
+   },
+   "templates/gc_destination_prompt.png": {
+    "sha256": "dcf69e43c7c13dcf34b0a34a606b3693738e21ad22fb714ed11335b351e80c75",
+    "size": 20215
+   },
+   "templates/gc_end_advance_button.png": {
+    "sha256": "e46722ec998a2d6f885c1f9ca5a33cead6814dfea7ab03e765fb9bc344603e3d",
+    "size": 8061
+   },
+   "templates/gc_fight_btn.png": {
+    "sha256": "cc1733d1a190346b5649efa082c1a62199ef7df9e38c789b739d8c2da49165e4",
+    "size": 3917
+   },
+   "templates/gc_fight_btn2.png": {
+    "sha256": "d3b3c2c4747ff1953a40f6b28f3d59350c83528edf90250710b550958af5c6dd",
+    "size": 7608
+   },
+   "templates/gc_game_error.png": {
+    "sha256": "ec50ef39f673f637ab20b09a330a3eb66e29854fd1b3d2e3cc533c6742a7840e",
+    "size": 29632
+   },
+   "templates/gc_icon.png": {
+    "sha256": "47c1080ff8436e110bcadec208d51348b0e68cb50e1e63d253bd3c053f4c0f87",
+    "size": 6722
+   },
+   "templates/gc_icon2.png": {
+    "sha256": "29bc28a4a38bc2f3cc046dec56168655afdb8178517181b8ca90055bbff3474a",
+    "size": 19295
+   },
+   "templates/gc_item_cancel.png": {
+    "sha256": "5cb9a0101bd7bc6a1bee209fa84a4b49ad3907ac7d71086924e0e96255a0013e",
+    "size": 6004
+   },
+   "templates/gc_map_menu_button.png": {
+    "sha256": "1348a7b568ab25cf79b4d2e75c255f227a5333a5c790c9c90169bed4dbf9c30f",
+    "size": 6440
+   },
+   "templates/gc_menu_areas_button.png": {
+    "sha256": "1ead917cf90516b825ee0aec195b35a85649936a5b5be2e14c384f5f41b773f3",
+    "size": 23813
+   },
+   "templates/gc_next_area_btn.png": {
+    "sha256": "85e3da7651c463299bba547587006f5200664eda2564c7a5af3667bf69a7ec6e",
+    "size": 8590
+   },
+   "templates/gc_no_stamina_ok.png": {
+    "sha256": "d76e2d0b2c18e96ebcf7abc576cb99725945d3edd11a68636ba9fc008ea42b18",
+    "size": 3337
+   },
+   "templates/gc_party_button.png": {
+    "sha256": "79e9121fa647f1584dede53db16b9bd447069d03073e760dd40fd1e7434fea17",
+    "size": 2675
+   },
+   "templates/gc_party_list_back.png": {
+    "sha256": "931a9548b31e0c10a46df249cd596f4e666b31830a8f9adf6e841d15aa56c1b2",
+    "size": 11463
+   },
+   "templates/gc_party_load_confirm.png": {
+    "sha256": "8142319652b568a618b7036b5c3be606822f3250ba7b61f0859afb3db19b099f",
+    "size": 13640
+   },
+   "templates/gc_party_load_slot.png": {
+    "sha256": "cf0c486ca9f2a5fb102e3fe36bcb45d43f3cb9420770adf66b15996eca11cece",
+    "size": 5056
+   },
+   "templates/gc_party_ready.png": {
+    "sha256": "fae03c03651bf876c7bc02ae07aa130f0176007f0b89a2470e0d93c7f56d1702",
+    "size": 12305
+   },
+   "templates/gc_results_end_advance.png": {
+    "sha256": "b04670bacb35e47eb3dc3769778827e51bc54da2101bb546a5aeca564f6ac850",
+    "size": 8020
+   },
+   "templates/gc_save_load_button.png": {
+    "sha256": "2058e4ddffe5996100284593268a614b114a4983364cf148cdc2bf0d51879053",
+    "size": 5638
+   },
+   "templates/gc_yuna_card_back.png": {
+    "sha256": "d2080d7e15ab48a20ee872b7eda5bcce4238617efee688e28b45454ddd72c58f",
+    "size": 23335
+   },
+   "templates/gc_yuna_chance.png": {
+    "sha256": "876cd3f282cb6ec2fd2884709cec4c85aff60b55b5ab56287dd10a055a6111fb",
+    "size": 12676
+   },
+   "templates/gc_yuna_lets_go.png": {
+    "sha256": "812f0652a33b345b3caa06e1b12d731a55e40603e1299731c094e1d7fee0582d",
+    "size": 15922
+   },
+   "templates/gc_yuna_regalia_pick.png": {
+    "sha256": "62edc4e2359fda4971b30376000bc62c06189c9ee03f60cbcbe5fd7db26c5ebe",
+    "size": 120508
+   },
+   "templates/gc_yuna_slots_start.png": {
+    "sha256": "cff6e64172f27a9986eadea187472eb5f02b07a59f6edbc935b8deafb7c0d695",
+    "size": 76327
+   },
+   "templates/gc_yuna_slots_stop.png": {
+    "sha256": "6b0d9aff111fa0e1a7096be2508e3642e1f4adc5aa7cccdbabdf7d04536a4a84",
+    "size": 54459
+   },
+   "templates/gc_yuna_slots_touch.png": {
+    "sha256": "b85a1ce4acf35c706c2f0d23e96ffbbf202b18d52485ef331ae0d7ba50be8301",
+    "size": 54460
+   },
+   "templates/helper_back_button.png": {
+    "sha256": "1dd8f5ed5250a34c685e14fd4d569b29aa9ef6683bb87bfc3e1b0cf4efb2b2db",
+    "size": 9368
+   },
+   "templates/helper_cancel_ready_button.png": {
+    "sha256": "717eeaf8844d96d4899d04af0001826090258343d6ae73eeeb9a6110b81e63b3",
+    "size": 17799
+   },
+   "templates/helper_confirm_farm_party_join.png": {
+    "sha256": "097a4641526b7341a2e8bc4bb704cf40843215d9a6d27653a25e8102f5523841",
+    "size": 5814
+   },
+   "templates/helper_food_blue_cheese.png": {
+    "sha256": "b29fdde1b1dd057663f7627cc4ab7c107d1de9df0ecc209e81fe89a62a80d611",
+    "size": 5846
+   },
+   "templates/helper_food_camembert.png": {
+    "sha256": "1ee7effd1f197ff301dc05c7d00b71caf9befc5826f68f9426dae0b54a793d6b",
+    "size": 9571
+   },
+   "templates/helper_food_emmental.png": {
+    "sha256": "81ae581d474aea3168f1dd6c1960c94a930a599ee7902c44d4849da2b3759692",
+    "size": 7183
+   },
+   "templates/helper_food_gorgonzola.png": {
+    "sha256": "10e71ea5e3b2d94d0951a678d82b7304104b3af2147f9885caef9d686dced562",
+    "size": 5620
+   },
+   "templates/helper_food_list_header.png": {
+    "sha256": "59bb1da76ccbc23d19c18476a14a884851d3fba5dba208672f14418a7a066762",
+    "size": 7953
+   },
+   "templates/helper_food_red_cheese.png": {
+    "sha256": "f747796b2c3f24402f6a7e09d1a55001e30760eaebf654a5746c42208c40bd68",
+    "size": 5969
+   },
+   "templates/helper_friends_filter.png": {
+    "sha256": "f52a596d8c71bea450c27e7cac6cb430ffe1ada513d23c1cc52a1ba5130a1d47",
+    "size": 4315
+   },
+   "templates/helper_full_lobby_button.png": {
+    "sha256": "a6909d8a4246b8d5f71390874a84d91f2c391f94364e2e9c6b12cab2912c6ab6",
+    "size": 6958
+   },
+   "templates/helper_join_multi_button.png": {
+    "sha256": "9057b852a25136f6f8a47bed4c4cb1496182a393ac0f683c3b8aee2f32d687c3",
+    "size": 27159
+   },
+   "templates/helper_leave_lobby_ok.png": {
+    "sha256": "6d2f9dfb5988c3ca81505da5c913164959027ecfb7204fd78b1fd5cd2168a37c",
+    "size": 7970
+   },
+   "templates/helper_lobby_back_button.png": {
+    "sha256": "0f23b371a237e6989e2d22589222803e3a1885bf4c08f9408059ea989658e4e0",
+    "size": 7454
+   },
+   "templates/helper_manage_parties_ready.png": {
+    "sha256": "d73d85f9a379e00f88484573fb81a6aae76b01e3fa27d74e77ee9b9d7671269f",
+    "size": 18458
+   },
+   "templates/helper_multiplayer_bonus.png": {
+    "sha256": "c15e2f15575f3e44d2d3e584891bec388ee59209f2c28abb541c7930031d6b75",
+    "size": 11545
+   },
+   "templates/helper_ready_button.png": {
+    "sha256": "7ccb24126c13cd5490726424fb34c9677c4e228f63942f40eb6c75f1160b7cf6",
+    "size": 22119
+   },
+   "templates/helper_refine_search_button.png": {
+    "sha256": "16895c73e1c270378ce024d83ae53ebfd44f4ba69e4d748cde1f60bd7a19f649",
+    "size": 6055
+   },
+   "templates/helper_reward_badge.png": {
+    "sha256": "0a8b0a67bda20150b7e05c4b3b0a22c222f18832bebb26981e5199def145a03c",
+    "size": 7648
+   },
+   "templates/helper_same_as_host_button.png": {
+    "sha256": "ffe0baceb27c795a7ca7bba2672a280923697dd6dc9ab95888fafef9d8e3b5fa",
+    "size": 10201
+   },
+   "templates/helper_select_food.png": {
+    "sha256": "af016b7ea106d71a32a695b6aafa269cd3b21a4e31140916570b456527940020",
+    "size": 4323
+   },
+   "templates/helper_update_button.png": {
+    "sha256": "8a6816b85653af688b208579729f2a79a070b71d458718c57c5bb56852499c18",
+    "size": 12808
+   },
+   "templates/home_nav_button.png": {
+    "sha256": "765f3966f774df52c1a7ac197805e65991b56e154ba3e51e49834d4aacb26900",
+    "size": 21611
+   },
+   "templates/hyper_rare.png": {
+    "sha256": "2a4da135d0ddf7cf9cf366b6ac283b86a274738fe2ec821590f04aba8184d291",
+    "size": 57460
+   },
+   "templates/include_ai_button.png": {
+    "sha256": "022c1c5d777a7c86bbbc33ecd4b670b7df37bed440fd10ba6f16a089169b38dd",
+    "size": 1116
+   },
+   "templates/loop_minus_button.png": {
+    "sha256": "4d5e381c6f88f7cc7f1516ebb08a6de7000aa063a706a9c7f645fabafeee3298",
+    "size": 4886
+   },
+   "templates/loop_plus_button.png": {
+    "sha256": "326339760dd1d27aa0d3ad2c487b83ea07ba4fdf4564193dfc1b742e7ad88c48",
+    "size": 5115
+   },
+   "templates/loopdigit_0_0.png": {
+    "sha256": "54cc05fa1c5701c43dec1c469d4ba0a5c2be47e3f7ae27a5dc9277b8434053bb",
+    "size": 200
+   },
+   "templates/loopdigit_1_0.png": {
+    "sha256": "0c04ca3d1a9830b7829e4e9d761efea122faacf034f9453859d610104baa85ec",
+    "size": 137
+   },
+   "templates/loopdigit_2_0.png": {
+    "sha256": "dae0125ef4e727aed8036673a7d9a7e11dbb52ebfd8ebd0e195be12030dfbe96",
+    "size": 178
+   },
+   "templates/loopdigit_3_0.png": {
+    "sha256": "cf43af4c2e04ac0a15c0431a7ce78e35709f6867935f62a247b037d4620b7cdc",
+    "size": 178
+   },
+   "templates/loopdigit_4_0.png": {
+    "sha256": "7a3e270c0eab41ab6389f3d032a76f9f7e5947de3a0e07956ee3c8e408ff6fde",
+    "size": 192
+   },
+   "templates/loopdigit_4_1.png": {
+    "sha256": "069cd1db1ec132cedd9b1cb926c6cb47346778f6433b9d0d9cc2bdeea02528c5",
+    "size": 194
+   },
+   "templates/loopdigit_5_0.png": {
+    "sha256": "329e431ac27dbd968717721feadef616ffece73845c30ac45d32fe3dc71c5d4f",
+    "size": 165
+   },
+   "templates/loopdigit_5_1.png": {
+    "sha256": "a027578e413120236d1e71bc1b6dfd41d0d74716297b1084faa6321522cc0551",
+    "size": 175
+   },
+   "templates/loopdigit_6_0.png": {
+    "sha256": "2c445ea1b441d827cfe3b0efcadb97c5e967920265aa25e966f3c521854a13e0",
+    "size": 188
+   },
+   "templates/loopdigit_7_0.png": {
+    "sha256": "85dab90489d8ae29f0b3cac0e8ab83baf7967a53d893e07b64fcee97f4e7c9f4",
+    "size": 171
+   },
+   "templates/loopdigit_8_0.png": {
+    "sha256": "cad8679723d2884ecd5c81fd589e4280eeca4e373e231739878a2547363ef02e",
+    "size": 199
+   },
+   "templates/loopdigit_9_0.png": {
+    "sha256": "c2c90747261747de72ff95b04d96364b15970d95690701b180362a2f9fe214f3",
+    "size": 189
+   },
+   "templates/looping_button.png": {
+    "sha256": "96fc12f701b010cc793db0d445c5295c5375a486e18bb06e20f1bb77cf18b4bc",
+    "size": 16031
+   },
+   "templates/loops_label.png": {
+    "sha256": "c1c1e09ea7c92d6be66b8d8145d32140ad361b0c80c324dce3ef01f34a4b4a81",
+    "size": 5209
+   },
+   "templates/mail_chest.png": {
+    "sha256": "58ccfd4270ffcf58fd6e4c9ae2f4e73cc6214edd4636c2a35e46fa77643b288a",
+    "size": 7373
+   },
+   "templates/mail_close_button.png": {
+    "sha256": "9a3a7d0a792b2b5c4dfeb994c0714d91af5312459b8c0338749e8f0c28398f1c",
+    "size": 4969
+   },
+   "templates/mail_empty_text.png": {
+    "sha256": "739e05f69c82ffdfdb9737c8a7e3cab80d8c4d0887e9891b77966499857e7744",
+    "size": 15930
+   },
+   "templates/mines_abandon_quest_button.png": {
+    "sha256": "1e52168bbf603bacb019f86b272c6304f88031146a34f72326a9c0e5bb9a7897",
+    "size": 22380
+   },
+   "templates/mines_arcana_dialogue.png": {
+    "sha256": "c4fc57b396ad19284bf517362e191d240088f557dcec276da5ae47705683f2fb",
+    "size": 4313
+   },
+   "templates/mines_area_change_dialogue.png": {
+    "sha256": "4f5fd976e2b41ce3a4e8b810717ba712162a89a8b69a7726226f600b636f6067",
+    "size": 20749
+   },
+   "templates/mines_auto_advance_title.png": {
+    "sha256": "07cd6c0663f706b1050f474c7536f80653d9817ad1767724c228dea3503c1d7b",
+    "size": 13017
+   },
+   "templates/mines_auto_checked.png": {
+    "sha256": "c579d16709ba02887d12b4fed966ac0718bb0d67973970cf2720c34e410ce316",
+    "size": 6829
+   },
+   "templates/mines_button.png": {
+    "sha256": "5d7911e40333e87c14d220eeec41b4bc6da962272a259e02d64c1f16bbe4d8b2",
+    "size": 18242
+   },
+   "templates/mines_challenge_button.png": {
+    "sha256": "c2571a99a8e3bbc81acafe19334680b280810989682fd6323348f4c981336fa0",
+    "size": 11406
+   },
+   "templates/mines_clear_time_failed.png": {
+    "sha256": "157ed97704dea926ac45ab747e42a1f71bb0d1d9c43ad2cf9eba8fa390e9516f",
+    "size": 2890
+   },
+   "templates/mines_close_button.png": {
+    "sha256": "90265a0b2a8e639ce5d45a5fc796f0a57c73a0ab8776fe4aed25c76c396cde33",
+    "size": 6223
+   },
+   "templates/mines_date_changed.png": {
+    "sha256": "87504fbfcef2f77a6101a9818cfca0ea914bd819858890cccd88eadce1952bf8",
+    "size": 21309
+   },
+   "templates/mines_go_mining.png": {
+    "sha256": "5a6cde1c918f32fda90cf310797ed2a188bb28076fec9069966bec1c79cbdabf",
+    "size": 11873
+   },
+   "templates/mines_go_to_mines.png": {
+    "sha256": "3990ae67e737c5be86ddb7dc77fa3e2b11703b773c2f585d68b8eb813078d48d",
+    "size": 20558
+   },
+   "templates/mines_no_support_unit.png": {
+    "sha256": "a64777655b92f38d3bacb2abff9ced03478588e9df2929c087e5fbadf224f26c",
+    "size": 11013
+   },
+   "templates/mines_not_enough_energy.png": {
+    "sha256": "0a4c24754a891ebd6496ecbccf3741946a402ba9bfc95479f02e0d95b8afe437",
+    "size": 23246
+   },
+   "templates/mines_omega_change_boss.png": {
+    "sha256": "a7eead2ec02a7973a345d4a0fb390f035ed0ddabb630be1128eb2100af313432",
+    "size": 6214
+   },
+   "templates/mines_omega_dialogue.png": {
+    "sha256": "05e9376a01ce9ab23aa7fdf92fbfb1a328e5b92121595a3e74f7508ef97df5aa",
+    "size": 26400
+   },
+   "templates/mines_omega_proceed.png": {
+    "sha256": "9a9e13ddfb70357c706d2d335a8ca9588bcacd08acbe5ceffc912643cf288810",
+    "size": 5425
+   },
+   "templates/mines_omega_standby.png": {
+    "sha256": "b1994d6baf48c24a14469beb8ea74219e5024fd54b0d519be377b7f40df43319",
+    "size": 5809
+   },
+   "templates/mines_select_support_unit_header.png": {
+    "sha256": "e5c329a8e4ac765b8f38dc502a89bab5fbcccddd5357e76b2dede85a9d3d9797",
+    "size": 13180
+   },
+   "templates/next_button.png": {
+    "sha256": "48f6f6d1acfe00b37cfcf316d79eb6cdf77f0e678b5b6f46d52a3f0b683fe8bf",
+    "size": 4614
+   },
+   "templates/ok_button.png": {
+    "sha256": "acfdb4ae78e343f00ab3de4214ab4b224e617749e5e3cb6c20c51f69251327f0",
+    "size": 2697
+   },
+   "templates/past_party_button.png": {
+    "sha256": "6c4dfee92ad4e08e58a1f15afb2d2fde0246a827956f859c8314290fe68790f2",
+    "size": 6435
+   },
+   "templates/potion_cupcake.png": {
+    "sha256": "f967a31241a29b1dd74f60f01ebed3218bd922ab4030cafe40a719e407bb6d12",
+    "size": 9749
+   },
+   "templates/potion_l.png": {
+    "sha256": "d8e3814be346350ad4161d3b467894d533a9f35030e727063bd3f1d4a12a4c76",
+    "size": 8026
+   },
+   "templates/potion_m.png": {
+    "sha256": "e9f80635c294aa565389d091b1e2d7d1e2e3ed21174406b46dd9a0201833e4f9",
+    "size": 7704
+   },
+   "templates/potion_s.png": {
+    "sha256": "2b038ff50963fc243a4a4d1de6aa4325874341d8e0d8345287a8c1849dd521d6",
+    "size": 7770
+   },
+   "templates/potion_used_ok.png": {
+    "sha256": "f8af91de892de1af882dee276eaab63d33f53cd9ae6d67beda9cfa56b14e207e",
+    "size": 6384
+   },
+   "templates/potion_used_text.png": {
+    "sha256": "a4cf880bb3b38b719e7740dcd7a03cd16355332c2a6cb6dda9ce9201ec741301",
+    "size": 5262
+   },
+   "templates/quest_list.png": {
+    "sha256": "798a957262622bf8a19d1a6c170d77ffe9298a1ef3d95ebc6fa3f23b000a6f05",
+    "size": 6625
+   },
+   "templates/quest_list_entry.png": {
+    "sha256": "efca9b9c1ecd1450a507884a64b8b13a100b16b50e3e7e1b7941b509217b09b4",
+    "size": 16914
+   },
+   "templates/raid_btn.png": {
+    "sha256": "f854273d5483dfb6120334eac868769827deaaf1af7f7b8b91c739380f8c2a01",
+    "size": 9677
+   },
+   "templates/raid_create.png": {
+    "sha256": "33fffb76eb7e5b0c9c9712af67e625ea4a7f1682c1bcaa72a7313cfdf3e766d7",
+    "size": 15669
+   },
+   "templates/raid_defeat_rewards.png": {
+    "sha256": "7cf83110c8ef45608b1dacb23c301ce20612291a4a361bd9ed56411ee8a5bc12",
+    "size": 10556
+   },
+   "templates/raid_defeated.png": {
+    "sha256": "6d63bdcbe0ed7907b6592993e1e25cc00690a9769102fd0a1ddfaabf3f93c630",
+    "size": 110924
+   },
+   "templates/raid_exchange_btn.png": {
+    "sha256": "6b12f37c9b9ee0205d20e4b3a8a86afeef4cdb8aa4970b15609efa1fa3a5683e",
+    "size": 3392
+   },
+   "templates/raid_exchange_btn2.png": {
+    "sha256": "7a8e6230825dba1a4ee7268dd552e385e0da3f8b518a2143f2710f1342f31477",
+    "size": 8422
+   },
+   "templates/raid_expand_btn.png": {
+    "sha256": "c10a8bad1098864cb6260acef27176ade700b4ddb58c479bfe9d65972fff5dcd",
+    "size": 5737
+   },
+   "templates/raid_friend_only_btn.png": {
+    "sha256": "246bb5ffb72a04f875cd097cce24560543dd2e4fb8e9e4206ff9b5e1deb5fdba",
+    "size": 8719
+   },
+   "templates/raid_green_sos.png": {
+    "sha256": "14a13d24900a57fa67fc01a801b747a7fc4b60c7b82814cf635e9d7981078a11",
+    "size": 4270
+   },
+   "templates/raid_home.png": {
+    "sha256": "5259decdc16b2d5c0c7150a7581506ba5b633215af6576673c690704a8335588",
+    "size": 10486
+   },
+   "templates/raid_join.png": {
+    "sha256": "bfbbaba8ad3ef3e6b4261974c7a6d901289787a265671e2aa0f1218a511d1c29",
+    "size": 12545
+   },
+   "templates/raid_ok_btn.png": {
+    "sha256": "27a1438ee6ff8298ea891237cb63bac8fa59b5f2b8bfa0b3cadade16c855eeed",
+    "size": 3113
+   },
+   "templates/raid_orange_ok_btn.png": {
+    "sha256": "495e4614defe05a089bfb0b3149aa6b562e35ba8bb852091c91340a4dcc65e74",
+    "size": 3024
+   },
+   "templates/raid_orange_ok_btn2.png": {
+    "sha256": "6c224a87f8d133584fa79064e581956461354bb6eb92a983f821d4e3b3ca1a9a",
+    "size": 3217
+   },
+   "templates/raid_refresh_btn.png": {
+    "sha256": "1daffcfa891a2b845987112fab3a3de762bb07fb05a1d4ae8a7285d4633b7a9f",
+    "size": 3480
+   },
+   "templates/raid_small_next.png": {
+    "sha256": "9375d770b902f2366e756831809949a3b57f695def8a5af2c47097719ed213f2",
+    "size": 4892
+   },
+   "templates/raid_sos_btn.png": {
+    "sha256": "9ee1495940ee5cec3282628d79cb86e7a3a5c70a3fd2bf406129fe2ed88b713c",
+    "size": 5489
+   },
+   "templates/raid_sos_join_btn.png": {
+    "sha256": "90b4649ce884b43e6afd2657c39dcd56ee8b49fa29c533068bd0c5ed1e6ada77",
+    "size": 3272
+   },
+   "templates/raid_sos_tab.png": {
+    "sha256": "a8881790c45b94b0a512d0ded51fe9f0c135ee8ba12f1a2bea0870aa243feb32",
+    "size": 4433
+   },
+   "templates/raid_sos_tab2.png": {
+    "sha256": "f335ed5bd6581bfe6e8f6279d61fce3ea5af6e9d6e6dedcf89cb5e7542912ee3",
+    "size": 7129
+   },
+   "templates/raid_start.png": {
+    "sha256": "0cae3a7180ed308c9d9efe1f1c4ea1dec46464a3c1ae87618bf11d3f2181481b",
+    "size": 16437
+   },
+   "templates/raid_ticket_btn.png": {
+    "sha256": "b7d86d2f32bba67a0eab0014459751f86190dd201e6763785489a0e92bedfcaf",
+    "size": 9248
+   },
+   "templates/raid_ticket_ok_btn.png": {
+    "sha256": "a1baaf2f32a1d408c0ee5aaff75b2e7b756d6aa6eb6c104407a1a0c13ad7b74c",
+    "size": 3211
+   },
+   "templates/ready_button.png": {
+    "sha256": "ce1eeb58c2dc17e6427c0ecbdb3f7ed9dca53ea86dba9445357217791d096e5f",
+    "size": 9591
+   },
+   "templates/redeploy_button.png": {
+    "sha256": "2689322830e7f111c5f353c1a9940cc7becf56cc7354f512574d20c32109fcfd",
+    "size": 7689
+   },
+   "templates/restart_btn.png": {
+    "sha256": "377fd0346e078b2da69b1312bd0020873601053f6fcb427a0b28a380f43b0cf4",
+    "size": 5920
+   },
+   "templates/results_redeploy.png": {
+    "sha256": "0349948168c07cdc61442e43a9c272f682404513897c19e4a6ab808a1d9b1735",
+    "size": 6700
+   },
+   "templates/select_crest_ok.png": {
+    "sha256": "de41d1376e4f03a9926bb7e6e60ff5a94a23fc622532aa24960955857c4bd170",
+    "size": 3828
+   },
+   "templates/select_crest_ok2.png": {
+    "sha256": "1f0ad489ccb99b61e329c86b502457583ecda59b75ae31354f580238805edf27",
+    "size": 3306
+   },
+   "templates/small_next_button.png": {
+    "sha256": "fde9f4e35d519d9915f88a62396f98638976d81dde2742f7627a1a8b78c6b92b",
+    "size": 5326
+   },
+   "templates/solo_quest_button.png": {
+    "sha256": "f534a93bb1e26dedd930ff86f0e353d3cc82fd8d3bc6ee690f9d8ff52c48d65f",
+    "size": 87286
+   },
+   "templates/summon_close_button.png": {
+    "sha256": "2a32308ab777da274313a623050cac090e9a6831f29a8ca8e8b9dcc5ab52300a",
+    "size": 5026
+   },
+   "templates/summon_later_button.png": {
+    "sha256": "7103b28077cc93617dbf94163f239da2db3c19e64649f856999373c27ad89a57",
+    "size": 13126
+   },
+   "templates/total_sign_in_bonus.png": {
+    "sha256": "a498d7c55bf6591d48c7d03162b5727c9aa68cf2ad53e6de4a92e004186aac2e",
+    "size": 18743
+   },
+   "templates/unexpected_error.png": {
+    "sha256": "b2e541d1783ab101a4d86f85cb0e1c45a75745e2240b3ec018196e75adeff877",
+    "size": 4252
+   },
+   "templates/unexpected_error_text.png": {
+    "sha256": "5fffb7645d21c1fde547acbac72851949f1b894c4693eb63fda02bad0dcb9277",
+    "size": 13860
+   },
+   "templates/use_pot_button.png": {
+    "sha256": "73f843ae8b8a3e88bc55034b99265827613090d850971a3d7ae8fcaab13bd8b6",
+    "size": 2725
+   },
+   "templates/use_potions_button.png": {
+    "sha256": "f0edf73b90fa8128925121b3fb2cf38e6a297c1e755b07adef91768b949e8f78",
+    "size": 3073
+   },
+   "templates/xpop_up.png": {
+    "sha256": "5de96eaf9febe66bee0c9bbd2bade43645f0d37c8793e570943b2e34ea736890",
+    "size": 1800
+   }
+  },
+  "meta": {
+   "apply_button": {
+    "h": 57,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 82
+   },
+   "arena_battle_button": {
+    "h": 89,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 285
+   },
+   "arena_find_battle": {
+    "h": 153,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 389
+   },
+   "arena_home_button": {
+    "h": 106,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 208
+   },
+   "arena_match_results": {
+    "h": 76,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 346
+   },
+   "arena_no_orbs_cancel": {
+    "h": 70,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 176
+   },
+   "arena_ok_button": {
+    "h": 53,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 128
+   },
+   "arena_ready": {
+    "h": 109,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 322
+   },
+   "arena_restore_all": {
+    "h": 50,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 159
+   },
+   "arena_vs_screen": {
+    "h": 301,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 269
+   },
+   "arena_win_fighter": {
+    "h": 227,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 188
+   },
+   "arena_win_master": {
+    "h": 220,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 207
+   },
+   "auto_button": {
+    "h": 57,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 50
+   },
+   "auto_loop_title": {
+    "h": 44,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "w": 290,
+    "x": 215,
+    "y": 140
+   },
+   "battle_button": {
+    "h": 57,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 140
+   },
+   "cancel_btn": {
+    "h": 46,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 103
+   },
+   "challenge_button": {
+    "h": 24,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 119
+   },
+   "claim_all_button": {
+    "h": 35,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 121
+   },
+   "claim_all_button_dim": {
+    "h": 35,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 121
+   },
+   "claim_ok_button": {
+    "h": 50,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 131
+   },
+   "compendium_card_lv": {
+    "h": 19,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 24
+   },
+   "compendium_card_lv_rainbow": {
+    "h": 19,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 24
+   },
+   "compendium_detail_marker": {
+    "h": 50,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 130
+   },
+   "compendium_grid_header": {
+    "h": 37,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 124
+   },
+   "continue_box": {
+    "h": 48,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 162
+   },
+   "crest_checkbox": {
+    "h": 55,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 55
+   },
+   "crest_fragment": {
+    "h": 47,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 203
+   },
+   "crest_fragment_ok": {
+    "h": 49,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 52
+   },
+   "crest_icon_lv3": {
+    "h": 38,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 61
+   },
+   "crest_icon_lv3plus": {
+    "h": 39,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 61
+   },
+   "crest_icon_lv4": {
+    "h": 49,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 78
+   },
+   "crest_icon_lv4plus": {
+    "h": 47,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 79
+   },
+   "crest_icon_lv5plus": {
+    "h": 135,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 720
+   },
+   "crest_palace_header": {
+    "h": 56,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 151
+   },
+   "crest_palace_icon": {
+    "h": 71,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 91
+   },
+   "crest_palace_icon2": {
+    "h": 67,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 92
+   },
+   "data_download_ok": {
+    "h": 38,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 130
+   },
+   "data_download_prompt": {
+    "h": 28,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 332
+   },
+   "drop_info": {
+    "h": 49,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 143
+   },
+   "equip_crest_screen": {
+    "h": 46,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 180
+   },
+   "exploring_button": {
+    "h": 78,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 213
+   },
+   "game_start_screen": {
+    "h": 59,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 106
+   },
+   "gc_ap_standby_recover": {
+    "h": 43,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 110
+   },
+   "gc_area_list_button": {
+    "h": 99,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 135
+   },
+   "gc_area_list_end_arrow": {
+    "h": 48,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 61
+   },
+   "gc_area_page_first": {
+    "h": 40,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 84
+   },
+   "gc_area_select": {
+    "h": 45,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 130
+   },
+   "gc_auto_advance_btn": {
+    "h": 38,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 203
+   },
+   "gc_auto_advance_btn2": {
+    "h": 66,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 169
+   },
+   "gc_close_btn": {
+    "h": 49,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 96
+   },
+   "gc_destination_prompt": {
+    "h": 44,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 340
+   },
+   "gc_end_advance_button": {
+    "h": 47,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 148
+   },
+   "gc_fight_btn": {
+    "h": 44,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 69
+   },
+   "gc_fight_btn2": {
+    "h": 60,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 96
+   },
+   "gc_game_error": {
+    "h": 39,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 428
+   },
+   "gc_icon": {
+    "h": 53,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 71
+   },
+   "gc_icon2": {
+    "h": 49,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 235
+   },
+   "gc_item_cancel": {
+    "h": 48,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 107
+   },
+   "gc_map_menu_button": {
+    "h": 32,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 86
+   },
+   "gc_menu_areas_button": {
+    "h": 56,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 210
+   },
+   "gc_next_area_btn": {
+    "h": 50,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 145
+   },
+   "gc_no_stamina_ok": {
+    "h": 52,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 55
+   },
+   "gc_party_button": {
+    "h": 29,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 66
+   },
+   "gc_party_list_back": {
+    "h": 60,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 160
+   },
+   "gc_party_load_confirm": {
+    "h": 50,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 360
+   },
+   "gc_party_load_slot": {
+    "h": 34,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 115
+   },
+   "gc_party_ready": {
+    "h": 70,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 220
+   },
+   "gc_results_end_advance": {
+    "h": 46,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 170
+   },
+   "gc_save_load_button": {
+    "h": 48,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 65
+   },
+   "gc_yuna_card_back": {
+    "h": 130,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 85
+   },
+   "gc_yuna_chance": {
+    "h": 58,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 182
+   },
+   "gc_yuna_lets_go": {
+    "h": 80,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 90
+   },
+   "gc_yuna_regalia_pick": {
+    "h": 110,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 524
+   },
+   "gc_yuna_slots_start": {
+    "h": 75,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 550
+   },
+   "gc_yuna_slots_stop": {
+    "h": 60,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 450
+   },
+   "gc_yuna_slots_touch": {
+    "h": 75,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 380
+   },
+   "helper_back_button": {
+    "h": 60,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 122
+   },
+   "helper_cancel_ready_button": {
+    "h": 60,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 325
+   },
+   "helper_confirm_farm_party_join": {
+    "h": 70,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 205
+   },
+   "helper_food_blue_cheese": {
+    "h": 35,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 173
+   },
+   "helper_food_camembert": {
+    "h": 35,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 222
+   },
+   "helper_food_emmental": {
+    "h": 35,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 173
+   },
+   "helper_food_gorgonzola": {
+    "h": 35,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 173
+   },
+   "helper_food_list_header": {
+    "h": 44,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 178
+   },
+   "helper_food_red_cheese": {
+    "h": 35,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 192
+   },
+   "helper_friends_filter": {
+    "h": 45,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 111
+   },
+   "helper_full_lobby_button": {
+    "h": 52,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 115
+   },
+   "helper_join_multi_button": {
+    "h": 60,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 270
+   },
+   "helper_leave_lobby_ok": {
+    "h": 70,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 175
+   },
+   "helper_lobby_back_button": {
+    "h": 42,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 122
+   },
+   "helper_manage_parties_ready": {
+    "h": 55,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 355
+   },
+   "helper_multiplayer_bonus": {
+    "h": 50,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 293
+   },
+   "helper_ready_button": {
+    "h": 60,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 325
+   },
+   "helper_refine_search_button": {
+    "h": 39,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 143
+   },
+   "helper_reward_badge": {
+    "h": 36,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 170
+   },
+   "helper_same_as_host_button": {
+    "h": 97,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 103
+   },
+   "helper_select_food": {
+    "h": 55,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 67
+   },
+   "helper_update_button": {
+    "h": 50,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 160
+   },
+   "home_nav_button": {
+    "h": 118,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "threshold": 0.9,
+    "w": 112,
+    "x": 4,
+    "y": 1156
+   },
+   "hyper_rare": {
+    "h": 126,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 558
+   },
+   "include_ai_button": {
+    "h": 35,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 28
+   },
+   "loop_minus_button": {
+    "h": 62,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "w": 52,
+    "x": 80,
+    "y": 738
+   },
+   "loop_plus_button": {
+    "h": 62,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "w": 52,
+    "x": 596,
+    "y": 738
+   },
+   "loopdigit_0_0": {
+    "h": 20,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 14
+   },
+   "loopdigit_1_0": {
+    "h": 20,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 7
+   },
+   "loopdigit_2_0": {
+    "h": 20,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 14
+   },
+   "loopdigit_3_0": {
+    "h": 20,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 14
+   },
+   "loopdigit_4_0": {
+    "h": 20,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 14
+   },
+   "loopdigit_4_1": {
+    "h": 20,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 15
+   },
+   "loopdigit_5_0": {
+    "h": 20,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 13
+   },
+   "loopdigit_5_1": {
+    "h": 20,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 14
+   },
+   "loopdigit_6_0": {
+    "h": 20,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 14
+   },
+   "loopdigit_7_0": {
+    "h": 20,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 14
+   },
+   "loopdigit_8_0": {
+    "h": 20,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 14
+   },
+   "loopdigit_9_0": {
+    "h": 20,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 14
+   },
+   "looping_button": {
+    "h": 53,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 218
+   },
+   "loops_label": {
+    "h": 38,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "w": 126,
+    "x": 390,
+    "y": 560
+   },
+   "mail_chest": {
+    "h": 47,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 65
+   },
+   "mail_close_button": {
+    "h": 39,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 96
+   },
+   "mail_empty_text": {
+    "h": 44,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "w": 420,
+    "x": 150,
+    "y": 360
+   },
+   "mines_abandon_quest_button": {
+    "h": 80,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 558
+   },
+   "mines_arcana_dialogue": {
+    "h": 45,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 187
+   },
+   "mines_area_change_dialogue": {
+    "h": 75,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 572
+   },
+   "mines_auto_advance_title": {
+    "h": 45,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 245
+   },
+   "mines_auto_checked": {
+    "h": 75,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 70
+   },
+   "mines_button": {
+    "h": 60,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 185
+   },
+   "mines_challenge_button": {
+    "h": 78,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 558
+   },
+   "mines_clear_time_failed": {
+    "h": 27,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 97
+   },
+   "mines_close_button": {
+    "h": 70,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 140
+   },
+   "mines_date_changed": {
+    "h": 60,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 250
+   },
+   "mines_go_mining": {
+    "h": 55,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 207
+   },
+   "mines_go_to_mines": {
+    "h": 59,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 267
+   },
+   "mines_no_support_unit": {
+    "h": 55,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 265
+   },
+   "mines_not_enough_energy": {
+    "h": 60,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 275
+   },
+   "mines_omega_change_boss": {
+    "h": 42,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 127
+   },
+   "mines_omega_dialogue": {
+    "h": 125,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 700
+   },
+   "mines_omega_proceed": {
+    "h": 42,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 127
+   },
+   "mines_omega_standby": {
+    "h": 42,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 127
+   },
+   "mines_select_support_unit_header": {
+    "h": 44,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 248
+   },
+   "next_button": {
+    "h": 47,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 76
+   },
+   "ok_button": {
+    "h": 44,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 61
+   },
+   "past_party_button": {
+    "h": 57,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 65
+   },
+   "potion_cupcake": {
+    "h": 70,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "w": 70,
+    "x": 85,
+    "y": 944
+   },
+   "potion_l": {
+    "h": 70,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "w": 70,
+    "x": 85,
+    "y": 779
+   },
+   "potion_m": {
+    "h": 70,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "w": 70,
+    "x": 85,
+    "y": 615
+   },
+   "potion_s": {
+    "h": 70,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "w": 70,
+    "x": 85,
+    "y": 450
+   },
+   "potion_used_ok": {
+    "h": 58,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "w": 168,
+    "x": 276,
+    "y": 662
+   },
+   "potion_used_text": {
+    "h": 30,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "w": 145,
+    "x": 220,
+    "y": 575
+   },
+   "quest_list": {
+    "h": 41,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 127
+   },
+   "quest_list_entry": {
+    "h": 34,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "w": 340,
+    "x": 38,
+    "y": 664
+   },
+   "raid_btn": {
+    "h": 60,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 120
+   },
+   "raid_create": {
+    "h": 43,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 284
+   },
+   "raid_defeat_rewards": {
+    "h": 46,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 207
+   },
+   "raid_defeated": {
+    "h": 168,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 720
+   },
+   "raid_exchange_btn": {
+    "h": 48,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 70
+   },
+   "raid_exchange_btn2": {
+    "h": 51,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 143
+   },
+   "raid_expand_btn": {
+    "h": 39,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 85
+   },
+   "raid_friend_only_btn": {
+    "h": 50,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 149
+   },
+   "raid_green_sos": {
+    "h": 49,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 66
+   },
+   "raid_home": {
+    "h": 61,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 103
+   },
+   "raid_join": {
+    "h": 53,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 181
+   },
+   "raid_ok_btn": {
+    "h": 44,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 48
+   },
+   "raid_orange_ok_btn": {
+    "h": 44,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 52
+   },
+   "raid_orange_ok_btn2": {
+    "h": 47,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 64
+   },
+   "raid_refresh_btn": {
+    "h": 55,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 42
+   },
+   "raid_small_next": {
+    "h": 49,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 95
+   },
+   "raid_sos_btn": {
+    "h": 72,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 52
+   },
+   "raid_sos_join_btn": {
+    "h": 49,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 55
+   },
+   "raid_sos_tab": {
+    "h": 42,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 68
+   },
+   "raid_sos_tab2": {
+    "h": 50,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 151
+   },
+   "raid_start": {
+    "h": 55,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 205
+   },
+   "raid_ticket_btn": {
+    "h": 43,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 140
+   },
+   "raid_ticket_ok_btn": {
+    "h": 43,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 50
+   },
+   "ready_button": {
+    "h": 65,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 131
+   },
+   "redeploy_button": {
+    "h": 37,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 154
+   },
+   "restart_btn": {
+    "h": 39,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 109
+   },
+   "results_redeploy": {
+    "h": 38,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 118
+   },
+   "select_crest_ok": {
+    "h": 55,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 102
+   },
+   "select_crest_ok2": {
+    "h": 52,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 91
+   },
+   "small_next_button": {
+    "h": 58,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 109
+   },
+   "solo_quest_button": {
+    "h": 280,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 255
+   },
+   "summon_close_button": {
+    "h": 42,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 114
+   },
+   "summon_later_button": {
+    "h": 44,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 344
+   },
+   "total_sign_in_bonus": {
+    "h": 44,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 270
+   },
+   "unexpected_error": {
+    "h": 53,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 106
+   },
+   "unexpected_error_text": {
+    "h": 34,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "w": 400,
+    "x": 160,
+    "y": 570
+   },
+   "use_pot_button": {
+    "h": 42,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 51
+   },
+   "use_potions_button": {
+    "h": 33,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 63
+   },
+   "xpop_up": {
+    "h": 43,
+    "screen_h": 1280,
+    "screen_w": 720,
+    "source": "restart",
+    "w": 37
+   }
+  },
+  "remove": [],
+  "version": "2026.11.15.1450"
+ },
+ "format": 1,
+ "published": "2026-11-15 14:50:25",
+ "serial": 1794718225
+}
