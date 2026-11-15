@@ -46,9 +46,9 @@ from typing import Callable
 from . import __version__, ed25519
 from .license import PUBLIC_KEY
 
-# Base URL of your update host (no trailing slash), e.g. "https://you.github.io/rerun-updates".
+# Base URL of the update host (no trailing slash): GitHub Pages of King-clash/ReRun (the `gh-pages` branch).
 # Empty = updates are off. config.yaml `updates.url` overrides it (handy for testing).
-UPDATE_URL = ""
+UPDATE_URL = "https://king-clash.github.io/ReRun"
 
 CHANNELS = ("stable", "beta")
 FORMAT = 1

@@ -1,6 +1,7 @@
 # Changelog
 
-## 1.1.1 — Rerun.exe now carries Windows file details (not released yet)
+## 1.1.1 — Update address set (GitHub Pages) and Windows file details
+- `UPDATE_URL` is now https://king-clash.github.io/ReRun (the `gh-pages` branch of King-clash/ReRun), so Rerun can check for signed template/routine updates and new versions of itself. 1.1.0 shipped with it empty and cannot update itself: install 1.1.1 by hand once.
 - build.py adds company, product, description and version to Rerun.exe (Properties > Details) and turns UPX off explicitly, to look less anonymous to Microsoft Defender/SmartScreen. Not proven to stop any flag.
 
 ## 1.1.0 — Quality-of-life settings (15 of 16 ideas; BETA, simulator + real fixtures)
