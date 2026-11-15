@@ -18,6 +18,8 @@ DEFAULTS = {
     "have": {},
     # Team checker: the team being built and the stage it is checked against
     "team": [], "team_stage": None, "team_filter": "My units",
+    # Team & Damage: the setup (same shape as the site's calculator link)
+    "calc": None,
     # the game day the app last saw, for the "new game day" reminder
     "last_day": None,
 }
