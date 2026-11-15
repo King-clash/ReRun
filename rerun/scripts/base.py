@@ -113,6 +113,27 @@ COMMON_TEMPLATES = [
 ]
 
 
+DEBUG_KEEP = 60     # newest screenshots kept in debug/ (each is about 1 MB); older ones are deleted
+
+
+def prune_debug_folder(folder, keep: int = DEBUG_KEEP) -> int:
+    """Delete the oldest .png files in `folder` beyond the newest `keep`. Returns how many went.
+    The names start with a timestamp, so sorting by name is sorting by age."""
+    try:
+        files = sorted(f for f in folder.iterdir() if f.suffix.lower() == ".png")
+    except OSError as e:
+        errlog.note("base.prune_debug", e)
+        return 0
+    removed = 0
+    for f in files[:max(0, len(files) - keep)]:
+        try:
+            f.unlink()
+            removed += 1
+        except OSError as e:
+            errlog.note("base.prune_debug", e)
+    return removed
+
+
 class BaseScript:
     ID = "base"
     NAME = "Base"
@@ -274,6 +295,7 @@ class BaseScript:
         ok, buf = cv2.imencode(".png", img)
         if ok:
             buf.tofile(str(path))
+            prune_debug_folder(folder)
             return str(path)
         return None
 

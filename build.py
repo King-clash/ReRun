@@ -76,6 +76,8 @@ def build_exe(dist: Path) -> bool:
         "--hidden-import", "gsc_app.page", "--hidden-import", "gsc_app.update_data",
         "--hidden-import", "gsc_app.scrape",
         "--exclude-module", "matplotlib", "--exclude-module", "pytest",
+        # Pillow's AVIF plugin (4 MB) - Rerun only reads and writes PNG/JPEG; Pillow skips it when absent.
+        "--exclude-module", "PIL._avif",
         str(ROOT / "main.py"),
     ]
     print(" ".join(cmd))

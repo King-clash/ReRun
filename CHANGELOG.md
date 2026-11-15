@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.2 — Smaller exe, capped debug folder (not released yet)
+- `Rerun.exe` 78.7 -> 74.4 MB: Pillow's unused AVIF plugin is left out of the build. The exe starts and responds (checked by launching the built file).
+- `debug/` keeps only the newest 60 saved screenshots (about 1 MB each); it used to grow forever. tests/test_debug_prune.py (2).
+- Speed: not changed on purpose. A farming tick is dominated by the ADB screenshot (~200 ms) and the 0.8 s pause; see PERFORMANCE_NOTES.md.
+
 ## 1.1.1 — Update address set (GitHub Pages) and Windows file details
 - `UPDATE_URL` is now https://king-clash.github.io/ReRun (the `gh-pages` branch of King-clash/ReRun), so Rerun can check for signed template/routine updates and new versions of itself. 1.1.0 shipped with it empty and cannot update itself: install 1.1.1 by hand once.
 - build.py adds company, product, description and version to Rerun.exe (Properties > Details) and turns UPX off explicitly, to look less anonymous to Microsoft Defender/SmartScreen. Not proven to stop any flag.
