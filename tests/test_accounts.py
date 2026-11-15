@@ -482,11 +482,13 @@ def test_dry_run_through_the_manager_taps_nothing_and_is_recorded_as_a_dry_run()
         dev = FakeDevice([cv2.imread(str(ROOT / "tests" / "fixtures" / "home.png"))])
         m.instances[inst].device = dev
         assert "Dry run" in m.start(inst, "any_quest", dry_run=True)
+        main = m.ops.store.active_id
         t0 = time.time()
-        while m.instances[inst].status not in ("idle", "error") and time.time() - t0 < 60:
+        # the status goes idle slightly BEFORE the session record is closed, so wait for the record
+        while time.time() - t0 < 60 and not (m.instances[inst].status in ("idle", "error") and m.ops.store.sessions(main)
+                                              and m.ops.store.sessions(main)[-1]["status"] != "running"):
             time.sleep(0.1)
         assert dev.taps == [], dev.taps
-        main = m.ops.store.active_id
         ses = m.ops.store.sessions(main)
         assert len(ses) == 1 and ses[0]["dry_run"] and ses[0]["status"] == "completed", ses
         assert any("DRY RUN RESULT" in line for line in m.log_lines)
