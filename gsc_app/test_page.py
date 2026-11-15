@@ -607,6 +607,42 @@ def test_rerun_hookup_on_a_copy():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_other_stages_view():
+    """Giant Bosses, Story Challenge and Events list, filter, search and show details."""
+    win, page, opened, errors = make_page()
+    try:
+        assert len(page.other) == 17 + 25 + 6
+        page.show_view("Bosses & Events")
+        page.update()
+        assert len(page._rows) == 48
+        page.group.set("Story Challenge")
+        page.refresh()
+        assert len(page._rows) == 25
+        page.group.set("All groups")
+        page.q["Bosses & Events"].set("goldola")
+        page.refresh()
+        rec = select_where(page, lambda s: s["boss"] == "Goldola")
+        assert "Only crits deal damage" in detail_text(page)
+        page.open_current()
+        assert opened[-1].endswith("/stages/goldola-giant-boss/")
+        # three areas, each with its own pages
+        assert page.seg.area.get() == "Quests"
+        page.seg.area.set("Units")
+        page.seg._area_clicked()
+        assert page.view.get() == "Units" and page.seg.pages._values == ["Units", "Team"]
+        page.show_view("Crests")
+        assert page.seg.area.get() == "Crests" and page.seg.pages._values[1] == "Planner"
+        page.show_view("Bosses & Events")
+        for size in ("S", "M", "L"):
+            page.size.set(size)
+            page._size_changed()
+            for s in page.other:
+                page._show_other(s)
+        assert not errors, errors
+    finally:
+        close(win)
+
+
 if __name__ == "__main__":
     failed = 0
     tests = [v for k, v in dict(globals()).items() if k.startswith("test_")]

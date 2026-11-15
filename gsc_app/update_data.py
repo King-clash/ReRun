@@ -212,6 +212,13 @@ class Updater:
                 out.add(c["icon"][len(SITE):])
         for lv in scrape.LEVELS:
             out.add(f"/images/crests/{lv.lower().replace('+', 'p')}.png")
+        # Giant Boss / Story / Event pictures (gsc_app/stage_catalog.json).
+        for cat in read_json(Path(__file__).with_name("stage_catalog.json"), {}).get(
+                "categories", []):
+            for s in cat.get("stages", []):
+                if s.get("image") and re.fullmatch(r"[A-Za-z0-9_./-]+\.(?:png|webp|jpg)",
+                                                   s["image"]) and ".." not in s["image"]:
+                    out.add(f"/images/{s['image']}")
         text = (self.out / "stage_guides.json").read_text(encoding="utf-8") \
             if (self.out / "stage_guides.json").exists() else ""
         out.update(re.findall(r'"(/images/[A-Za-z0-9_./-]+\.(?:png|webp|jpg))"', text))

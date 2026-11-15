@@ -34,7 +34,16 @@ from .store import MyUnits, Settings
 from .team import TEAM_SIZE, TeamCheck, hazard_hits, hazards
 
 SITE = "https://gscompanion.com"
-VIEWS = ["Today", "Week", "Crests", "Units", "Team", "Planner", "Compare"]
+OTHER = "Bosses & Events"  # Giant Bosses, Story Challenge and Event quests (stage_catalog.json)
+# Three areas, each with its own pages (the second row of the navigation).
+AREAS = {
+    "Quests": ["Today", "Week", OTHER],
+    "Crests": ["Crests", "Planner", "Compare"],
+    "Units": ["Units", "Team"],
+}
+VIEWS = [v for views in AREAS.values() for v in views]  # Ctrl+1.. follow this order
+ALL_GROUPS = "All groups"
+CATALOG = Path(__file__).with_name("stage_catalog.json")
 FIND = "Find"  # search results across stages, crests and units (not a tab)
 DIFFS = ["NOVA", "EXTREME", "PRO"]
 DIFF_COLOR = {"NOVA": "red", "EXTREME": "orange", "PRO": "blue"}
@@ -61,15 +70,16 @@ COLUMNS = {
     "Units": [("mine", "★", 38), ("name", "Unit", 200), ("element", "Element", 76),
               ("tag", "Type", 56), ("picks", "Recommended crests", 300)],
     "Planner": [("name", "Crest", 190), ("stage", "Stage", 250), ("units", "For", 250)],
+    OTHER: [("name", "Stage", 260), ("boss", "Boss", 200), ("info", "Details", 240)],
 }
 # Columns that take the spare width, per view (the rest keep their size).
 STRETCH = {"Crests": {"name", "where"}, "Units": {"picks"},
            "Planner": {"stage", "units"}, "Today": {"name", "units"}, "Team": {"fit"},
-           FIND: {"name", "info"}}
+           FIND: {"name", "info"}, OTHER: {"name", "boss", "info"}}
 BOARD_VIEWS = ("Week", "Compare")  # drawn as a grid, not a table
 CENTER = {"difficulty", "element", "tag", "kind", "mine", "team", "ready", "what"}
 HINTS = {"Week": "stage", "Crests": "crest", "Units": "unit",
-         "Today": "stage or crest", FIND: "result"}
+         "Today": "stage or crest", FIND: "result", OTHER: "stage"}
 NBSP = " "  # keeps a unit's name on one line in the detail panel
 DAY_CHECK_MS = 60_000
 
@@ -155,8 +165,51 @@ class Pictures:
         return self.get(self.dir / src[len("/images/"):], h, max_w)
 
 
+def area_of(view: str, default: str = "Quests") -> str:
+    return next((a for a, vs in AREAS.items() if view in vs), default)
+
+
+class Nav(tk.Frame):
+    """Two-level navigation: an area (Quests / Crests / Units) and that area's pages."""
+
+    def __init__(self, parent, view: tk.StringVar, command):
+        super().__init__(parent, bg=C["bg"])
+        self.view, self.command = view, command
+        self.area = tk.StringVar(value=area_of(view.get()))
+        self.last = {a: vs[0] for a, vs in AREAS.items()}  # page last open in each area
+        self.areas = ios.Segmented(self, list(AREAS), self.area, command=self._area_clicked)
+        self.areas.pack(side="left")
+        self.pages: ios.Segmented | None = None
+        self._shown_area = ""
+        self._draw()
+
+    def _area_clicked(self):
+        self.view.set(self.last[self.area.get()])
+        self._draw()
+        self.command()
+
+    def _page_clicked(self):
+        self.last[area_of(self.view.get())] = self.view.get()
+        self.command()
+
+    def _draw(self):
+        v = self.view.get()
+        if v in VIEWS:  # search results keep the area you were in
+            self.area.set(area_of(v))
+            self.last[area_of(v)] = v
+        area = self.area.get()
+        self.areas._draw()
+        if area != self._shown_area:
+            if self.pages:
+                self.pages.destroy()
+            self.pages = ios.Segmented(self, AREAS[area], self.view, command=self._page_clicked)
+            self.pages.pack(side="left", padx=(px(18), 0))
+            self._shown_area = area
+        self.pages._draw()
+
+
 class GSCompanionPage(tk.Frame):
-    """parent:        any Tk container (ios.init must already have run).
+    """parent:      any Tk container (ios.init must already have run).
     root:          the folder holding data/gscompanion/ (Rerun's folder).
     flash:         optional (text, kind) -> None, e.g. Rerun's toast.
     settings_path: where to remember things (default data/gscompanion/companion_settings.json).
@@ -197,7 +250,8 @@ class GSCompanionPage(tk.Frame):
         view = self.s["view"] if self.s["view"] in VIEWS else "Today"
         self.view = tk.StringVar(value=view)
         self._before_find = view
-        self.q = {v: tk.StringVar() for v in ("Crests", "Units", "Team")}
+        self.q = {v: tk.StringVar() for v in ("Crests", "Units", "Team", OTHER)}
+        self.group = tk.StringVar(value=ALL_GROUPS)
         for v in self.q.values():
             v.trace_add("write", lambda *a: self.refresh())
         self.find_q = tk.StringVar()
@@ -231,9 +285,34 @@ class GSCompanionPage(tk.Frame):
         except (OSError, ValueError):
             self.details = {}
         self.teams = TeamCheck(self.gsc, self.guides, self.details)
+        self.other = self._load_other()
         if hasattr(self, "my"):
             self.my.gsc = self.gsc
             self.my._scan_key = None
+
+    @staticmethod
+    def _load_other() -> list[dict]:
+        """Giant Bosses, Story Challenge and Event quests from stage_catalog.json, one flat
+        list; each record gets its group, its page address and a short details line."""
+        try:
+            doc = json.loads(CATALOG.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return []
+        out = []
+        for cat in doc.get("categories", []):
+            for s in cat.get("stages", []):
+                rec = dict(s)
+                rec["group"] = cat.get("title", "")
+                rec["url"] = f"{SITE}/stages/{s['slug']}/"
+                if cat.get("id") == "story":
+                    rec["info"] = f"Ch. {s['chapter']} · {s['hp']:,} HP"
+                elif cat.get("id") == "events":
+                    rec["info"] = " · ".join(
+                        x for x in (s.get("tag"), f"{s['hp']:,} HP") if x)
+                else:
+                    rec["info"] = ", ".join(s.get("hazards", [])) or "Giant Boss"
+                out.append(rec)
+        return out
 
     # ================================================================== layout
     def _build(self):
@@ -260,7 +339,7 @@ class GSCompanionPage(tk.Frame):
 
         bar = tk.Frame(self, bg=C["bg"])
         bar.pack(fill="x", padx=px(20), pady=(0, px(8)))
-        self.seg = ios.Segmented(bar, VIEWS, self.view, command=self._switch)
+        self.seg = Nav(bar, self.view, self._switch)
         self.seg.pack(side="left")
         self.summary = tk.Label(bar, bg=C["bg"], fg=C["secondary"], font=F["footnote"])
         self.summary.pack(side="right")
@@ -663,6 +742,12 @@ class GSCompanionPage(tk.Frame):
                        small=True).pack(side="left", padx=(px(16), 0))
             self._note(f"{n} unit{'s' if n != 1 else ''} in the plan  ·  add more from a unit's "
                        "details")
+        elif view == OTHER:
+            search()
+            select([ALL_GROUPS] + list(dict.fromkeys(r["group"] for r in self.other)),
+                   self.group)
+            self._note("Giant Bosses, Story Challenge and Event quests  ·  "
+                       "full guides are on the site")
         elif view == "Compare":
             ios.Button(f, "Clear", self.compare_clear, kind="plain", color="red",
                        small=True).pack(side="left")
@@ -684,7 +769,7 @@ class GSCompanionPage(tk.Frame):
                              anchor="center" if key in CENTER else "w")
         pw = 0
         if self.pics.available:
-            pw = px(104 * self.k) if view == "Today" else px(48 * self.k)
+            pw = px(104 * self.k) if view in ("Today", OTHER) else px(48 * self.k)
         self.tree.heading("#0", text="")
         self.tree.column("#0", width=pw, minwidth=pw, stretch=False, anchor="center")
         self._pic_w = pw
@@ -728,13 +813,14 @@ class GSCompanionPage(tk.Frame):
         if view == "Compare":
             self._render_compare()
             return
-        if not self.gsc.available:
+        if not self.gsc.available and view != OTHER:
             self.tree.delete(*self.tree.get_children())
             self._empty("No GS Companion data\nBuild it with:  py tools/gscompanion_build.py")
             return
         rows = {"Crests": self._crest_rows, "Units": self._unit_rows,
                 "Planner": self._planner_rows, "Today": self._today_rows,
-                "Team": self._team_rows, FIND: self._find_rows}[view]()
+                "Team": self._team_rows, FIND: self._find_rows,
+                OTHER: self._other_rows}[view]()
         key, desc = self._sort[view]
         if key:
             def sort_key(r):
@@ -790,9 +876,54 @@ class GSCompanionPage(tk.Frame):
             return self.pics.of(rec, "stage", self.thumb, px(96 * self.k))
         if kind in ("unit", "crest"):
             return self.pics.of(rec, kind, self.thumb)
+        if kind == "other":
+            return self._other_pic(rec, self.thumb, px(96 * self.k))
         return None
 
+    def _other_pic(self, rec: dict, h: int, max_w: int):
+        """The stage's banner / boss picture, if "Update data" has saved it."""
+        return self.pics.site(f"/images/{rec['image']}", h, max_w) if rec.get("image") else None
+
     # --- rows -----------------------------------------------------------------
+    def _other_rows(self) -> list[dict]:
+        q = self.q[OTHER].get().strip().lower()
+        group = self.group.get()
+        rows = []
+        for s in self.other:
+            if group != ALL_GROUPS and s["group"] != group:
+                continue
+            if q and q not in " ".join(
+                    str(s.get(k, "")) for k in ("name", "boss", "area", "location", "event",
+                                                "tag", "info", "group")).lower():
+                continue
+            rows.append({"kind": "other", "rec": s, "values": {
+                "name": s["name"], "boss": s.get("boss", ""),
+                "info": s["info"]}})
+        return rows
+
+    def _show_other(self, s: dict):
+        self._begin()
+        if self._pic(self._other_pic(s, px(170 * self.k), self._detail_w())):
+            self._put("\n")
+        self._put(s["name"] + "\n", "title")
+        self._put(s["group"] + "\n", "sub")
+        facts = [("Boss", s.get("boss")), ("Chapter", s.get("chapter")),
+                 ("Area", s.get("area")), ("Location", s.get("location")),
+                 ("Event", s.get("event")), ("Type", s.get("tag")),
+                 ("HP", f"{s['hp']:,}" if s.get("hp") else None)]
+        for label, val in facts:
+            if val:
+                self._put(f"{label}\t", "dim")
+                self._put(f"{val}\n")
+        if s.get("hazards"):
+            self._put("Boss hazards\n", "h")
+            for h in s["hazards"]:
+                self._put(f"•  {h}\n", "indent")
+        self._put("\nThe waves, enemy stats, recommended units and example teams are in the "
+                  "full guide on the site.\n", "dim")
+        self._action("Open guide on site", self.open_current)
+        self._put("\n")
+        self._end()
     def _today_rows(self) -> list[dict]:
         """Stages open today, best for your units first, each with the crests your units
         still need from it."""
@@ -1179,7 +1310,7 @@ class GSCompanionPage(tk.Frame):
     def _show(self, kind: str, rec: dict):
         self._shown = (kind, rec)
         {"stage": self._show_stage, "crest": self._show_crest,
-         "unit": self._show_unit}.get(kind, lambda r: None)(rec)
+         "unit": self._show_unit, "other": self._show_other}.get(kind, lambda r: None)(rec)
 
     def _show_placeholder(self, view: str):
         self._shown = None
@@ -2198,7 +2329,8 @@ class GSCompanionPage(tk.Frame):
             url = {"Week": f"{SITE}/stages/crest-palace/",
                    "Today": f"{SITE}/stages/crest-palace/", "Team": f"{SITE}/team-builder/",
                    "Crests": f"{SITE}/crests/", "Units": f"{SITE}/units/",
-                   "Planner": f"{SITE}/crests/", "Compare": f"{SITE}/crests/"}.get(
+                   "Planner": f"{SITE}/crests/", "Compare": f"{SITE}/crests/",
+                   OTHER: f"{SITE}/stages/"}.get(
                 self.view.get(), SITE + "/")
         self._open_url(url)
         self.flash("Opened GSCompanion in your browser", "info")
