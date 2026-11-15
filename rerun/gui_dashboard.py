@@ -49,6 +49,7 @@ class DashboardMixin:
         bar = tk.Frame(left, bg=C["bg"])
         bar.pack(fill="x", pady=(px(12), 0))
         ios.Button(bar, "Start", self.start_sel, icon="play").pack(side="left")
+        ios.Button(bar, "Dry Run", self.dry_run_sel, kind="gray", icon="search").pack(side="left", padx=(px(8), 0))
         self.pause_btn = ios.Button(bar, "Pause", self.pause_sel, kind="tinted", icon="pause")
         self.pause_btn.pack(side="left", padx=px(8))
         ios.Button(bar, "Stop", self.stop_sel, kind="tinted", color="red", icon="stop").pack(side="left")
@@ -290,7 +291,7 @@ class DashboardMixin:
                       "yet. Watch the first runs and stop it (F12) if anything looks wrong.",
                 "Beta Script", ok="Start"):
             return
-        self.flash(self.m.start(name))
+        self.flash(self._start_checked(name))
 
     def stop_sel(self):
         if self.selected():
@@ -463,7 +464,7 @@ class DashboardMixin:
     def _manage_stream(self, name: str | None) -> bool:
         """Start / stop the video stream for the shown instance. True while it runs."""
         want = (name is not None and self._live_fps() > 0 and self.live_auto.get()
-                and self.nb.index() == 0 and self.state() not in ("withdrawn", "iconic"))
+                and self._dashboard_in_view() and self.state() not in ("withdrawn", "iconic"))
         serial = self.m.instances[name].serial if want else None
         failed_at = self._stream_failed.get(serial) if serial else None
         if not want or (failed_at and time.monotonic() - failed_at < STREAM_RETRY_S):
@@ -528,7 +529,7 @@ class DashboardMixin:
                 self._preview_last_idle = time.monotonic()
                 self._energy_shot(name)
             return
-        if not self.live_auto.get() or self.nb.index() != 0 or self.state() == "withdrawn":
+        if not self.live_auto.get() or not self._dashboard_in_view() or self.state() == "withdrawn":
             return
         if not name:
             return

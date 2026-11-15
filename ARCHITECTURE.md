@@ -25,6 +25,11 @@ rerun/
   gui_<tab>.py          one mixin per tab: gui_updates (updates+key), gui_dashboard (+Live View), gui_settings
                         (+setup check), gui_templates, gui_history, gui_units (+Companion), gui_discord, gui_log;
                         gui_common holds the shared imports, constants and small widgets
+  accounts.py           Account Manager store: accounts/<id>/ (values with provenance, scans, sessions, events); the one source of truth
+  checklist.py          daily/weekly tasks and game-clock resets; goals.py goals + suggestions; vault.py crest vault (advice only)
+  safety.py             limits, dry-run device wrapper, Terms-of-Service text; account_ops.py glue to Manager (sessions, scans, reports, alerts)
+  gui_accounts*.py      Account Manager workspace; gui_farming.py Macro Farming workspace (reuses the dashboard/settings/history pages);
+                        gui_forms.py form dialog; ios.py also holds SideNav, ProgressBar, Pill, BarChart, Banner, metric_card
   events.py             typed shape of the events Manager.emit sends; configcheck.py warns about bad config keys
   textnav.py            find palace / quest names on screen from OCR words (Crest fallback)
   runlog.py             persistent rerun.log (rotated)

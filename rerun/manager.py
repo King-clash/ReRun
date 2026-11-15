@@ -529,7 +529,7 @@ class Manager:
         except StopRoutine as e:
             self.log(name, f"Stopped ({e})")
             reason = f"stopped: {e}"
-            if str(e) != "stopped by user" and str(e) != "stopped":
+            if str(e) not in ("stopped by user", "stopped") and not str(e).startswith("dry run complete"):
                 self.notify(name, f"Stopped: {e}", ping=True)
             self._set_status(inst, "idle", str(e))
         except MissingTemplate as e:

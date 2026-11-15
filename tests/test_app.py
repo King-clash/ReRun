@@ -148,7 +148,8 @@ def test_gui_starts_and_closes():
     def popover_open_close():
         from rerun import ios
         import tkinter as tk
-        app.nb.select(1)
+        app.nb.select(app._tab_farming)
+        app._farm_nav.select("settings")
         app.update()
         app.set_script._open()
         app.update()
@@ -161,15 +162,15 @@ def test_gui_starts_and_closes():
         app.after(200, lambda: app.nb.select(0))
         app.after(700, app.destroy)
 
-    app.after(300, lambda: (app.nb.select(1), app._load_settings_form()))
+    app.after(300, lambda: (app.nb.select(app._tab_farming), app._farm_nav.select("settings"), app._load_settings_form()))
     app.after(600, lambda: (app.nb.select(2), app.refresh_checklist()))
-    app.after(900, lambda: (app.nb.select(3), app.refresh_history()))
+    app.after(900, lambda: (app.nb.select(app._tab_farming), app._farm_nav.select("activity"), app.refresh_history()))
     app.after(1100, lambda: (app.hist_kind.set("Crests"), app.refresh_history()))
-    app.after(1200, lambda: (app.nb.select(4), app.units_q.set("a"), app.refresh_units()))
+    app.after(1200, lambda: (app.nb.select(app._tab_accounts), app._am_nav.select("units"), app.units_q.set("a"), app.refresh_units()))
     app.after(1250, lambda: (app.comp_show.set("Near target"), app.refresh_units(),
                              app._refresh_compendium_tiles(force=True)))
-    app.after(1300, lambda: app.nb.select(5))
-    app.after(1500, lambda: (app.nb.select(6), app.log_level.set("Errors"), app._rebuild_log()))
+    app.after(1300, lambda: app.nb.select(app._tab_discord))
+    app.after(1500, lambda: (app.nb.select(app._tab_discord + 1), app.log_level.set("Errors"), app._rebuild_log()))
     # GS Companion tab (last) and its link back to Rerun
     app.after(1600, lambda: (app.companion is not None and app.nb.select(app._tab_companion),
                              app._companion_refresh()))

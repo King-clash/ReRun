@@ -12,9 +12,13 @@ from .gui_history import HistoryMixin
 from .gui_units import UnitsMixin
 from .gui_discord import DiscordMixin
 from .gui_log import LogMixin
+from .gui_accounts import AccountsMixin
+from .gui_accounts2 import AccountsMoreMixin
+from .gui_farming import FarmingMixin
 
 
-class App(UpdatesKeysMixin, DashboardMixin, SettingsMixin, TemplatesMixin, HistoryMixin, UnitsMixin, DiscordMixin, LogMixin, tk.Tk):
+class App(AccountsMixin, AccountsMoreMixin, FarmingMixin, UpdatesKeysMixin, DashboardMixin, SettingsMixin, TemplatesMixin,
+          HistoryMixin, UnitsMixin, DiscordMixin, LogMixin, tk.Tk):
     def __init__(self, manager: Manager, license=None):
         ios.enable_dpi_awareness()
         super().__init__()
@@ -22,12 +26,12 @@ class App(UpdatesKeysMixin, DashboardMixin, SettingsMixin, TemplatesMixin, Histo
         self.license = license   # rerun/license.py License (None: no key check, e.g. tests)
         ios.init(self, str(self.m.config.get("appearance", "auto")))
         self.title("Rerun")
-        self.geometry(f"{px(1220)}x{px(840)}")
+        self.geometry(f"{px(1220)}x{px(900)}")
         saved = qol.clamp_geometry(str((self.m.config.get("ui") or {}).get("geometry") or ""),
                                    self.winfo_screenwidth(), self.winfo_screenheight())
         if saved:                      # where the window was last time (only if still on screen)
             self.geometry(saved)
-        self.minsize(px(1060), px(720))
+        self.minsize(px(1060), px(800))
         self._icon = ImageTk.PhotoImage(make_icon(64))
         self.iconphoto(True, self._icon)
         self.events: queue.Queue = queue.Queue()
@@ -46,14 +50,14 @@ class App(UpdatesKeysMixin, DashboardMixin, SettingsMixin, TemplatesMixin, Histo
         self.nb.pack(fill="both", expand=True)
         self.status = self.nb.status
         self.toast = ios.Toast(self.nb.content)
-        self._build_dashboard()
-        self._build_settings()
+        self._host = None                       # set while a page is built into a workspace instead of a tab
+        self._build_accounts()                  # Account Manager: units live inside it
+        self._build_farming()                   # Macro Farming: dashboard, routine settings, history live inside it
         self._build_templates()
-        self._build_history()
-        self._build_units()
-        self._tab_discord = 5
+        self._tab_discord = self.nb.count()
         self._build_discord()
         self._build_log()
+        self._build_app_settings()
         self._backfill_log()
         self._build_companion()
         self.status.configure(text="F12 stops everything  ·  F11 pauses or resumes all")
@@ -87,13 +91,16 @@ class App(UpdatesKeysMixin, DashboardMixin, SettingsMixin, TemplatesMixin, Histo
     # small helpers --------------------------------------------------------
     def _page(self, title: str, tab: str, icon: str, scroll: bool = False):
         """Returns (page, content parent, header-right frame)."""
+        host = self._host or self.nb.content
         if scroll:
-            page = ios.ScrollFrame(self.nb.content)
+            page = ios.ScrollFrame(host)
             parent = page.inner
         else:
-            page = tk.Frame(self.nb.content, bg=C["bg"])
+            page = tk.Frame(host, bg=C["bg"])
             parent = page
-        self.nb.add(page, tab, icon)
+        if self._host is None:
+            self.nb.add(page, tab, icon)
+        self._last_page = page                  # a workspace packs this itself
         return page, parent, ios.page_header(parent, title)
 
     def _label(self, parent, text="", secondary=True, font="footnote", **kw):
@@ -164,6 +171,7 @@ class App(UpdatesKeysMixin, DashboardMixin, SettingsMixin, TemplatesMixin, Histo
         if self.state() != "withdrawn":
             self.refresh_instances()
             self._auto_preview()
+        self._farm_update_status()
         self._ticks = getattr(self, "_ticks", 0) + 1
         if self._ticks % 30 == 0:
             self._check_template_health()

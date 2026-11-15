@@ -472,6 +472,54 @@ def test_dashboard_series_never_invent_data():
         shutil.rmtree(root, ignore_errors=True)
 
 
+def test_dry_run_through_the_manager_taps_nothing_and_is_recorded_as_a_dry_run():
+    import cv2
+    from rerun.adb import FakeDevice
+    root, m = make_manager()
+    try:
+        m.config["game_package"] = "fake.grandsummoners"
+        inst = next(iter(m.instances))
+        dev = FakeDevice([cv2.imread(str(ROOT / "tests" / "fixtures" / "home.png"))])
+        m.instances[inst].device = dev
+        assert "Dry run" in m.start(inst, "any_quest", dry_run=True)
+        t0 = time.time()
+        while m.instances[inst].status not in ("idle", "error") and time.time() - t0 < 60:
+            time.sleep(0.1)
+        assert dev.taps == [], dev.taps
+        main = m.ops.store.active_id
+        ses = m.ops.store.sessions(main)
+        assert len(ses) == 1 and ses[0]["dry_run"] and ses[0]["status"] == "completed", ses
+        assert any("DRY RUN RESULT" in line for line in m.log_lines)
+        # a dry run never completes a checklist task
+        c = m.ops.checklist
+        c.begin_run(main, "login_reward")
+        i = m.instances[inst]
+        i.account, i.dry_run, i.task, i.session_id = main, True, "login_reward", m.ops.store.begin_session(main, inst, "login_mail", True)
+        m.ops.session_ended(i, {}, "finished: done")
+        row = {r["id"]: r for r in c.rows(main)}["login_reward"]
+        assert row["state"] == "available", row["state"]
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
+def test_session_limit_stops_the_run():
+    root, m = make_manager()
+    try:
+        import threading
+
+        class Ctx:
+            stop_event, pause_event = threading.Event(), threading.Event()
+
+        class I:
+            name, ctx, limit_timer = "x", Ctx(), None
+        i = I()
+        m.arm_limit(i, 0.005)
+        assert Ctx.stop_event.wait(3), "the session limit must set the stop event"
+        i.limit_timer.cancel()
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failed = 0

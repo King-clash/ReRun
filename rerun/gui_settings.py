@@ -11,9 +11,8 @@ class SettingsMixin:
 
     # ================================================================ settings
     def _build_settings(self):
-        _, page, shdr = self._page("Script Settings", "Settings", "settings", scroll=True)
-        ios.Button(shdr, "Import from another Rerun…", self.import_old_data, kind="plain",
-                   icon="download", small=True).pack(side="right")
+        """Routine settings (per emulator and script). Built into the Macro Farming workspace."""
+        _, page, shdr = self._page("Routine Settings", "Settings", "settings", scroll=True)
         wrap = tk.Frame(page, bg=C["bg"])
         wrap.pack(fill="x", padx=px(20))
         g = ios.Group(wrap)
@@ -30,7 +29,16 @@ class SettingsMixin:
         bar.pack(fill="x", pady=(px(14), 0))
         ios.Button(bar, "Save Settings", self._save_settings_form, icon="save").pack(side="left")
         self._label(bar, "Changes apply the next time the script starts.").pack(side="left", padx=px(12))
+        self.form_vars: dict[str, tk.Variable] = {}
+        self.set_script.current(1)
 
+    def _build_app_settings(self):
+        """App-wide settings: theme, tray, start options, logging, updates."""
+        _, page, shdr = self._page("Settings", "Settings", "settings", scroll=True)
+        ios.Button(shdr, "Import from another Rerun…", self.import_old_data, kind="plain",
+                   icon="download", small=True).pack(side="right")
+        wrap = tk.Frame(page, bg=C["bg"])
+        wrap.pack(fill="x", padx=px(20))
         g2 = ios.Group(wrap, header="App", footer="Theme applies the next time Rerun opens.")
         g2.pack(fill="x", pady=(px(30), px(24)))
         self.appearance = ios.Select(g2.row("Theme"), values=list(APPEARANCE.values()),
@@ -98,8 +106,6 @@ class SettingsMixin:
         # the row's grey subtitle doubles as the update status line
         self.upd_status = right.master.winfo_children()[1].winfo_children()[1]
         self._set_update_status(self._update_idle_text())
-        self.form_vars: dict[str, tk.Variable] = {}
-        self.set_script.current(1)
 
     # setup check ------------------------------------------------------------
     def open_setup_check(self):

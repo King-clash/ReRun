@@ -73,7 +73,7 @@ DEFAULT_SAFETY = {
 DEFAULT_NOTIFY = {
     "enabled": True, "daily_report": True, "failures": True, "low_energy": True,
     "low_energy_below": 0,           # 0 = off
-    "task_reminders": True, "event_warnings": True, "event_warn_hours": 24, "ping": True,
+    "event_warnings": True, "event_warn_hours": 24, "ping": True,
 }
 DEFAULT_PREFS = {"energy_regen_minutes": 0,      # minutes per energy point; 0 = unknown -> no refill estimate
                  "week_reset_weekday": 0,        # 0 = Monday (an assumption - set it to the game's real day)

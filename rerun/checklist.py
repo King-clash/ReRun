@@ -33,7 +33,7 @@ BUILTIN_TASKS = [
     {"id": "free_summon", "name": "Free summon", "period": "daily", "priority": 3,
      "script": None, "note": "Manual. Rerun never spends summons by itself."},
     {"id": "raid_tickets", "name": "Raid tickets", "period": "daily", "priority": 4,
-     "script": "raids", "note": "'Raid Tickets' script is BETA (not yet run on a real game)."},
+     "script": "raid_tickets", "note": "'Raid Tickets' script is BETA (not yet run on a real game)."},
     {"id": "weekly_shop", "name": "Weekly shop items", "period": "weekly", "priority": 2,
      "script": None, "note": "Manual. Rerun never buys anything."},
     {"id": "weekly_missions", "name": "Weekly missions", "period": "weekly", "priority": 3,
@@ -215,6 +215,14 @@ class Checklist:
             raise AccountError(f"'{tdef['name']}' is already running.")
         with self.s._lock:
             a["tasks"].setdefault(tid, {}).update(run_state="in_progress", run_t=now)
+            self.s._save(a)
+        self.s._emit("task", aid, tid)
+
+    def cancel_run(self, aid: str, tid: str) -> None:
+        """A run that never really started (refused, or a dry run) leaves the task as it was."""
+        a, _ = self._rec(aid, tid)
+        with self.s._lock:
+            a["tasks"].setdefault(tid, {}).update(run_state="")
             self.s._save(a)
         self.s._emit("task", aid, tid)
 

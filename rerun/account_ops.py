@@ -134,8 +134,11 @@ class AccountOps:
                 n = sum(v for k, v in delta.items() if pick(k))
                 if n > 0:
                     results[label] = n
-            ok = reason.startswith("finished") or reason.startswith("stopped: stopped") or reason == "stopped: stopped by user"
-            status = "completed" if reason.startswith("finished") else ("stopped" if ok else "error")
+            dry = bool(getattr(inst, "dry_run", False))
+            if dry:
+                results["planned actions"] = len(getattr(inst, "last_plan", None) or [])
+            ok = reason.startswith("finished") or reason.startswith("stopped: stopped")
+            status = "completed" if (reason.startswith("finished") or (dry and "dry run complete" in reason))                 else ("stopped" if ok else "error")
             err = "" if status != "error" else reason
             self.store.end_session(aid, sid, status, results, err)
             ctx = inst.ctx
@@ -145,11 +148,37 @@ class AccountOps:
                                        source="energy bar (read while farming)")
             tid = getattr(inst, "task", "")
             if tid:
-                self.checklist.end_run(aid, tid, ok=reason.startswith("finished"))
-            if status == "error" and self.store.get(aid)["notify"]["failures"]:
+                if getattr(inst, "dry_run", False):
+                    self.checklist.cancel_run(aid, tid)             # a dry run completes nothing
+                else:
+                    self.checklist.end_run(aid, tid, ok=reason.startswith("finished"))
+            if status == "error" and not dry and self.store.get(aid)["notify"]["failures"]:
                 self.m.notify(inst.name, f"{self.name(aid)}: {inst.script} ended with a problem: {reason}", ping=True)
         except Exception as ex:  # noqa: BLE001
             errlog.note("ops.session_end", ex)
+
+    def run_task(self, aid: str, tid: str) -> str:
+        """Start the script behind a checklist task. Refuses anything done already, unautomatable, or unsafe;
+        returns a sentence for the user."""
+        try:
+            tdef = next((d for d in self.checklist.definitions(aid) if d["id"] == tid), None)
+            if tdef is None:
+                return "Unknown task."
+            avail = self.m.scripts_available()
+            if not tdef.get("script") or tdef["script"] not in avail:
+                return f"'{tdef['name']}' is a manual task - Rerun has no tested routine for it."
+            inst = self.store.get(aid)["instance"]
+            if not inst or inst not in self.m.instances:
+                return "Link this account to an emulator first (Account Manager > Information)."
+            if len(self.store.accounts_for_instance(inst)) > 1 and self.store.active_id != aid:
+                return "Several accounts share this emulator - make this account active and confirm it is open in the game."
+            self.checklist.begin_run(aid, tid)
+        except AccountError as e:
+            return str(e)
+        msg = self.m.start(inst, tdef["script"], confirm_account=aid, task=tid)
+        if not msg.startswith(("Started", "Dry run")):
+            self.checklist.cancel_run(aid, tid)
+        return msg
 
     # ------------------------------------------------------------------ scanning
     def scan_energy(self, aid: str) -> dict:

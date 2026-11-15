@@ -126,6 +126,8 @@ def init(root: tk.Tk, appearance: str = "auto") -> None:
         "button_small": (sb[0], 9) + sb[2:], "footnote": (text, 9),
         "footnote_semi": (sb[0], 9) + sb[2:], "caption": (text, 8),
         "mono": (mono, 9), "glyph": (text, 15),
+        # type scale for dashboards: big numbers, card titles
+        "metric": (disp, 24, "bold"), "metric_small": (disp, 15, "bold"), "card_title": (sb[0], 12) + sb[2:],
     })
     if ICON_FONT:
         F.update({"icon": (ICON_FONT, 10), "icon_tab": (ICON_FONT, 15),
@@ -364,9 +366,15 @@ class Button(tk.Canvas):
         self._bh = px(28 if small else 34)
         self._padx = px(0 if kind == "plain" else (11 if small else 15))
         self._state, self._enabled = "normal", True
-        self.bind("<Enter>", lambda e: self._set_state("hover"))
-        self.bind("<Leave>", lambda e: self._set_state("normal"))
-        self.bind("<ButtonPress-1>", lambda e: self._set_state("pressed"))
+        self._focus = False
+        self.configure(takefocus=1)              # Tab reaches it; Space / Return press it
+        self.bind("<FocusIn>", lambda e=None: self._set_focus(True))
+        self.bind("<FocusOut>", lambda e=None: self._set_focus(False))
+        for k in ("<space>", "<Return>"):
+            self.bind(k, self._key_press)
+        self.bind("<Enter>", lambda e=None: self._set_state("hover"))
+        self.bind("<Leave>", lambda e=None: self._set_state("normal"))
+        self.bind("<ButtonPress-1>", lambda e=None: self._set_state("pressed"))
         self.bind("<ButtonRelease-1>", self._release)
         self.set_text(text)
 
@@ -385,8 +393,19 @@ class Button(tk.Canvas):
         self._draw()
 
     def _set_state(self, s):
+        if not self.winfo_exists():       # a Leave event can arrive just after the page was redrawn
+            return
         self._state = s
         self._draw()
+
+    def _set_focus(self, on: bool):
+        self._focus = on
+        self._draw()
+
+    def _key_press(self, _e=None):
+        if self._enabled and self._cmd:
+            self._cmd()
+        return "break"
 
     def _release(self, e):
         fire = self._state == "pressed" and 0 <= e.x < self._bw and 0 <= e.y < self._bh
@@ -428,6 +447,12 @@ class Button(tk.Canvas):
             self.create_text(x, y, text=self._icon, font=F["icon"], fill=fg, anchor="w")
             x += iw + px(6)
         self.create_text(x + tw // 2, y, text=self._text, font=self._font, fill=fg)
+        if self._focus:                                       # visible keyboard focus ring
+            if self._kind == "plain":
+                self.create_line(self._padx, self._bh - 2, self._bw - self._padx, self._bh - 2,
+                                 fill=self._color, width=2)
+            else:
+                rounded_outline(self, 1, 1, self._bw - 1, self._bh - 1, px(8 if self._small else 10), C["blue"])
 
 
 class Switch(tk.Canvas):
@@ -837,11 +862,14 @@ class TabView(tk.Frame):
         self._tabs: list[tuple[tk.Label, tk.Label]] = []
         self._index: int | None = None
 
-    def add(self, page: tk.Frame, text: str, icon: str):
+    def add(self, page: tk.Frame, text: str, icon: str, first: bool = False):
+        """`first=True` shows the tab at the left end (its index is still its creation order)."""
         i = len(self._pages)
         self._pages.append(page)
         cell = tk.Frame(self._items, bg=C["bar"], width=px(112), height=px(44), cursor="hand2")
-        cell.grid(row=0, column=i)
+        self._cells = getattr(self, "_cells", [])
+        self._cells.append((i, cell, first))
+        self._regrid()
         cell.pack_propagate(False)
         ic = tk.Label(cell, text=icon_text(icon) or "●", bg=C["bar"], cursor="hand2",
                       font=F["icon_tab"] if ICON_FONT else F["body"])
@@ -855,6 +883,11 @@ class TabView(tk.Frame):
             self.select(0)
         else:
             self._paint()
+
+    def _regrid(self):
+        order = [c for c in self._cells if c[2]] + [c for c in self._cells if not c[2]]
+        for col, (_, cell, _f) in enumerate(order):
+            cell.grid(row=0, column=col)
 
     def select(self, i: int):
         if self._index is not None:
@@ -996,3 +1029,203 @@ def ask_string(root, title: str, message: str, initial: str = "") -> str | None:
     i, text = _dialog(root, title, message, [("Cancel", "cancel"), ("OK", "default")],
                       initial=initial, default=1, cancel=0)
     return text if i == 1 else None
+
+
+# ------------------------------------------------------------------ workspace widgets (Account Manager, Macro Farming)
+def rounded_outline(cv: tk.Canvas, x0, y0, x1, y1, r, color: str, width: int = 2):
+    cv.create_line(x0 + r, y0, x1 - r, y0, x1, y0 + r, x1, y1 - r, x1 - r, y1, x0 + r, y1, x0, y1 - r, x0, y0 + r,
+                   x0 + r, y0, fill=color, width=width, smooth=True)
+
+
+def animations_enabled() -> bool:
+    """False when Windows 'Show animations' is off (reduced motion): widgets then jump instead of easing."""
+    try:
+        import ctypes
+        flag = ctypes.c_int(1)
+        ctypes.windll.user32.SystemParametersInfoW(0x1042, 0, ctypes.byref(flag), 0)   # SPI_GETCLIENTAREAANIMATION
+        return bool(flag.value)
+    except (AttributeError, OSError, ImportError):
+        return True
+
+
+class SideNav(tk.Frame):
+    """Vertical section list for a workspace. Click, or Up/Down/Home/End when focused.
+    `items` is [(key, label)]; `command(key)` runs after a selection."""
+
+    def __init__(self, parent, items: list[tuple[str, str]], command, width: int = 196, title: str = ""):
+        self._bg = bg_of(parent)
+        super().__init__(parent, bg=self._bg, width=px(width), highlightthickness=0, takefocus=1)
+        self.pack_propagate(False)
+        self._cmd, self._items, self.current = command, items, None
+        if title:
+            tk.Label(self, text=title.upper(), bg=self._bg, fg=C["secondary"], font=F["footnote"],
+                     anchor="w").pack(fill="x", padx=px(14), pady=(px(6), px(8)))
+        self._rows: dict[str, tuple[tk.Frame, tk.Label]] = {}
+        for key, label in items:
+            row = tk.Frame(self, bg=self._bg, cursor="hand2")
+            row.pack(fill="x", padx=px(8), pady=px(1))
+            lb = tk.Label(row, text=label, bg=self._bg, fg=C["label"], font=F["body"], anchor="w",
+                          cursor="hand2")
+            lb.pack(fill="x", padx=px(10), pady=px(7))
+            for w in (row, lb):
+                w.bind("<Button-1>", lambda e=None, k=key: self.select(k, focus=True))
+                w.bind("<Enter>", lambda e=None, k=key: self._paint(hover=k))
+                w.bind("<Leave>", lambda e=None: self._paint())
+            self._rows[key] = (row, lb)
+        self.bind("<Up>", lambda e=None: self._step(-1))
+        self.bind("<Down>", lambda e=None: self._step(1))
+        self.bind("<Home>", lambda e=None: self.select(self._items[0][0]))
+        self.bind("<End>", lambda e=None: self.select(self._items[-1][0]))
+        self.bind("<FocusIn>", lambda e=None: self._paint())
+        self.bind("<FocusOut>", lambda e=None: self._paint())
+
+    def _step(self, d: int):
+        keys = [k for k, _ in self._items]
+        i = keys.index(self.current) if self.current in keys else 0
+        self.select(keys[max(0, min(len(keys) - 1, i + d))])
+        return "break"
+
+    def select(self, key: str, focus: bool = False, notify: bool = True):
+        if key not in self._rows:
+            return
+        self.current = key
+        if focus:
+            self.focus_set()
+        self._paint()
+        if notify:
+            self._cmd(key)
+
+    def _paint(self, hover: str | None = None):
+        focused = self.focus_get() is self
+        for key, (row, lb) in self._rows.items():
+            if key == self.current:
+                bg, fg = mix(self._bg, C["blue"], 0.22 if DARK_MODE else 0.13), C["blue"]
+                font = F["body_semi"]
+            else:
+                bg, fg, font = (C["fill"] if key == hover else self._bg), C["label"], F["body"]
+            row.configure(bg=bg, highlightthickness=2 if (focused and key == self.current) else 0,
+                          highlightbackground=bg, highlightcolor=C["blue"])
+            lb.configure(bg=bg, fg=fg, font=font)
+
+
+class ProgressBar(tk.Canvas):
+    """Thin rounded bar, 0..1. Eases to a new value unless the system asks for reduced motion."""
+
+    def __init__(self, parent, color: str = "blue", height: int = 8, width: int = 160):
+        self._bg = bg_of(parent)
+        self._h = px(height)
+        super().__init__(parent, bg=self._bg, height=self._h, width=px(width), highlightthickness=0, bd=0)
+        self._color, self._value, self._shown = C[color], 0.0, 0.0
+        self.bind("<Configure>", lambda e=None: self._draw())
+
+    def set(self, value: float, color: str | None = None):
+        self._value = max(0.0, min(1.0, value))
+        if color:
+            self._color = C[color]
+        if not animations_enabled() or abs(self._value - self._shown) < 0.01:
+            self._shown = self._value
+            self._draw()
+        else:
+            self._ease(6)
+
+    def _ease(self, steps: int):
+        if not self.winfo_exists():
+            return
+        self._shown += (self._value - self._shown) / max(1, steps)
+        self._draw()
+        if steps > 1:
+            self.after(25, lambda: self._ease(steps - 1))
+
+    def _draw(self):
+        if not self.winfo_exists():
+            return
+        self.delete("all")
+        w = max(self.winfo_width(), 2)
+        rounded_rect(self, 0, 0, w, self._h, self._h // 2, C["fill"], self._bg)
+        fw = int(w * self._shown)
+        if fw >= self._h:
+            rounded_rect(self, 0, 0, fw, self._h, self._h // 2, self._color, C["fill"])
+        elif fw > 0:
+            rounded_rect(self, 0, 0, self._h, self._h, self._h // 2, self._color, C["fill"])
+
+
+class Pill(tk.Label):
+    """Small tinted status label ("Completed", "BETA", ...). Always carries text, never colour alone."""
+
+    def __init__(self, parent, text: str, kind: str = "gray"):
+        bg = bg_of(parent)
+        c = C.get(kind, C["gray"])
+        super().__init__(parent, text=f" {text} ", bg=mix(bg, c, 0.22 if DARK_MODE else 0.14), fg=c,
+                         font=F["footnote_semi"], padx=px(4), pady=px(1))
+
+
+class BarChart(tk.Canvas):
+    """Simple bar chart from [(label, value)]. Shows an honest empty state when there is nothing to plot."""
+
+    def __init__(self, parent, title: str, data: list[tuple[str, float]], empty: str = "No data recorded yet",
+                 color: str = "blue", height: int = 150, unit: str = ""):
+        self._bg = bg_of(parent)
+        super().__init__(parent, bg=self._bg, height=px(height), highlightthickness=0, bd=0)
+        self.title, self.data, self.empty, self._color, self.unit = title, data, empty, C[color], unit
+        self.bind("<Configure>", lambda e=None: self._draw())
+
+    def _draw(self):
+        if not self.winfo_exists():
+            return
+        self.delete("all")
+        w, h = max(self.winfo_width(), 80), int(float(self["height"]))
+        self.create_text(px(2), px(8), text=self.title, anchor="w", fill=C["label"], font=F["footnote_semi"])
+        if not self.data or not any(v for _, v in self.data):
+            self.create_text(w // 2, h // 2 + px(6), text=self.empty, fill=C["secondary"], font=F["footnote"])
+            return
+        top, bot = px(28), h - px(20)
+        mx = max(v for _, v in self.data) or 1
+        n = len(self.data)
+        slot = (w - px(8)) / n
+        bw = min(px(34), slot * 0.6)
+        for i, (lab, v) in enumerate(self.data):
+            x = px(4) + slot * i + (slot - bw) / 2
+            bh = (bot - top) * (v / mx)
+            if v:
+                rounded_rect(self, x, bot - bh, x + bw, bot, min(px(5), bw / 2), self._color, self._bg)
+            val = f"{v:,.0f}" if float(v).is_integer() else f"{v:,.1f}"
+            self.create_text(x + bw / 2, bot - bh - px(7), text=val + self.unit, fill=C["secondary"], font=F["caption"])
+            self.create_text(x + bw / 2, h - px(8), text=lab, fill=C["secondary"], font=F["caption"])
+        self.create_line(px(4), bot, w - px(4), bot, fill=C["sep"])
+
+
+class Banner(tk.Frame):
+    """A prominent notice (e.g. the Terms-of-Service warning). Text wraps with the window."""
+
+    def __init__(self, parent, text: str, kind: str = "orange", title: str = ""):
+        bg = bg_of(parent)
+        c = C[kind]
+        tint = mix(bg, c, 0.2 if DARK_MODE else 0.12)
+        super().__init__(parent, bg=tint, highlightthickness=1, highlightbackground=mix(tint, c, 0.5))
+        inner = tk.Frame(self, bg=tint)
+        inner.pack(fill="x", padx=px(14), pady=px(7))
+        if title:
+            tk.Label(inner, text=title, bg=tint, fg=c, font=F["body_semi"], anchor="w").pack(fill="x")
+        self.label = tk.Label(inner, text=text, bg=tint, fg=C["label"], font=F["footnote"], anchor="w", justify="left")
+        self.label.pack(fill="x")
+        self.bind("<Configure>", lambda e=None: e is not None and self.label.configure(wraplength=max(200, e.width - px(40))))
+
+
+def wrapped_label(parent, text: str = "", secondary: bool = True, font: str = "footnote", **kw) -> tk.Label:
+    """Label whose wrap width follows its parent, so text never runs off a narrow window."""
+    lb = tk.Label(parent, text=text, bg=bg_of(parent), fg=C["secondary"] if secondary else C["label"],
+                  font=F[font], anchor="w", justify="left", **kw)
+    lb.bind("<Configure>", lambda e=None: e is not None and lb.configure(wraplength=max(120, e.width - 4)))
+    return lb
+
+
+def metric_card(parent, caption: str, value: str = "-", note: str = ""):
+    """Card with a small caption, a big number and a grey note. Returns (card, value label, note label)."""
+    card = Card(parent, pad=10)
+    tk.Label(card.body, text=caption.upper(), bg=C["card"], fg=C["secondary"], font=F["caption"], anchor="w").pack(fill="x")
+    v = tk.Label(card.body, text=value, bg=C["card"], fg=C["label"], font=F["metric"], anchor="w")
+    v.pack(fill="x")
+    n = tk.Label(card.body, text=note, bg=C["card"], fg=C["secondary"], font=F["caption"], anchor="w", justify="left")
+    n.pack(fill="x")
+    n.bind("<Configure>", lambda e=None: e is not None and n.configure(wraplength=max(100, e.width - 4)))
+    return card, v, n
