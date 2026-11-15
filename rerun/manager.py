@@ -23,6 +23,8 @@ from .crest_stats import CrestLedger
 from .history import History
 from .compendium import Compendium
 from .units import UnitRoster
+from .account_ops import AccountOps
+from .safety import DryRunDevice, plan_summary
 from .scripts import SCRIPTS
 from .scripts.base import Finished
 from .stats import Stats, fmt_duration
@@ -98,6 +100,12 @@ class Instance:
     thread: threading.Thread | None = None
     ctx: Context | None = None
     device: Device | None = None
+    account: str = ""        # Account Manager id this run belongs to ("" = unattributed)
+    session_id: str = ""
+    task: str = ""           # checklist task this run was started for
+    dry_run: bool = False
+    limit_timer: threading.Timer | None = None
+    last_plan: list | None = None     # what the last dry run would have done
 
 
 def deep_merge(base: dict, extra: dict) -> dict:
@@ -140,6 +148,7 @@ class Manager:
         self.instances: dict[str, Instance] = {}
         self.reload()
         self._setup_reference_names()
+        self.ops = AccountOps(self)      # accounts, checklist, goals, vault (rerun/account_ops.py)
 
     # ------------------------------------------------------------ GS Companion names
     def _setup_reference_names(self) -> None:
@@ -331,12 +340,22 @@ class Manager:
 
     def notify(self, instance: str, message: str, image: np.ndarray | None = None,
                ping: bool = False) -> None:
+        ops = getattr(self, "ops", None)
+        aid = None
+        if ops is not None:
+            aid = ops.account_of_running(instance) or next(iter(
+                [a["id"] for a in ops.store.accounts_for_instance(instance)][:1]), None)
+        muted = bool(aid and not ops.store.get(aid)["notify"]["enabled"])   # this account sends no Discord messages
+        if aid and len(self.ops.store.ids()) > 1 and not message.startswith(self.ops.name(aid)):
+            message = f"[{self.ops.name(aid)}] {message}"      # several accounts: say which one
+        if aid and not self.ops.store.get(aid)["notify"]["ping"]:
+            ping = False                                         # this account never @mentions
         self.log(instance, f"NOTIFY: {message}")
         ping, skipped = self.effective_ping(message, ping) if ping else (False, "")
         if skipped:
             self.log(instance, f"(no Discord @mention: {skipped})")
         self.emit({"type": "notify", "instance": instance, "message": message})
-        if self.discord:
+        if self.discord and not muted:
             png = None
             if image is not None:
                 ok, buf = cv2.imencode(".png", image)
@@ -389,7 +408,10 @@ class Manager:
     # ------------------------------------------------------------ control
     locked = False   # set by the app while its key is expired: nothing may start
 
-    def start(self, name: str, script: str | None = None) -> str:
+    def start(self, name: str, script: str | None = None, confirm_account: str | None = None,
+              dry_run: bool = False, task: str = "") -> str:
+        """Start a script. `confirm_account` is needed when several accounts share this emulator (it says
+        which one is logged in); `dry_run` shows what would be tapped and taps nothing."""
         if self.locked:
             return "Rerun's key has expired - enter a new key in Rerun to start scripts"
         with self._lock:
@@ -404,11 +426,28 @@ class Manager:
                 self.set_instance_script(name, script)
             if inst.script not in self.scripts_available():
                 return f"Unknown script '{inst.script}'"
+            aid, err, dry = self.ops.before_start(name, inst.script, confirm_account, dry_run)
+            if err:
+                return err
+            inst.account, inst.dry_run, inst.task = aid or "", dry, task
             self._set_status(inst, "starting")
             inst.thread = threading.Thread(target=self._worker, args=(inst,),
                                            name=f"worker-{name}", daemon=True)
             inst.thread.start()
-            return f"Started {self.scripts_available()[inst.script]} on {name}"
+            who = f" for {self.ops.name(aid)}" if aid else ""
+            return (f"Dry run of {self.scripts_available()[inst.script]} on {name}{who} (nothing will be tapped)"
+                    if dry else f"Started {self.scripts_available()[inst.script]} on {name}{who}")
+
+    def arm_limit(self, inst: Instance, minutes: int) -> None:
+        """Stop this run after `minutes` (the account's session limit)."""
+        def fire(ctx=inst.ctx, n=inst.name):
+            if ctx is not None and not ctx.stop_event.is_set():
+                self.log(n, f"Session limit of {minutes} minutes reached - stopping")
+                ctx.stop_event.set()
+                ctx.pause_event.clear()
+        inst.limit_timer = threading.Timer(minutes * 60, fire)
+        inst.limit_timer.daemon = True
+        inst.limit_timer.start()
 
     def stop(self, name: str) -> str:
         inst = self.instances.get(name)
@@ -455,15 +494,19 @@ class Manager:
     def _worker(self, inst: Instance) -> None:
         name = inst.name
         started_at, before, reason = None, {}, "finished"
+        plan_dev = None
         try:
             dev = self.device(name)
             dev.connect()
             dev.resolve_package(self.config.get("game_package"))
+            if inst.dry_run:
+                dev = plan_dev = DryRunDevice(dev, log=lambda m, n=name: self.log(n, m))
             ctx = Context(
                 instance=name, device=dev, vision=self.vision, stats=self.stats,
                 routines=self.routines, base_resolution=(720, 1280),
                 log=self.log, notify=self.notify, history=self.history, data_dir=self.root,
-                crests=self.crests, units=self.units,
+                crests=self.crests,
+                units=self.ops.roster_for(inst.account) if inst.account else self.units,
             )
             # Queue runs other scripts with this instance's settings for them.
             ctx.params["settings_of"] = lambda sid, n=name: self.script_settings(n, sid)
@@ -472,6 +515,7 @@ class Manager:
             self._set_status(inst, "running", inst.script)
             self.stats.mark_started(name)
             started_at, before = time.time(), dict(self.stats.get(name))
+            self.ops.session_started(inst, inst.account, inst.dry_run)
             if inst.script.startswith(CUSTOM_PREFIX):
                 Runner(ctx, inst.script[len(CUSTOM_PREFIX):]).run()
             else:
@@ -505,6 +549,12 @@ class Manager:
             self._set_status(inst, "error", repr(e))
         finally:
             self.stats.mark_stopped(name)
+            if inst.limit_timer is not None:
+                inst.limit_timer.cancel()
+                inst.limit_timer = None
+            if plan_dev is not None:
+                self.log(name, "DRY RUN RESULT: " + plan_summary(plan_dev.plan))
+                inst.last_plan = list(plan_dev.plan)
             if started_at is not None:
                 self._record_session(inst, started_at, before, reason)
             inst.ctx = None
@@ -531,6 +581,7 @@ class Manager:
             detail = f"Session ended after {mins} min ({title}): {reason}"                      + (" | " + ", ".join(parts) if parts else "")
             self.history.add(name, inst.script, "session", detail)
             self.log(name, detail)
+            self.ops.session_ended(inst, delta, reason)
         except Exception as e:  # noqa: BLE001 - a summary must never break shutdown
             errlog.note("manager.session_summary", e)
 
@@ -578,6 +629,13 @@ class Manager:
                 self.discord.send(self.daily_summary(), None, False)
                 self.log("app", "Daily summary sent to Discord")
                 did.append("summary")
+                if self.ops.send_daily_reports():
+                    did.append("account reports")
+        try:
+            if self.ops.check_alerts():
+                did.append("account alerts")
+        except Exception as e:  # noqa: BLE001 - alerts are a nicety; the clock must keep running
+            errlog.note("manager.account_alerts", e)
         return did
 
     def daily_summary(self, update_baseline: bool = True) -> str:
