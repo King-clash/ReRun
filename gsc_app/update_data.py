@@ -36,7 +36,8 @@ PAUSE_S = 0.5
 MAX_PAGE = 4_000_000
 MAX_IMAGE = 3_000_000
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) gsc-companion/1.0"}
-PARTS = ("lists", "guides", "units", "pictures")
+PARTS = ("lists", "guides", "bosses", "equips", "calc", "units", "pictures")
+CATALOG = Path(__file__).with_name("stage_catalog.json")
 META_NOTE = "Fan-site reference data; the game itself is the authority."
 
 
@@ -98,7 +99,9 @@ class Updater:
     # --- parts --------------------------------------------------------------------------
     def run(self) -> bool:
         """True when everything worked (cancelled or failed parts -> False)."""
-        steps = [("lists", self.lists), ("guides", self.guides), ("units", self.units),
+        steps = [("lists", self.lists), ("guides", self.guides), ("bosses", self.bosses),
+                 ("equips", self.equips), ("calc", self.calc),
+                 ("units", self.units),
                  ("pictures", self.pictures)]
         try:
             for name, fn in steps:
@@ -166,6 +169,94 @@ class Updater:
             "stages": guides})
         self.summary.append(f"{len(guides)} stage guides")
 
+    def bosses(self):
+        """The guide for every Giant Boss, Story Challenge and Event quest in
+        stage_catalog.json -> other_guides.json (same shape as stage_guides.json)."""
+        stages = []
+        for cat in read_json(CATALOG, {}).get("categories", []):
+            for s in cat.get("stages", []):
+                stages.append({"name": s["name"], "difficulty": "", "slug": s["slug"],
+                               "boss": s.get("boss", ""),
+                               "url": f"{SITE}/stages/{s['slug']}/"})
+        path = self.out / "other_guides.json"
+        old = {g["slug"]: g for g in read_json(path, {}).get("stages", [])}
+        guides = []
+        for i, s in enumerate(stages):
+            self.progress(f"Boss and event guides: {s['name']}", i, len(stages))
+            try:
+                if not re.match(r"^[a-z0-9-]+$", s["slug"]):
+                    raise ValueError("odd slug")
+                g = scrape.parse_stage_guide(self.page(f"/stages/{s['slug']}/"), s)
+                if not g["summary"] and not g["roles"] and not g["waves"]:
+                    raise ValueError("page had no guide")
+                guides.append(g)
+            except Cancelled:
+                raise
+            except Exception as e:  # noqa: BLE001 - keep the old guide, report it
+                self.failed.append((s["name"], str(e)))
+                if s["slug"] in old:
+                    guides.append(old[s["slug"]])
+        self.progress("Boss and event guides", len(stages), len(stages))
+        write_json(path, {
+            "source": f"{SITE}/stages/", "built": date.today().isoformat(),
+            "note": "Giant Boss, Story Challenge and Event guides from GS Companion. "
+                    "Local reference only.",
+            "stages": guides})
+        self.summary.append(f"{len(guides)} boss and event guides")
+
+    def equips(self):
+        """Every equip (name, rarity, type, cooldown, skill, passives, where to get it) from
+        the site's own list (/equips.json) -> equips.json."""
+        self.progress("Equips", 0, 1)
+        raw = json.loads(self.page("/equips.json"))
+        keep = ("id", "name", "aka", "slug", "star", "type", "ct", "img", "loc", "secret",
+                "skill", "passives")
+        out = []
+        for e in raw if isinstance(raw, list) else []:
+            if not (isinstance(e, dict) and e.get("name")
+                    and re.fullmatch(r"[a-z0-9-]+", str(e.get("slug", "")))):
+                continue
+            out.append({k: e[k] for k in keep if k in e})
+        if len(out) < 500:  # never replace good data with a half-read page
+            self.failed.append(("equips", f"list looked wrong ({len(out)} equips)"))
+            return
+        write_json(self.out / "equips.json", {
+            "source": f"{SITE}/equips/", "built": date.today().isoformat(),
+            "note": META_NOTE, "equips": out})
+        self.progress("Equips", 1, 1)
+        self.summary.append(f"{len(out)} equips")
+
+    def calc(self):
+        """The data the site's Team Builder and Damage Calc run on: every unit's structured
+        effects (/units.json), the calculator's equips (/calc-equips.json) and the unit /
+        enemy / crest lists embedded in the calculator page. -> team_*.json, calc_*.json"""
+        steps = 4
+        self.progress("Team and damage data", 0, steps)
+        units = json.loads(self.page("/units.json"))
+        self.progress("Team and damage data", 1, steps)
+        equips = json.loads(self.page("/calc-equips.json"))
+        self.progress("Team and damage data", 2, steps)
+        html = self.page("/damage-calc/")
+        self.progress("Team and damage data", 3, steps)
+        blobs = {}
+        for key in ("calc-data", "enemy-data", "crest-data"):
+            m = re.search(r'<script[^>]*\bid="%s"[^>]*>(.*?)</script>' % key, html, re.S)
+            blobs[key] = json.loads(m.group(1)) if m else None
+        if (not isinstance(units, list) or len(units) < 200 or not isinstance(equips, list)
+                or len(equips) < 500 or not all(isinstance(blobs[k], list) and blobs[k]
+                                                for k in blobs)):
+            self.failed.append(("calc", "the Team Builder / Damage Calc data looked wrong"))
+            return
+        meta = {"source": SITE, "built": date.today().isoformat(), "note": META_NOTE}
+        write_json(self.out / "team_units.json", {**meta, "units": units})
+        write_json(self.out / "calc_equips.json", {**meta, "equips": equips})
+        write_json(self.out / "calc_units.json", {**meta, "units": blobs["calc-data"]})
+        write_json(self.out / "calc_enemies.json", {**meta, "enemies": blobs["enemy-data"]})
+        write_json(self.out / "calc_crests.json", {**meta, "crests": blobs["crest-data"]})
+        self.progress("Team and damage data", steps, steps)
+        self.summary.append(f"{len(units)} team units, {len(equips)} calc equips, "
+                            f"{len(blobs['enemy-data'])} enemies, {len(blobs['crest-data'])} crests")
+
     def units(self):
         units = read_json(self.out / "units.json", {}).get("units", [])
         path = self.out / "unit_details.json"
@@ -212,8 +303,37 @@ class Updater:
                 out.add(c["icon"][len(SITE):])
         for lv in scrape.LEVELS:
             out.add(f"/images/crests/{lv.lower().replace('+', 'p')}.png")
-        text = (self.out / "stage_guides.json").read_text(encoding="utf-8") \
-            if (self.out / "stage_guides.json").exists() else ""
+        # Giant Boss / Story / Event pictures (gsc_app/stage_catalog.json).
+        for cat in read_json(Path(__file__).with_name("stage_catalog.json"), {}).get(
+                "categories", []):
+            for s in cat.get("stages", []):
+                if s.get("image") and re.fullmatch(r"[A-Za-z0-9_./-]+\.(?:png|webp|jpg)",
+                                                   s["image"]) and ".." not in s["image"]:
+                    out.add(f"/images/{s['image']}")
+        for e in read_json(self.out / "equips.json", {}).get("equips", []):
+            if re.fullmatch(r"[A-Za-z0-9_]+", str(e.get("img", ""))):
+                out.add(f"/images/{e['img']}.png")
+        # Team & Damage: element, race and equip-type icons, the calculator's equips and
+        # units, and its enemy icons.
+        for n in ("fire", "water", "earth", "light", "dark"):
+            out.add(f"/images/elem_{n}.png")
+        for n in ("human", "demon", "god", "spirit", "machine", "dragon", "beast", "giant"):
+            out.add(f"/images/race_{n}.png")
+        for n in ("phys", "mag", "def", "heal", "supp"):
+            out.add(f"/images/lbstone_{n}.png")
+        for e in read_json(self.out / "calc_equips.json", {}).get("equips", []):
+            if re.fullmatch(r"[A-Za-z0-9_]+", str(e.get("img", ""))):
+                out.add(f"/images/{e['img']}.png")
+        for u in read_json(self.out / "calc_units.json", {}).get("units", []):
+            if re.fullmatch(r"[A-Za-z0-9_]+", str(u.get("thumb", ""))):
+                out.add(f"/images/{u['thumb']}.png")
+        for e in read_json(self.out / "calc_enemies.json", {}).get("enemies", []):
+            ic = str(e.get("icon") or "")
+            if re.fullmatch(r"/images/[A-Za-z0-9_./-]+\.(?:png|webp|jpg)", ic) and ".." not in ic:
+                out.add(ic)
+        text = "".join((self.out / f).read_text(encoding="utf-8")
+                       for f in ("stage_guides.json", "other_guides.json")
+                       if (self.out / f).exists())
         out.update(re.findall(r'"(/images/[A-Za-z0-9_./-]+\.(?:png|webp|jpg))"', text))
         return sorted(p for p in out if ".." not in p)
 

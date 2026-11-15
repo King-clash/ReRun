@@ -72,7 +72,9 @@ def build_exe(dist: Path) -> bool:
         "--hidden-import", "pystray._win32",
         "--hidden-import", "pynput.keyboard._win32",
         "--hidden-import", "pynput.mouse._win32",
-        # GS Companion tab (imported inside a try block in rerun/gui.py)
+        # GS Companion tab (imported inside a try block in rerun/gui.py), and the Giant Boss /
+        # Story / Event stage list it reads next to gsc_app/page.py
+        "--add-data", f"{ROOT / 'gsc_app' / 'stage_catalog.json'}{SEP}gsc_app",
         "--hidden-import", "gsc_app.page", "--hidden-import", "gsc_app.update_data",
         "--hidden-import", "gsc_app.scrape",
         "--exclude-module", "matplotlib", "--exclude-module", "pytest",

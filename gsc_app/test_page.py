@@ -577,8 +577,16 @@ def test_rerun_hookup_on_a_copy():
             def step():
                 p = pages[-1]
                 app.nb.select(len(pages) - 1); app.update()
-                for v in ('Today', 'Week', 'Units', 'Team', 'Planner', 'Compare'):
+                for v in ('Today', 'Week', 'Bosses & Events', 'Crests', 'Planner', 'Compare',
+                          'Units', 'Team', 'Team & Damage', 'Equips', 'Guide picks'):
                     p.show_view(v); app.update()
+                # Team & Damage inside Rerun: add a unit, the damage appears
+                p.show_view('Team & Damage'); app.update()
+                cp = p.calc_panel
+                cp.model.add_unit(0, cp.data.unit_list[0]['id']); cp.refresh(); app.update()
+                assert cp.model.result() and cp.model.result()['result']['shown'] >= 0
+                p.show_view('Bosses & Events'); app.update()
+                p.find_q.set('goldola'); app.update()
                 p.show_view('Units'); app.update()
                 assert len(p._rows) > 400
                 # Rerun Units -> Companion
@@ -605,6 +613,251 @@ def test_rerun_hookup_on_a_copy():
         assert "HOOKUP OK" in r.stdout, r.stdout + r.stderr
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_other_stages_view():
+    """Giant Bosses, Story Challenge and Events list, filter, search and show details."""
+    win, page, opened, errors = make_page()
+    try:
+        assert len(page.other) == 17 + 25 + 6
+        page.show_view("Bosses & Events")
+        page.update()
+        assert len(page._rows) == 48
+        page.group.set("Story Challenge")
+        page.refresh()
+        assert len(page._rows) == 25
+        page.group.set("All groups")
+        page.q["Bosses & Events"].set("goldola")
+        page.refresh()
+        rec = select_where(page, lambda s: s["boss"] == "Goldola")
+        assert "Only crits deal damage" in detail_text(page)
+        # every boss / story / event quest has its guide, with waves, in the panel
+        assert page.other_guides.available, "run gsc_app/update_data.py --only bosses first"
+        for s in page.other:
+            g = page.other_guides.for_stage(s)
+            assert g and g["waves"], s["name"]
+            page._show_other(s)
+            assert "WAVES" in detail_text(page), s["name"]
+        select_where(page, lambda s: s["boss"] == "Goldola")
+        txt = detail_text(page)
+        assert "Brutal Botanical Beast Goldola" in txt and "Ailment RES" in txt
+        page.open_current()
+        assert opened[-1].endswith("/stages/goldola-giant-boss/")
+        # three areas, each with its own pages
+        assert page.seg.area.get() == "Quests"
+        page.seg.area.set("Units")
+        page.seg._area_clicked()
+        assert page.view.get() == "Units" and page.seg.pages._values == ["Units", "Team"]
+        page.show_view("Crests")
+        assert page.seg.area.get() == "Crests" and page.seg.pages._values[1] == "Planner"
+        page.show_view("Bosses & Events")
+        for size in ("S", "M", "L"):
+            page.size.set(size)
+            page._size_changed()
+            for s in page.other:
+                page._show_other(s)
+        assert not errors, errors
+    finally:
+        close(win)
+
+
+def test_equips_area():
+    """The Equips area lists the site's equips, filters them, links guides to them."""
+    win, page, opened, errors = make_page()
+    try:
+        assert len(page.equips) >= 1500, "run gsc_app/update_data.py --only equips first"
+        page.show_view("Equips")
+        page.update()
+        assert page.seg.area.get() == "Equips" and page.seg.pages._values == ["Equips", "Guide picks"]
+        assert 0 < len(page._rows) <= 400
+        page.etype.set("HEAL")
+        page.refresh()
+        assert page._rows and all(r["values"]["type"] == "HEAL" for r in page._rows.values())
+        page.etype.set("All types")
+        page.estar.set("6★")
+        page.q["Equips"].set("trance frenzy")
+        page.refresh()
+        rec = select_where(page, lambda e: "Trance Frenzy" in e["name"])
+        txt = detail_text(page)
+        assert "SKILL" in txt and "Earth" in txt
+        page.open_current()
+        assert "/equips/" in opened[-1]
+        page.estar.set("All rarities")
+        page.show_view("Guide picks")
+        page.update()
+        assert page._rows, "no equips are named in the guides"
+        for e in page.equips[:150]:
+            page._show_equip(e)
+        # a boss guide's equip links to the Equips page
+        page.show_view("Bosses & Events")
+        select_where(page, lambda s: s.get("boss") == "Goldola")
+        page._links  # guide shown
+        eq = next(e for e in page.equips if "Force Keratos" in e["name"] and e["used_in"])
+        page.go("Equips", eq)
+        assert page.view.get() == "Equips" and "Force Keratos" in detail_text(page)
+        assert not errors, errors
+    finally:
+        close(win)
+
+
+# Fingerprints the site's own calculator gave for random teams (see gsc_app/calc_check.py).
+# They only hold while data/gscompanion/calc_*.json is the data the site had at the time.
+SITE_DIGESTS = [(555, 1500, "15d9746d"), (7, 3000, "9e4520c7")]
+SITE_APS_DIGEST = (321, 2000, "95ac4c43")   # the arts gauge per second
+SITE_LINK = ("~jZRBDoIwEEXvwlqTmZaZVs7gFVwYNGrCSiGuuLtDgZbaEmBF23TmZ_5_TbICqCwTqmVm1mOSsQ0VWBytOMw1"
+             "TxoiOy-9PwJWrPa0czfF25BfaR7ygEWlM2qADYmaaUVIHOdqPigBcCnLkOUyJ2uSsVtXWVSU06XNMCU_M7tY"
+             "AQOtjUsBs96la80e1Ik9KP2kiZDjIibVY1x80QQZA_IFbM6vx7PdZEdLv4APkfYASRxihqbfUagcNZLalK26"
+             "e3_ut2PdXL9HoaWCDdiUa5PlzVnXdsPAZOp_7JUmA5_suUoqps9u01f4mFU05z1syQM3vwD-Pet_")
+
+
+def test_calc_matches_site():
+    """The ported damage rules give the same answers as the site's calculator."""
+    from gsc_app import calc, calc_check
+    data = calc.CalcData(ROOT / "data" / "gscompanion")
+    assert data.available, "run gsc_app/update_data.py --only calc first"
+    for seed, count, want in SITE_DIGESTS:
+        got = calc_check.digest(data, seed, count)
+        assert got == want, f"seed {seed}: {got} != {want} (data changed? re-check with the site)"
+    seed, count, want = SITE_APS_DIGEST
+    got = calc_check.aps_digest(data, seed, count)
+    assert got == want, f"arts gauge: {got} != {want} (data changed? re-check with the site)"
+
+
+def test_calc_model_and_links():
+    from gsc_app import calc
+    from gsc_app.calc_model import CalcModel, decode_state, encode_state
+    data = calc.CalcData(ROOT / "data" / "gscompanion")
+    m = CalcModel(data)
+    ids = [u["id"] for u in data.unit_list if u.get("hits")][:4]
+    for i, uid in enumerate(ids):
+        m.add_unit(i, uid)
+    assert [bool(x) for x in m.s["slots"]] == [True] * 4 and m.s["hit"]
+    m.set_leader(2)
+    assert m.leader() == 2
+    m.move_unit(2, -1)           # the leader moves with its unit
+    assert m.leader() == 1
+    m.set_attacker(3)
+    assert m.s["atk"] == 3 and m.s["base"]["unit"] == m.unit(3)["atk"]
+    m.remove_unit(3)             # attacker removed -> first unit attacks
+    assert m.s["atk"] == 0 and m.s["slots"][3] is None
+    # equips: only ones that fit the slot, ATK follows the attacker's equips
+    u = m.unit(0)
+    sl = u["slots"][0]
+    eq = next(e for e in data.equips.values() if m.can_equip(0, 0, e["id"]))
+    assert not m.can_equip(0, 0, next(e["id"] for e in data.equips.values()
+                                      if e["type"] not in sl["types"]))
+    m.set_equip(0, 0, eq["id"])
+    assert m.s["base"]["equip"] == (eq.get("atk") or 0)
+    m.remove_equip(0, 0)
+    assert "equips" not in m.s["slots"][0] and m.s["base"]["equip"] == 0
+    # share links round trip, and a link the site made loads
+    link = m.to_link()
+    m2 = CalcModel(data)
+    assert m2.load_link(link) and m2.s == m.s
+    assert decode_state(encode_state(m.s)) == m.s
+    site = CalcModel(data)
+    assert site.load_link("https://gscompanion.com/damage-calc/#" + SITE_LINK)
+    assert site.unit() and site.result()["result"]["shown"] >= 0
+    assert not CalcModel(data).load_link("hello")
+
+
+def test_team_and_damage_page():
+    """The page: pick units and equips from the pickers, edit numbers, watch the damage."""
+    win, page, opened, errors = make_page()
+    try:
+        from gsc_app.page import CALC
+        page.show_view(CALC)
+        page.update()
+        assert page.seg.area.get() == "Calc" and page.seg.pages is None
+        cp = page.calc_panel
+        m = cp.model
+        top = cp.pick_unit(0)
+        top.query.set("abaddon")
+        top.update()
+        top.choose()
+        page.update()
+        assert m.unit(0)["name"] == "Abaddon" and m.s["hit"]
+        before = m.result()["result"]["shown"]
+        # numbers typed into a field reach the model and the result
+        var, _ = cp._vars["mult"]
+        var.set("99999")
+        page.update()
+        assert m.s["mult"] == 99999 and m.result()["result"]["shown"] != before
+        # an equip chosen in the picker
+        top = cp.pick_equip(0, 0)
+        top.update()
+        assert top.tree.get_children()
+        top.choose()
+        page.update()
+        assert m.s["slots"][0].get("equips") and m.s["base"]["equip"] >= 0
+        # choosing an enemy / crest opens a searchable list with pictures (not a tall pop-up),
+        # and only the enemy part of the page is redrawn
+        slots_before = list(cp.slots_box.winfo_children())
+        enemy_before = list(cp.enemy_box.winfo_children())
+        top = cp.pick_enemy()
+        top.update()
+        assert len(top.tree.get_children()) == 1 + len(cp.data.enemies)
+        top.query.set("fongion")
+        top.update()
+        top.choose()
+        page.update()
+        assert m.s["enemy"]["id"] and m.s["enemy"]["race"]
+        assert list(cp.slots_box.winfo_children()) == slots_before   # slots left alone
+        assert list(cp.enemy_box.winfo_children()) != enemy_before
+        top = cp.pick_crest()
+        top.update()
+        top.query.set("atk up")
+        top.update()
+        top.choose()
+        page.update()
+        assert m.s["crest"]["id"] and m.s["base"]["crest"] >= 0
+        # the scroll position survives an edit
+        cp.left.canvas.yview_moveto(0.5)
+        page.update()
+        y = cp.left.canvas.yview()[0]
+        cp._do(m.toggle_status, "Burn", True)
+        page.update()
+        assert abs(cp.left.canvas.yview()[0] - y) < 0.05
+        # the effect list can switch a modifier off
+        r = m.result()
+        rel = [x for x in r["mods"] if x["relevant"]]
+        if rel:
+            cp._override(rel[0]["key"], False)
+            assert m.s["ov"][rel[0]["key"]] is False
+        # a unit's passives and arts gauge are in its card's Details, and in the Units panel
+        cp._toggle_details(0)
+        page.update()
+        texts = []
+
+        def walk(w):
+            for c in w.winfo_children():
+                if isinstance(c, tk.Label):
+                    texts.append(str(c.cget("text")))
+                walk(c)
+
+        walk(cp.slots_box)
+        assert any("Arts gauge" in t for t in texts) and any("Passives" in t for t in texts), texts
+        page.show_view("Units")
+        page.update()
+        select_where(page, lambda u: u["name"] == "Abaddon")
+        panel = detail_text(page)
+        assert "Arts gauge" in panel and "Buffs and debuffs" in panel and "Stats" in panel
+        assert "Passives" in panel
+        page.show_view(CALC)
+        page.update()
+        # the link opens the same setup on the site
+        cp.open_site()
+        assert opened[-1].startswith("https://gscompanion.com/damage-calc/#~")
+        # it is remembered between runs
+        cp._save()
+        assert page.s["calc"]["slots"][0]["id"] == m.s["slots"][0]["id"]
+        for size in ("S", "L", "M"):
+            page.size.set(size)
+            page._size_changed()
+            page.update()
+        assert not errors, errors
+    finally:
+        close(win)
 
 
 if __name__ == "__main__":

@@ -114,3 +114,21 @@ the old spelling is kept as an alias and every rename is logged in `units/rename
 
 `build.py` adds the `gsc_app` modules to Rerun.exe and copies your local
 `data/gscompanion/` (not `raw/`) next to it; the data is never inside the exe or in git.
+
+## Team & Damage (Calc area)
+
+The site's Team Builder and Damage Calculator as one page: up to 4 units (leader, order, which
+moves are on, stacks, dream, equips), who attacks with which move, the enemy, a crest and extra
+modifiers. The same team feeds both halves, and the damage updates as you edit.
+
+- `calc.py` is the site's damage rules ported to Python; `calc_model.py` is the setup and its
+  edits; `calc_page.py` is the page. Nothing is run from the site: only its data is read
+  (`update_data.py --only calc` saves `team_units.json`, `calc_units.json`, `calc_equips.json`,
+  `calc_enemies.json` and `calc_crests.json` into `data/gscompanion/`).
+- **Copy link / Open on site** make the site's own share link for the setup (same format), and
+  **Load link…** reads one made on gscompanion.com.
+- Checked against the live calculator: `tools/calc_oracle.js` runs the site's code on random teams
+  in a browser tab; `calc_check.py` rebuilds the same teams and compares (10,000+ teams matched),
+  and `calc_model_check.py` compares whole setups opened from share links. `test_page.py` keeps
+  the fingerprints, so a data refresh that changes the rules is noticed.
+- Not ported: the Team Builder's unit search by buff, its arts-gauge analysis, and saving teams.

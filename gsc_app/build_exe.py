@@ -47,6 +47,8 @@ def main() -> int:
             "--add-data", f"{work / 'stage' / 'data'}{';' if sys.platform == 'win32' else ':'}data",
             # App icon picture, loaded at run time for the window (and tray).
             "--add-data", f"{ROOT / 'rerun' / 'assets'}{';' if sys.platform == 'win32' else ':'}rerun/assets",
+            # Giant Boss / Story / Event stage list, read next to page.py.
+            "--add-data", f"{ROOT / 'gsc_app' / 'stage_catalog.json'}{';' if sys.platform == 'win32' else ':'}gsc_app",
             # Only Tk + Pillow are needed; see the stand-ins in __main__.py.
             "--exclude-module", "cv2", "--exclude-module", "numpy",
             "--exclude-module", "discord", "--exclude-module", "matplotlib",

@@ -1,0 +1,79 @@
+{
+  "source": "https://gscompanion.com/stages/",
+  "scraped": "2026-11-15",
+  "note": "Crest Palace (18 stages) is already in ReRun via crest_palace.json / stage_guides.json, so it is not repeated here. Each stage's page is https://gscompanion.com/stages/<slug>/ ; images are https://gscompanion.com/images/<image>.",
+  "categories": [
+    {
+      "id": "giant-bosses",
+      "title": "Giant Bosses",
+      "subtitle": "Awoken Giant Bosses",
+      "url": "https://gscompanion.com/stages/giant-bosses/",
+      "stages": [
+        {"slug": "aerugraxes-giant-boss", "boss": "Aerugraxes", "name": "A Subzero Hellscape", "hazards": [], "image": "stages/banner_490.webp"},
+        {"slug": "code-xtf-eraser-giant-boss", "boss": "Code XTF: Eraser", "name": "Fortress of the Machine Gods", "hazards": ["Adaptive element shield", "Final nuke at 0% HP"], "image": "stages/banner_498.webp"},
+        {"slug": "degilmagna-giant-boss", "boss": "Degilmagna", "name": "The Crimson King", "hazards": [], "image": null},
+        {"slug": "elpneumas-giant-boss", "boss": "Elpneumas", "name": "The Green Strikes Back", "hazards": [], "image": "stages/banner_499.webp"},
+        {"slug": "flogassa-giant-boss", "boss": "Flogassa", "name": "Crimson Flames of the Phoenix", "hazards": [], "image": "stages/banner_488.webp"},
+        {"slug": "fosradius-giant-boss", "boss": "Fosradius", "name": "Glowing Sanctuary", "hazards": ["PHY DMG negated"], "image": "stages/banner_501.webp"},
+        {"slug": "freydal-giant-boss", "boss": "Freydal", "name": "Cry of the Azure Roc", "hazards": [], "image": "stages/banner_497.webp"},
+        {"slug": "geo-zagnus-giant-boss", "boss": "Geo Zagnus", "name": "Frozen Calamity in the North", "hazards": [], "image": "stages/banner_489.webp"},
+        {"slug": "goldola-giant-boss", "boss": "Goldola", "name": "Life Draining Botanical Beast", "hazards": ["Only damaged while burning", "Only crits deal damage", "Water DMG heals it"], "image": "stages/banner_491.webp"},
+        {"slug": "ifrit-giant-boss", "boss": "Ifrit", "name": "Trials of the Flame God", "hazards": ["Opens: halves your HP + Burn"], "image": "stages/banner_496.webp"},
+        {"slug": "mavroskia-giant-boss", "boss": "Mavroskia", "name": "The Black Shadow of Eclipse", "hazards": ["God Killer", "Black Hole: drains Arts, cuts max HP"], "image": "stages/banner_494.webp"},
+        {"slug": "oldeus-giant-boss", "boss": "Oldeus", "name": "Shrine of Remembrance", "hazards": [], "image": "stages/banner_4000200.webp"},
+        {"slug": "palamicia-giant-boss", "boss": "Palamicia", "name": "A Silent Swordfight", "hazards": [], "image": "stages/banner_495.webp"},
+        {"slug": "ragsherum-phantom-giant-boss", "boss": "Ragsherum Phantom", "name": "Despair of the Cursed Armor", "hazards": ["True Nightmare kills its target"], "image": "stages/banner_492.webp"},
+        {"slug": "tonetauras-giant-boss", "boss": "Tonetauras", "name": "Clashing Thunder of the Emerald Bird", "hazards": [], "image": "stages/banner_493.webp"},
+        {"slug": "valzandeth-giant-boss", "boss": "Valzandeth", "name": "Caverns of Darkness", "hazards": ["Invincible while charging"], "image": "stages/banner_500.webp"},
+        {"slug": "wilkes-giant-boss", "boss": "Wilkes", "name": "Sanctuary of the Bright Spirit", "hazards": ["Light DMG negated", "Opens invincible: max HP to 30% + True Arts", "Arts crit below 30%"], "image": "stages/banner_487.webp"}
+      ]
+    },
+    {
+      "id": "story",
+      "title": "Story Challenge",
+      "subtitle": "Main story Challenge quests, in story order",
+      "url": "https://gscompanion.com/stages/story/",
+      "stages": [
+        {"slug": "challenge-melias-past", "chapter": 7, "name": "Melia's Past", "area": "Magus Empire of La Riiz", "location": "The Dark Lord's Lair", "boss": "Subject β-3", "hp": 1580000, "image": "enemies/500771013.webp"},
+        {"slug": "challenge-the-magical-plants-target", "chapter": 8, "name": "The Magical Plant's Target", "area": "Aerial City, La Riiz", "location": "Boum Forest Garden", "boss": "Ferocious Plant Beast Gorondola", "hp": 1500000, "image": "enemies/500201313.webp"},
+        {"slug": "challenge-giaveil-the-grand-prince-of-sin", "chapter": 9, "name": "Giaveil, the Grand Prince of Sin", "area": "Isliid Underground Cavern", "location": "Realm of Gods", "boss": "Grand Prince of Sin Giaveil", "hp": 2000000, "image": "enemies/500821513.webp"},
+        {"slug": "challenge-guardian-of-time", "chapter": 10, "name": "Guardian of Time", "area": "The Sealed Holy Land", "location": "Heaven's Tower Meios", "boss": "Fongion", "hp": 6000000, "image": "enemies/500861413.webp"},
+        {"slug": "challenge-shadowy-pall", "chapter": 10, "name": "Shadowy Pall", "area": "The Sealed Holy Land", "location": "Pinnacle of Glory", "boss": "Celia", "hp": 5000000, "image": "enemies/102546512.webp"},
+        {"slug": "challenge-borne-by-wishes", "chapter": 10, "name": "Borne by Wishes", "area": "The Sealed Holy Land", "location": "Pinnacle of Glory", "boss": "Celia", "hp": 8000000, "image": "enemies/500841013.webp"},
+        {"slug": "challenge-sinful-puppet", "chapter": 12, "name": "Sinful Puppet", "area": "Central Gramenia", "location": "Renewed Pursuit", "boss": "Grand Prince of Sin Giaveil", "hp": 6600000, "image": "enemies/500821513.webp"},
+        {"slug": "challenge-minced-words", "chapter": 13, "name": "Minced Words", "area": "South Bamint", "location": "The Silent Sword", "boss": "Emi", "hp": 9000000, "image": "enemies/501701513.webp"},
+        {"slug": "challenge-the-blade-awakens", "chapter": 14, "name": "The Blade Awakens", "area": "North La Riiz", "location": "The Knight's Sword", "boss": "Emi", "hp": 10000000, "image": "enemies/501701513.webp"},
+        {"slug": "challenge-the-swords-will", "chapter": 15, "name": "The Sword's Will", "area": "South La Riiz", "location": "Two Leaders", "boss": "Groitz", "hp": 10000000, "image": "enemies/501771313.webp"},
+        {"slug": "challenge-the-fated-clash", "chapter": 16, "name": "The Fated Clash", "area": "North Isliid", "location": "Blade Vs. Bullet", "boss": "Hart", "hp": 10000000, "image": "enemies/103286512.webp"},
+        {"slug": "challenge-through-the-night", "chapter": 16, "name": "Through the Night", "area": "North Isliid", "location": "Beneath Yggdrasil", "boss": "Emperor Isliid", "hp": 24000000, "image": "enemies/103426412.webp"},
+        {"slug": "challenge-meet-the-scout", "chapter": 18, "name": "Meet the Scout", "area": "West Gramenia", "location": "Shadowed Ravine", "boss": "Rosetta", "hp": 9000000, "image": "enemies/103446312.webp"},
+        {"slug": "challenge-master-of-crimson", "chapter": 19, "name": "Master of Crimson", "area": "East Gramenia", "location": "World of Blood", "boss": "Master of Crimson", "hp": 10000000, "image": "enemies/103576512.webp"},
+        {"slug": "challenge-memories-of-the-comet", "chapter": 21, "name": "Memories of the Comet", "area": "West La Riiz", "location": "Infernal Sacrifice", "boss": "Za'remnah", "hp": 25000000, "image": "enemies/500851513.webp"},
+        {"slug": "challenge-darklight-dragon", "chapter": 24, "name": "Darklight Dragon", "area": "South Iscator", "location": "Tower of Providence", "boss": "Ouga", "hp": 40000000, "image": "enemies/501811213.webp"},
+        {"slug": "challenge-ring-of-time", "chapter": 25, "name": "Ring of Time", "area": "Central Iscator", "location": "Boundary of Time", "boss": "Fongion", "hp": 38000000, "image": "enemies/500861413.webp"},
+        {"slug": "challenge-defier-of-fate", "chapter": 26, "name": "Defier of Fate", "area": "East Iscator", "location": "Hill of Radiance", "boss": "Isliid, Defier of Fate", "hp": 35000000, "image": "enemies/103807412.webp"},
+        {"slug": "challenge-apostate-paladin", "chapter": 27, "name": "Apostate Paladin", "area": "North Iscator", "location": "Tower of Treachery", "boss": "Ultimate Paladin Roy", "hp": 25000000, "image": "enemies/103827212.webp"},
+        {"slug": "challenge-their-promise", "chapter": 28, "name": "Their Promise", "area": "Iscator Skies", "location": "Inside the Tree", "boss": "Titan Roy", "hp": 50000000, "image": "enemies/501881250.webp"},
+        {"slug": "challenge-blooming-intensity", "chapter": 29, "name": "Blooming Intensity", "area": "Northeast La Riiz", "location": "Red Garden", "boss": "Verzard, Demise Pursuer", "hp": 55000000, "image": "enemies/103907112.webp"},
+        {"slug": "challenge-beyond-the-ages", "chapter": 30, "name": "Beyond the Ages", "area": "Deus Gate", "location": "Dragon Summit", "boss": "Azure Phoenix Freydal", "hp": 35000000, "image": "enemies/500081213.webp"},
+        {"slug": "challenge-prima-ether-blades", "chapter": 31, "name": "Prima Ether Blades", "area": "Central Deus Gate", "location": "The Gods' Entryway", "boss": "Platina", "hp": 28000000, "image": "enemies/104047412.webp"},
+        {"slug": "challenge-opposing-blades", "chapter": 32, "name": "Opposing Blades", "area": "Inner Deus Gate", "location": "Red Sky Castle", "boss": "Orvell", "hp": 33000000, "image": "enemies/103026412.webp"},
+        {"slug": "challenge-following-the-crest", "chapter": 33, "name": "Following the Crest", "area": "North Falfania", "location": "Town of Intersections", "boss": "Berwick", "hp": 50000000, "image": "enemies/103637112.webp"}
+      ]
+    },
+    {
+      "id": "events",
+      "title": "Events",
+      "subtitle": "Event quests",
+      "url": "https://gscompanion.com/stages/events/",
+      "stages": [
+        {"slug": "daily-quest", "name": "Daily Quest!", "tag": null, "event": "Daily Quest", "boss": "Golcat God", "hp": 50000, "image": "enemies/100975411.webp"},
+        {"slug": "misson-of-the-sacred-sword-awk-the-chosen-one", "name": "The Chosen One", "tag": "AWK", "event": "Misson of the Sacred Sword", "boss": "Master of Swords Nogia", "hp": 2300000, "image": "enemies/102336411.webp"},
+        {"slug": "pierrot-of-flames-awk-greatest-show-of-the-century", "name": "Greatest Show of the Century", "tag": "AWK", "event": "Pierrot of Flames", "boss": "Burning Beast Tamer Pientz", "hp": 2000000, "image": "enemies/102236111.webp"},
+        {"slug": "soul-of-imari-spex-hyper-mark-of-the-veteran", "name": "Mark of the Veteran", "tag": "SPEX Hyper", "event": "Soul of Imari", "boss": "Hakuro", "hp": 13000000, "image": "enemies/103566311.webp"},
+        {"slug": "the-azure-monarch-spex-hyper-the-esteemed-servant", "name": "The Esteemed Servant", "tag": "SPEX Hyper", "event": "The Azure Monarch", "boss": "Virago", "hp": 10000000, "image": "enemies/103036212.webp"},
+        {"slug": "the-beasts-rampage-awk-manifestation-of-the-tragedy", "name": "Manifestation of the Tragedy", "tag": "AWK", "event": "The Beast's Rampage", "boss": "Berserk Beast Slayer Zerkalo", "hp": 2600000, "image": "enemies/102366511.webp"}
+      ]
+    }
+  ]
+}

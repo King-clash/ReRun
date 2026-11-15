@@ -7,8 +7,8 @@ from pathlib import Path
 
 
 class Guides:
-    def __init__(self, folder: Path):
-        self.path = Path(folder) / "stage_guides.json"
+    def __init__(self, folder: Path, filename: str = "stage_guides.json"):
+        self.path = Path(folder) / filename
         self.by_slug: dict[str, dict] = {}
         self.built = ""
         try:

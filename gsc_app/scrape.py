@@ -291,6 +291,67 @@ def _wave(w: Node) -> dict:
             "image": img_src(top.first("span", "eface")) if top is not None else ""}
 
 
+def _foe(f: Node) -> dict:
+    """One enemy of a Giant Boss / Story / Event wave (div.lu-foe), with the boss's
+    mechanics (ailment RES, phases, moves) when the page lists them."""
+    lt = f.first("span", "lu-t")
+    b = lt.first("b") if lt is not None else None
+    n = lt.first("span", "lu-n") if lt is not None else None
+    stats = {s.attrs["data-l"]: s.clean() for s in f.children("span", "lu-stats")[0].all("span")
+             if s.attrs.get("data-l")} if f.children("span", "lu-stats") else {}
+    chips = f.children("span", "chips")
+    mech = []
+    for dl in f.all("dl", "mech-rows"):
+        for row in dl.all("div", "mech-row"):
+            dd = row.first("dd")
+            items = []
+            for sp in (dd.children("span") if dd is not None else []):
+                v = sp.first("b", "val")
+                txt = sp.clean()
+                if v is not None:
+                    txt = f"{txt[:len(txt) - len(v.clean())].strip()} {v.clean()}".strip()
+                if txt:
+                    items.append(txt)
+            if items:
+                mech.append({"head": row.ctext("dt"), "items": items})
+    moves = []
+    for li in f.all("li"):
+        nm = li.first("span", "mv-name")
+        what = li.first("span", "mv-what")
+        if nm is not None and nm.first("b") is not None:
+            arts = " (Arts)" if nm.first("i") is not None else ""
+            moves.append(f"{nm.first('b').clean()}{arts}: {what.clean() if what else ''}".rstrip(": "))
+    return {"name": b.clean() if b is not None else "",
+            "count": n.clean().replace("×", "x") if n is not None else "",
+            "info": lt.ctext("small") if lt is not None else "", "stats": stats,
+            "traits": [c.clean() for c in chips[0].children("span", "chip")] if chips else [],
+            "image": img_src(f.first("span", "eface")), "boss": "boss" in f.classes,
+            "mech": mech, "moves": moves}
+
+
+def _gwave(w: Node) -> dict:
+    """A wave on the newer page layout (div.gwave): lineups (possibilities) of enemies,
+    plus the guide's notes for a boss wave."""
+    label = w.ctext("span", "wl")
+    guide = w.first("div", "gw-guide")
+    chips = []
+    if guide is not None:
+        for c in guide.all("span", "chip"):
+            tone = next((x[5:] for x in c.classes if x.startswith("tone-")), "")
+            chips.append({"text": c.clean(), "tone": tone})
+    notes = [p.clean() for p in guide.all("p") if p.clean()] if guide is not None else []
+    lineups = [l for l in w.children("div", "lineup") if "missing" not in l.classes]
+    foes = [[_foe(f) for f in l.children("div", "lu-foe")] for l in lineups]
+    enemies = foes[0] if foes else []
+    for i, alt in enumerate(foes[1:], 2):
+        notes.append(f"Possibility {i}: " + ", ".join(
+            e["name"] + (f" {e['count']}" if e["count"] else "") for e in alt))
+    boss = next((e for e in enemies if e["boss"]), None)
+    return {"label": label, "name": boss["name"] if boss else "", "details": [],
+            "chips": chips, "notes": notes, "enemies": enemies,
+            "image": boss["image"] if boss else ""}
+
+
 def parse_stage_guide(text: str, stage: dict) -> dict:
     main = main_of(text)
     head = main.first("header", "st-head")
@@ -323,6 +384,28 @@ def parse_stage_guide(text: str, stage: dict) -> dict:
         teams.append({"units": [_face(a) for a in box.children("a", "face")] if box else [],
                       "note": note[0].clean() if note else "",
                       "team_builder": SITE + builder if builder else ""})
+    missions, rewards, guide_link = [], "", {}
+    more = head.first("div", "st-more") if head is not None else None
+    for d in (more.children("div") if more is not None else []):
+        h = d.ctext("h2")
+        if h == "Missions":
+            for li in d.all("li"):
+                s = li.first("span")
+                b = li.first("b")
+                missions.append(" → ".join(x for x in (s.clean() if s else "",
+                                                        b.clean() if b else "") if x))
+        elif h == "Rewards":
+            rewards = d.ctext("p")
+    gl = head.first("a", "guide-link") if head is not None else None
+    if gl is not None:
+        guide_link = {"text": gl.clean(), "url": gl.attrs.get("href", "")}
+    equips = []
+    eq = section(main, "Useful equips")
+    for li in (eq.all("li") if eq is not None else []):
+        a = li.first("a")
+        if a is not None:
+            equips.append({"name": a.clean(),
+                           "note": li.ctext("span", "muted").lstrip("· ").strip()})
     src = main.first("p", "sources")
     source = {}
     if src is not None:
@@ -335,8 +418,12 @@ def parse_stage_guide(text: str, stage: dict) -> dict:
         "facts": facts, "summary": main.ctext("p", "summary"),
         "drops_image": drops.attrs.get("src", "") if drops is not None else "",
         "drops_text": drops.attrs.get("alt", "") if drops is not None else "",
-        "waves": [_wave(w) for w in waves_sec.children("div", "wave")] if waves_sec else [],
+        "waves": ([_wave(w) for w in waves_sec.children("div", "wave")]
+                  + [_gwave(w) for w in waves_sec.children("div", "gwave")])
+                 if waves_sec else [],
         "roles": roles, "teams": teams, "source": source,
+        "missions": missions, "rewards": rewards, "guide_link": guide_link,
+        "equips": equips,
     }
 
 
